@@ -28,6 +28,14 @@ lazy val root = (project in file("."))
     scalacOptions ++= Seq(
       "-deprecation"
     ),
+    scalacOptions in Compile in doc ++= Seq(
+      "-feature",
+      "-diagrams",
+      "-diagrams-max-classes", "250",
+      "-doc-version", version.value,
+      "-doc-title", name.value,
+      "-sourcepath", (baseDirectory in ThisBuild).value.toString
+    ),
     
     // Compile / unmanagedResources / includeFilter := "*.sv"
     includeFilter in Compile in unmanagedResources  := "*.sv"
