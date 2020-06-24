@@ -31,6 +31,7 @@ object Driver extends EasyLogging {
       // Core transforms 
       new CheckUseBeforeDecl,
       new CheckScopes,
+      new CheckBlockingAssignments,
       new InferDefLogicClocks,
       new PropagateClocks,
       new FlowReferences,

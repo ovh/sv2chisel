@@ -1551,7 +1551,7 @@ class Visitor(
     }
     val loc = getVariableLvalue(ctx.variable_lvalue)
     val expr = getExpression(ctx.expression)
-    Connect(ctx.getSourceInterval, attr, loc, expr, false, false)
+    Connect(ctx.getSourceInterval, attr, loc, expr, false, true)
   }
   
   private def visitBlocking_assignment(ctx: Blocking_assignmentContext, attr: VerilogAttributes): Statement = {
