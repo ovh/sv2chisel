@@ -1102,7 +1102,7 @@ class Visitor(
   
   private def visitData_type_or_implicit(ctx: Data_type_or_implicitContext, isHw: Boolean): (Type, LogicResolution) = {
     ctx match {
-      case null =>  unsupported.raiseIt(ctx, s"Excepted data type for context '${getRawText(ctx)}'"); (UnknownType(), LogicUnresolved)
+      case null =>  unsupported.raiseIt(ctx, s"Excepted data type for null context"); (UnknownType(), LogicUnresolved)
       case t => (t.data_type, t.implicit_data_type) match {
         case (d, null) => getDataType(d, isHw)
         case (null, i) => (getImplicitDataType(i), LogicUnresolved)
@@ -1115,7 +1115,12 @@ class Visitor(
     ctx match {
       case null => (BoolType(UndefinedInterval), LogicUnresolved)
       case c => unsupported.check(ctx)
-        visitData_type_or_implicit(c.data_type_or_implicit, isHw)
+        c.data_type_or_implicit match {
+          case null => 
+            unsupported.raiseIt(ctx, s"To investigate? weird Net_or_var_data_typeContext: `${getRawText(ctx)}`")
+            (BoolType(UndefinedInterval), LogicUnresolved)
+          case cdi => visitData_type_or_implicit(cdi, isHw)
+        }
     }
   }
   
