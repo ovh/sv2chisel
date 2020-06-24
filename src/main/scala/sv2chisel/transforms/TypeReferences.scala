@@ -11,8 +11,8 @@ import sv2chisel.ir.refreshTypes._
 import collection.mutable.{HashMap, ArrayBuffer}
 
 class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
-  implicit lazy val srcFile = currentSourceFile
-  implicit lazy val stream = currentStream
+  implicit var srcFile = currentSourceFile
+  implicit var stream = currentStream
   
   def processDescription(d: Description): Description = {
     d match {

@@ -17,8 +17,8 @@ class RemoveConcats(
   val forceConcatsAsBundle : Boolean = false, 
   val noRHSasBundle : Boolean = true // TODO partially implemented
 ) extends DefModuleBasedTransform {
-  implicit lazy val srcFile = currentSourceFile
-  implicit lazy val stream = currentStream
+  implicit var srcFile = currentSourceFile
+  implicit var stream = currentStream
   private val ui = UndefinedInterval
   private val nv = NoVerilogAttribute
   
