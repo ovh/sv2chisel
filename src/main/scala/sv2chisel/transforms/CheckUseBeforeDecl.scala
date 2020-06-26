@@ -68,6 +68,7 @@ class CheckUseBeforeDecl(val llOption: Option[logger.LogLevel.Value] = None) ext
   def processPackage(p: DefPackage): DefPackage = {
     implicit val refs = new RefStore() 
     refs ++= remoteRefs
+    forceRefsRefresh()
     // propagate to local refs & record them
     p.copy(refs = Some(refs), body = processStatement(p.body))
   }

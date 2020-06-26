@@ -172,6 +172,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
   def forceRefsRefresh(): Unit = {
     trace("forceRefresh")
     refOutdated = true
+    currentProject.get.clearDescriptionCache()
     remoteRefsStore.clear()
   }
   
@@ -199,6 +200,18 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
       }
     }
     remoteRefsStore
+  }
+  
+  def updateContext(desc: String): Unit = {
+    currentProject.get.getEntries.map(e => e.src.descriptions.collect {
+      case n: HasName => (n, e)
+    }).flatten.foreach {( t => {
+        if (desc == t._1.name) {
+          currentSourceFile = Some(t._2.src)
+          currentStream = Some(t._2.stream)
+        }
+      }
+    )}
   }
   
   private def processDescriptionWrapper(d: Description): Description = {

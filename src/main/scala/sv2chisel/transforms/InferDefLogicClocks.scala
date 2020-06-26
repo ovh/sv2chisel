@@ -99,7 +99,13 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
         currentProject.get.findModule(i.module.serialize) match {
           case Some(d) =>
             info(i, s"Processing in advance module ${i.module.serialize} instanciated as ${i.name} in current module ${m.name}.")
-            Some(processModule(d))
+            val stream = currentStream
+            val src = currentSourceFile
+            updateContext(d.name)
+            val res = Some(processModule(d))
+            currentStream = stream
+            currentSourceFile = src
+            res
           case None =>
               warn(i, s"Unable to find module module ${i.module.serialize} instanciated as ${i.name} in current module ${m.name} for clock inference processing.")
               None
