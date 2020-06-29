@@ -352,8 +352,8 @@ class Visitor(
     //   | DECIMAL_TRISTATE_NUMBER_WITH_BASE 
     //   | HEX_NUMBER 
     //  ;
-    val hexPattern: Regex = "([0-9]+)?'(?:x|X|h|H)\\s*([0-9_a-fA-F]+)".r
-    val octPattern: Regex = "([0-9]+)?'(?:o|O)\\s*([0-7_]+)".r
+    val hexPattern: Regex = "([0-9]+)?'(?:x|X|h|H)\\s*([0-9_a-fA-FxXzZ?_]+)".r
+    val octPattern: Regex = "([0-9]+)?'(?:o|O)\\s*([0-7xXzZ?_]+)".r
     val decPattern: Regex = "([0-9]+)?'(?:d|D)\\s*([0-9_]+)".r
     val binPattern: Regex = "([0-9]+)?'(?:b|B)\\s*([01xXzZ?_]+)".r
     val intPattern: Regex = "([0-9_]+)".r
@@ -362,7 +362,7 @@ class Visitor(
       Width(BigInt(str, 10))
     }
     
-    def safeBin(n: Number): Expression = {
+    def safeNum(n: Number): Expression = {
       val maskB = ArrayBuffer[String]()
       val resB = ArrayBuffer[String]()
       var replacedXZ = false
@@ -370,10 +370,12 @@ class Visitor(
       n.value.foreach(c => {
         c.toString match {
           case "_" => maskB += "_"; resB += "_"
-          case "0" => maskB += "1"; resB += "0"
-          case "1" => maskB += "1"; resB += "1"
           case "?" => maskB += "0"; resB += "0" ; replacedMark = true
-          case _ =>   maskB += "0"; resB += "0" ; replacedXZ = true
+          case "x" => maskB += "0"; resB += "0" ; replacedXZ = true
+          case "X" => maskB += "0"; resB += "0" ; replacedXZ = true
+          case "z" => maskB += "0"; resB += "0" ; replacedXZ = true
+          case "Z" => maskB += "0"; resB += "0" ; replacedXZ = true
+          case _ =>   maskB += "1"; resB += c.toString 
         }
       })
       val mask = maskB.mkString
@@ -391,14 +393,14 @@ class Visitor(
     }
     
     ((((hexPattern.unapplySeq(str) match {
-      case Some(Seq(null, value)) => Some(Number(i, value, NumberHexa))
-      case Some(Seq(width, value)) => Some(Number(i, value, getW(width), NumberHexa))
+      case Some(Seq(null, value)) => Some(safeNum(Number(i, value, NumberHexa)))
+      case Some(Seq(width, value)) => Some(safeNum(Number(i, value, getW(width), NumberHexa)))
       case _ => None
     }) match {
       case Some(e) => Some(e)
       case None => octPattern.unapplySeq(str) match {
-        case Some(Seq(null, value)) => Some(Number(i, value, NumberOctal))
-        case Some(Seq(width, value)) => Some(Number(i, value, getW(width), NumberOctal))
+        case Some(Seq(null, value)) => Some(safeNum(Number(i, value, NumberOctal)))
+        case Some(Seq(width, value)) => Some(safeNum(Number(i, value, getW(width), NumberOctal)))
         case _ => None
       }
     }) match {
@@ -411,8 +413,8 @@ class Visitor(
     }) match {
       case Some(e) => Some(e)
       case None => binPattern.unapplySeq(str) match {
-        case Some(Seq(null, value)) => Some(safeBin(Number(i, value, NumberBinary)))
-        case Some(Seq(width, value)) => Some(safeBin(Number(i, value, getW(width), NumberBinary)))
+        case Some(Seq(null, value)) => Some(safeNum(Number(i, value, NumberBinary)))
+        case Some(Seq(width, value)) => Some(safeNum(Number(i, value, getW(width), NumberBinary)))
         case _ => None
       }
     }) match {
