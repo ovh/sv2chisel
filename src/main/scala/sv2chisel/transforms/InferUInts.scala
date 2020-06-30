@@ -236,14 +236,14 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
           
           flow match {
             case None => // nothing to do ; no warning
-            case Some(SourceFlow) => visitExpression(p, true) 
-            case Some(SinkFlow) => visitExpression(p, false)
+            case Some(SourceFlow) => visitExpression(exp, false)
+            case Some(SinkFlow) => visitExpression(exp, true)
             case _ => 
               exp match {
                 case _:UndefinedExpression => // useless to warn user
                 case _ => 
                   warn(p, s"Unknown flow for port ${p.serialize} of instance ${i.name}. Treating it as potential Source which might prevent its conversion to UInt")
-                  visitExpression(p, true) 
+                  visitExpression(exp, true)
               }
           }
         })

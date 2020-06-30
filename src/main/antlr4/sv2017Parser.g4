@@ -1401,7 +1401,7 @@ expression:
     | expression LOG_AND              ( attribute_instance )* expression  #ExpressionBinOpAnd
     | expression LOG_OR               ( attribute_instance )* expression  #ExpressionBinOpOr
     | expression ( KW_MATCHES pattern )? TRIPLE_AND expression ( KW_MATCHES pattern )? #ExpressionTripleAnd
-    | expression ( KW_MATCHES pattern )? QUESTIONMARK ( attribute_instance )* expression COLON expression #ExpressionTernary
+    | <assoc=right> expression ( KW_MATCHES pattern )? QUESTIONMARK ( attribute_instance )* expression COLON expression #ExpressionTernary
     | expression operator_impl        ( attribute_instance )* expression  #ExpressionBinOpImpl
 ;
 concatenation:

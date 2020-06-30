@@ -699,7 +699,7 @@ class ChiselNumber(e: Number){
         case NumberDecimal => 
         addDep(); 
         if(e.value.replace("_","").length < 16){ // 16 is a safe value
-          ChiselTxtS(e, ctx, "d\"" + e.value + "\"")
+          ChiselTxtS(e, ctx, "\"d" + e.value + "\"")
         } else {
           ChiselTxtS(e, ctx, "BigInt(u\"" + e.value + "\", 10)")
         }
@@ -707,7 +707,7 @@ class ChiselNumber(e: Number){
         case NumberBinary => 
           addDep(); 
           if(e.value.replace("_","").length < 64){
-            ChiselTxtS(e, ctx, "b\"" + e.value + "\"")
+            ChiselTxtS(e, ctx, "\"b" + e.value + "\"")
           } else {
             ChiselTxtS(e, ctx, "BigInt(u\"" + e.value + "\", 2)")
           }
@@ -715,7 +715,7 @@ class ChiselNumber(e: Number){
         case NumberOctal => 
           addDep(); 
           if(e.value.replace("_","").length < 32){
-            ChiselTxtS(e, ctx, "o\"" + e.value + "\"")
+            ChiselTxtS(e, ctx, "\"o" + e.value + "\"")
           } else {
             ChiselTxtS(e, ctx, "BigInt(u\"" + e.value + "\", 8)")
           }
@@ -725,7 +725,7 @@ class ChiselNumber(e: Number){
         case NumberHexa => 
           addDep(); 
           if(e.value.replace("_","").length < 16){
-            ChiselTxtS(e, ctx, "h\"" + e.value + "\"")
+            ChiselTxtS(e, ctx, "\"h" + e.value + "\"")
           } else {
             ChiselTxtS(e, ctx, "BigInt(u\"" + e.value + "\", 16)")
           }
@@ -1081,13 +1081,13 @@ class ChiselDoCall(e: DoCall){
 
 class ChiselConcat(e: Concat){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    ctx.src.addDep(PackageRef(UndefinedInterval, "fpga.utils", "Concat"))
+    ctx.src.addDep(PackageRef(UndefinedInterval, "chisel3.util", "Cat"))
     val c = ChiselTxtS(", ")
     val args = e.args.map(_.chiselize(ctx) ++ c).flatten match {
       case Seq() => Seq()
       case s => s.dropRight(1) 
     }
-    val decl = ChiselTxtS(e, ctx, "Concat(") ++ args ++ ChiselTxtS(")")
+    val decl = ChiselTxtS(e, ctx, "Cat(") ++ args ++ ChiselTxtS(")")
     e.tpe match {
       case v: VecType => 
         (v.getWidth.evalBigIntOption, v.tpe) match {

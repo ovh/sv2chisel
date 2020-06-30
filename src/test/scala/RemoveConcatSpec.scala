@@ -46,7 +46,7 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
                             "packsmall(i)(0) := auto_concat.packsmall_i_0")
     
     // seccond concat inline
-    result should contains ("pack(2*i+1) := Mux(bool, Concat(packsmall(i)(WWW-1,0).asUInt, b\"0\".U(1.W)), 0.U)")
+    result should contains ("pack(2*i+1) := Mux(bool, Cat(packsmall(i)(WWW-1,0).asUInt, \"b0\".U(1.W)), 0.U)")
     
   }
 
