@@ -35,7 +35,7 @@ class LiteralSpec extends Sv2ChiselSpec {
     result should contains ("class Test() extends MultiIOModule {")
 
     result should contains ("val bool = Wire(Bool())")
-    result should contains ("val iint = RegInit(UInt(5.W), b\"101\".U(5.W))")
+    result should contains ("val iint = RegInit(UInt(5.W), \"b101\".U(5.W))")
     
     result should contains ("bool := true.B")
     result should contains ("bool := false.B")

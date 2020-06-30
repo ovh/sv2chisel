@@ -73,16 +73,16 @@ class SwitchSpec extends Sv2ChiselSpec {
     
     result should contains ("when(true.B === a) {",
                               "res := prev",
-                            "} .elsewhen (true.B === Concat(b, c).orR()) {",
+                            "} .elsewhen (true.B === Cat(b, c).orR()) {",
                               "res := mem(31,12).asUInt<<12",
-                            "} .elsewhen (true.B === Concat(a, d, e).orR()) {",
+                            "} .elsewhen (true.B === Cat(a, d, e).orR()) {",
                               "res := mem(31,20).asTypeOf(SInt(32.W))",
-                            "} .elsewhen (true.B === Concat(a, b).andR()) {",
-                              "res := (Concat(mem(31), mem(7), mem(30,25).asUInt, mem(11,8).asUInt, b\"0\".U(1.W))).asTypeOf(SInt(32.W))",
+                            "} .elsewhen (true.B === Cat(a, b).andR()) {",
+                              "res := (Cat(mem(31), mem(7), mem(30,25).asUInt, mem(11,8).asUInt, \"b0\".U(1.W))).asTypeOf(SInt(32.W))",
                             "} .elsewhen (true.B === b) {",
-                              "res := (Concat(mem(31,25).asUInt, mem(11,7).asUInt)).asTypeOf(SInt(32.W))",
+                              "res := (Cat(mem(31,25).asUInt, mem(11,7).asUInt)).asTypeOf(SInt(32.W))",
                             "} .otherwise {",
-                              "res := b\"0\".U(1.W)",
+                              "res := \"b0\".U(1.W)",
                             "}")
     
   }

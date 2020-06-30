@@ -42,11 +42,11 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     result should contains ("val a = Wire(Bool())")
     result should contains ("val b = Wire(Bool())")
     result should contains ("val c = Wire(Bool())")
-    result should contains ("c := Concat(B_TRUE.B && a, (B_TRUE.B || B_FALSE.B) && b, C_UNKNOWN.B && b).orR()")
+    result should contains ("c := Cat(B_TRUE.B && a, (B_TRUE.B || B_FALSE.B) && b, C_UNKNOWN.B && b).orR()")
     
     result should contains ("val w = Wire(Vec(32, Bool()))")
     result should contains ("val z = Wire(UInt(32.W))")
-    result should contains ("w(14,12) := b\"000\".U(3.W).asBools")
+    result should contains ("w(14,12) := \"b000\".U(3.W).asBools")
     /// padding (bit extension is done properly)
     result should contains ("w(31,16) := w(10,0).asTypeOf(SInt(16.W)).asBools") 
     result should contains ("w(15,0) := z(10,0).asTypeOf(SInt(16.W)).asBools") 

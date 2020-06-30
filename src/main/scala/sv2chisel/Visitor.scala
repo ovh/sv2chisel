@@ -367,6 +367,13 @@ class Visitor(
       val resB = ArrayBuffer[String]()
       var replacedXZ = false
       var replacedMark = false
+      val maskBase = n.base match {
+        case NumberDecimal => "" // raise error latter if used
+        case NumberBinary => "1"
+        case NumberOctal => "7"
+        case NumberHexa => "F"
+      }
+      
       n.value.foreach(c => {
         c.toString match {
           case "_" => maskB += "_"; resB += "_"
@@ -375,13 +382,15 @@ class Visitor(
           case "X" => maskB += "0"; resB += "0" ; replacedXZ = true
           case "z" => maskB += "0"; resB += "0" ; replacedXZ = true
           case "Z" => maskB += "0"; resB += "0" ; replacedXZ = true
-          case _ =>   maskB += "1"; resB += c.toString 
+          case _ =>   maskB += maskBase; resB += c.toString 
         }
       })
       val mask = maskB.mkString
       val res = resB.mkString
       (replacedMark, replacedXZ, wildComp) match {
-        case (m, r, Some(e)) if (m || r) => MaskedNumber(n.tokens, n.copy(value = res), n.copy(value = mask))
+        case (m, r, Some(e)) if (m || r) => 
+          if(maskBase == "") unsupported.raiseIt(i, "Unsupported use of mask with decimal base")
+          MaskedNumber(n.tokens, n.copy(value = res), n.copy(value = mask))
         case (true, _, None) => 
           unsupported.raiseIt(i, "Unsupported use of quotation mark, replaced with '0'")
           n.copy(value = res)
