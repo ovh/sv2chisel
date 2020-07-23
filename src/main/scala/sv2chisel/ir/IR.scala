@@ -422,6 +422,7 @@ case class NoNameAssign(tokens: Interval, expr: Expression, flow: Flow) extends 
   def mapExpr(f: Expression => Expression) = this.copy(expr = f(expr))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = f(expr)
+  def toNamed(name: String): NamedAssign = NamedAssign(tokens, name, expr, flow)
 }
 
 case class TypeInst(
