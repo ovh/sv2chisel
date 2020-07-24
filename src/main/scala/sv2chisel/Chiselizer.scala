@@ -691,58 +691,25 @@ class ChiselSubRange(e: SubRange){
 
 class ChiselNumber(e: Number){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    // TODO: TECH DEBT : make this unrelated to fpga-vac-chisel for open-sourcing
-    def addDep(): Unit = ctx.src.addDep(PackageRef(UndefinedInterval, "fpga.utils.Literals", "_"))
     def baseValue: Seq[ChiselTxt] = {
       e.base match {
         case NumberDecimal if(!e.value.contains("_") && e.value.length < 16) => ChiselTxtS(e, ctx, e.value)
-        case NumberDecimal => 
-        addDep(); 
-        if(e.value.replace("_","").length < 16){ // 16 is a safe value
-          ChiselTxtS(e, ctx, "\"d" + e.value + "\"")
-        } else {
-          ChiselTxtS(e, ctx, "BigInt(u\"" + e.value + "\", 10)")
-        }
-        
-        case NumberBinary => 
-          addDep(); 
-          if(e.value.replace("_","").length < 64){
-            ChiselTxtS(e, ctx, "\"b" + e.value + "\"")
-          } else {
-            ChiselTxtS(e, ctx, "BigInt(u\"" + e.value + "\", 2)")
-          }
-          
-        case NumberOctal => 
-          addDep(); 
-          if(e.value.replace("_","").length < 32){
-            ChiselTxtS(e, ctx, "\"o" + e.value + "\"")
-          } else {
-            ChiselTxtS(e, ctx, "BigInt(u\"" + e.value + "\", 8)")
-          }
-          
-        case NumberHexa if(!e.value.contains("_") && e.value.length < 16) => 
-          ChiselTxtS(e, ctx, "0x" + e.value + "")
-        case NumberHexa => 
-          addDep(); 
-          if(e.value.replace("_","").length < 16){
-            ChiselTxtS(e, ctx, "\"h" + e.value + "\"")
-          } else {
-            ChiselTxtS(e, ctx, "BigInt(u\"" + e.value + "\", 16)")
-          }
+        case NumberDecimal => ChiselTxtS(e, ctx, "\"d" + e.value + "\"")
+        case NumberBinary  => ChiselTxtS(e, ctx, "\"b" + e.value + "\"")
+        case NumberOctal   => ChiselTxtS(e, ctx, "\"o" + e.value + "\"")
+        case NumberHexa    => ChiselTxtS(e, ctx, "\"h" + e.value + "\"")
       }
     }
     
-    val value = (e.kind, e.tpe) match {
-      case (HwExpressionKind, s: SIntType) => baseValue ++ ChiselTxtS(".S")
-      case (HwExpressionKind, s: UIntType) => baseValue ++ ChiselTxtS(".U")
+    (e.kind, e.tpe) match {
+      case (HwExpressionKind, SIntType(_, UnknownWidth())) => baseValue ++ ChiselTxtS(".U.asSInt")
+      case (HwExpressionKind, SIntType(_, w)) => baseValue ++ ChiselTxtS(".U.asTypeOf(SInt(") ++ w.chiselize(ctx) ++ ChiselTxtS("))")
+      case (HwExpressionKind, UIntType(_, UnknownWidth(), _)) => baseValue ++ ChiselTxtS(".U")
+      case (HwExpressionKind, UIntType(_, w, _)) => baseValue ++ ChiselTxtS(".U(") ++ w.chiselize(ctx) ++ ChiselTxtS(")")
       case (SwExpressionKind, _) => baseValue
       case _ => 
         rcritical(ctx, e, s"Probably unsupported emission for number '${e.serialize}' $e")
         ChiselTxtS(e, ctx, e.value + "/* expect trouble here */")
-    }
-    e.width match {
-      case UnknownWidth() => value
-      case w => value ++ ChiselTxtS("(") ++ w.chiselize(ctx) ++ ChiselTxtS(")")
     }
   }
 }
