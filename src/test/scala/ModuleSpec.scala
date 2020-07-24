@@ -17,7 +17,7 @@ class ModuleSpec extends Sv2ChiselSpec {
   
   // Basic Tests of Module wraper for tests
   
-  "Module" should "should be properly emitted with wrapper" in {
+  "Module" should "be properly emitted with wrapper" in {
     val result = emitInModule(s"""
       |wire a, b;
       |assign a = b;
@@ -30,7 +30,7 @@ class ModuleSpec extends Sv2ChiselSpec {
     result should contains ("a := b")
     
   }
-  it should "should be properly emitted with named wrapper" in {
+  it should "be properly emitted with named wrapper" in {
     val result = emitInModule("MyTest", s"""
       |wire a, b;
       |assign a = b;
@@ -45,7 +45,7 @@ class ModuleSpec extends Sv2ChiselSpec {
   }
   
   // Test Inputs
-  it should "should be properly emitted with IOs" in {
+  it should "be properly emitted with IOs" in {
     val result = emit(s"""
       |module CustomModule(
       |  input a,
@@ -63,7 +63,7 @@ class ModuleSpec extends Sv2ChiselSpec {
   }
   
   // Test Params
-  it should "should be properly emitted with Params" in {
+  it should "be properly emitted with Params" in {
     val result = emit(s"""
       |module CustomModule#(
       |  parameter TEST
@@ -85,7 +85,7 @@ class ModuleSpec extends Sv2ChiselSpec {
   }
   
   // Instances
-  "Instances" should "should be properly emitted with options" in {
+  "Instances" should "be properly emitted with options" in {
     val result = emit(s"""
       |module mod#(
       |  parameter TEST = 1
@@ -124,7 +124,7 @@ class ModuleSpec extends Sv2ChiselSpec {
     
   }
   
-  it should "should be properly emitted without options" in {
+  it should "be properly emitted without options" in {
     val result = emit(s"""
       |module mod#(
       |  parameter TEST = 1
@@ -154,7 +154,7 @@ class ModuleSpec extends Sv2ChiselSpec {
     result should contains ("o := instB.b")
   }
   
-  it should "should be properly emitted without named port map" in {
+  it should "be properly emitted without named port map" in {
     val result = emit(s"""
       |module mod#(
       |  parameter TEST = 1

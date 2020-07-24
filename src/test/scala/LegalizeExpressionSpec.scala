@@ -15,7 +15,7 @@ import org.scalatest._
 class LegalizeExpressionSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "LegalizeExpressionSpec" should "should be properly emitted" in {
+  "LegalizeExpressionSpec" should "be properly emitted" in {
     val result = emitInModule("""
       |localparam [0:0] B_TRUE = 1;
       |localparam [0:0] B_FALSE = 0;

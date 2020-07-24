@@ -40,7 +40,7 @@ class SwitchSpec extends Sv2ChiselSpec {
   
   */
   
-  "SwitchSpec" should "should be properly emitted" in {
+  "SwitchSpec" should "be properly emitted" in {
     val result = emitInModule("""
       |wire a, b, c, d, e; 
       |wire [31:0] mem, prev; 

@@ -15,7 +15,7 @@ import org.scalatest._
 class IfElseGenSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "IfElseGenSpec" should "should be properly emitted without begin end blocks" in {
+  "IfElseGenSpec" should "be properly emitted without begin end blocks" in {
     val result = emitInModule("""
       |localparam a, b, c; 
       |wire [31:0] res; 
@@ -42,7 +42,7 @@ class IfElseGenSpec extends Sv2ChiselSpec {
     
   }
   
-  it should "should be properly emitted with begin end blocks" in {
+  it should "be properly emitted with begin end blocks" in {
     val result = emitInModule("""
       |localparam a, b, c; 
       |wire [31:0] res; 
@@ -68,7 +68,7 @@ class IfElseGenSpec extends Sv2ChiselSpec {
                              "}")
   }
   
-  it should "should be properly emitted without elsewhen for blocks" in {
+  it should "be properly emitted without elsewhen for blocks" in {
     val result = emitInModule("""
       |localparam a, b, c; 
       |wire [31:0] res; 
@@ -99,7 +99,7 @@ class IfElseGenSpec extends Sv2ChiselSpec {
                              "}")
   }
   
-  it should "should be properly emitted without elsewhen for blocks 2" in {
+  it should "be properly emitted without elsewhen for blocks 2" in {
     val result = emitInModule("""
       |localparam a, b, c; 
       |wire [31:0] res;

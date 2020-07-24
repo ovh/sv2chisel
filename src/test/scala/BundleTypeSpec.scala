@@ -15,7 +15,7 @@ import org.scalatest._
 class BundleTypeSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "BundleType" should "should be properly emitted" in {
+  "BundleType" should "be properly emitted" in {
     val result = emitInModule(s"""
       |localparam A = 5;
       |localparam B = $$clog2(A + 8);

@@ -15,7 +15,7 @@ import org.scalatest._
 class ComplexRangeSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "ComplexRangeSpec" should "should be properly emitted" in {
+  "ComplexRangeSpec" should "be properly emitted" in {
     val result = emitInModule(s"""
       |logic [31: 0] a_vect;
       |logic [0 :31] b_vect;

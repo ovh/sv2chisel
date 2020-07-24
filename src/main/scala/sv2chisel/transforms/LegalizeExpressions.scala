@@ -330,6 +330,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               p.copy(tpe = castTpe, args = args, kind = kind)
             
             case (_: PrimOps.UnaryOp, _: VecType) =>
+              debug(p, "Caught Unary Op of a VecType (must be converted to UInt first)")
               val expr = processExpressionRec(p.args.head, expected, castTpe)
               val exp = (expr.tpe, castTpe) match {
                 case (_: VecType, _: VecType ) => doCast(expr, HwExpressionKind, baseUInt)
@@ -447,7 +448,30 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               val exprs = p.args.map(processExpressionRec(_, expected, baseTpe))
               p.copy(args = exprs, kind = exprs(0).kind, tpe = exprs(0).tpe)
             
-            case (o: PrimOps.BitOp, _) => //bitwise operator ... not sure how they need to be managed ...
+            case (o: PrimOps.BitNeg, _) => //bitwise operator ... not sure how they need to be managed ...
+              val arg = processExpressionRec(p.args.head, expected, castTpe)
+              // the point is : to be equivalent to verilog inference 
+              // the bitneg must apply on a sized literal
+              // if size is unknown it won't extend properly
+              val a = (expected, arg.tpe.widthOption, castTpe.widthOption) match {
+                case (HwExpressionKind, Some(UnknownWidth()), Some(UnknownWidth())) => arg // nothing to do
+                case (HwExpressionKind, Some(UnknownWidth()), Some(w)) => 
+                  arg match {
+                    case n: Number => 
+                      DoCast(UndefinedInterval, n, expected, UIntType(UndefinedInterval, w, n.base))
+                    case _ => 
+                      debug(o, "Automated cast within BitNeg might be inaccurate")
+                      DoCast(UndefinedInterval, arg, expected, arg.tpe.mapWidth(_ => w))
+                  }
+                case (HwExpressionKind, None, Some(w)) => 
+                  // use intermediary UInt anyway to be able to apply the Neg operator
+                  DoCast(UndefinedInterval, arg, expected, UIntType(UndefinedInterval, w, NumberDecimal))
+                  
+                case _ => arg // nothing to do (no width or SwExpressionKind where width does not make sense)
+              }
+              p.copy(args = Seq(a), kind = a.kind, tpe = a.tpe)
+              
+            case (o: PrimOps.BitOp, _) => //bitwise operator (expect BitNeg)
               val exprs = p.args.map(processExpressionRec(_, expected, baseTpe))
               val (kind, args) = castThemAll(exprs, baseUInt, None)
               p.copy(args = args, kind = kind)

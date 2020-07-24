@@ -15,7 +15,7 @@ import org.scalatest._
 class BasicSpecs extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "BasicSpecs" should "should be properly emitted" in {
+  "BasicSpecs" should "be properly emitted" in {
     val result = emitInModule(s"""
       |localparam A = 5;
       |localparam B = $$clog2(A + 8);
@@ -76,6 +76,28 @@ class BasicSpecs extends Sv2ChiselSpec {
     result should contains ("ascii := \"test\".V.asTypeOf(UInt(64.W))")
 
     
+  }
+  
+  it should "deal with verilog literal tricks" in {
+    val result = emitInModule(s"""
+      |wire [31:0] test;
+      |assign test = ~0;
+      |assign test[5:0] = '0;
+      |wire [31:0] test2;
+      |assign test2 = ~0;
+      |wire [31:0] test3;
+      |assign test3 = ~(0+0);
+      """.stripMargin
+    )
+    debug(result)
+    result should contains ("class Test() extends MultiIOModule {")
+    result should contains ("val test = Wire(Vec(32, Bool()))")
+    result should contains ("test := ( ~0.U(32.W)).asBools")
+    result should contains ("test(5,0) := (0.U).asTypeOf(Vec(6, Bool()))")
+    result should contains ("val test2 = Wire(UInt(32.W))")
+    result should contains ("test2 :=  ~0.U(32.W)")
+    result should contains ("val test3 = Wire(UInt(32.W))")
+    result should contains ("test3 :=  ~((0+0)).U(32.W)")
   }
 
 }
