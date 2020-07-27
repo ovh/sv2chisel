@@ -31,6 +31,11 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       |assign w[31:16] = $signed(w[10:0]);
       |assign w[15:0] = $signed(z[10:0]);
       |assign w = z*z+1;
+      |
+      |wire [31:0] ww;
+      |wire b;
+      |assign ww[31:25] = w[6:5] == 2'b00 ? 7'b0100000 : 7'b0000000;
+      |assign ww[31:25] = b ? 2'b01 : (b ? 2'b10 : 2'b00);
       """.stripMargin
     )
     debug(result)
@@ -51,6 +56,10 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     result should contains ("w(31,16) := w(10,0).asTypeOf(SInt(16.W)).asBools") 
     result should contains ("w(15,0) := z(10,0).asTypeOf(SInt(16.W)).asBools") 
     result should contains ("w := (z*z+1.U).asTypeOf(Vec(32, Bool()))") 
+    
+    result should contains ("ww(31,25) := Mux(w(6,5).asUInt === \"b00\".U(2.W), \"b0100000\".U(7.W), \"b0000000\".U(7.W)).asBools")
+    // ugly rendering but ... it works ...
+    result should contains ("ww(31,25) := Mux(b, \"b01\".U(2.W).asTypeOf(Vec(7, Bool())), (Mux(b, \"b10\".U(2.W), \"b00\".U(2.W)).asTypeOf(Vec(7, Bool()))))")
   }
 
 }

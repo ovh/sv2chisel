@@ -143,7 +143,8 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
         case Seq(a) => Some(a.tpe)
         case s => 
           commonType(s.tail) match {
-            case Some(k) if (k == s.head.tpe) => Some(k)
+            // map interval to avoid false negative due to different source tokens
+            case Some(k) if (k == s.head.tpe.mapInterval(_ => k.tokens)) => Some(k)
             case _ => None
           }
       }
@@ -316,7 +317,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               
               val conseq = processExpressionRec(p.args(1), expected, castTpe)
               val alt = processExpressionRec(p.args(2), expected, castTpe)
-              val (kind, cast) = castThemAll(Seq(conseq, alt), castTpe, Some(expected))
+              val (kind, tpe, cast) = castTypeAll(Seq(conseq, alt), castTpe, Some(expected))
               
               val args = (pred.kind, kind) match {
                 case (SwExpressionKind, HwExpressionKind) => 
@@ -327,7 +328,12 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
                 case _ => Seq(pred, cast(0), cast(1))
               }
               
-              p.copy(tpe = castTpe, args = args, kind = kind)
+              val res = p.copy(tpe = tpe, args = args, kind = kind)
+              if(castTpe.getClass.getSuperclass.isInstance(tpe)){
+                res
+              } else {
+                doCast(res, kind, castTpe)
+              }
             
             case (_: PrimOps.UnaryOp, _: VecType) =>
               debug(p, "Caught Unary Op of a VecType (must be converted to UInt first)")
