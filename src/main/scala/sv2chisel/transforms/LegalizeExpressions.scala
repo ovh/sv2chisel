@@ -56,7 +56,11 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           (e.tpe, toTpe) match {
             case (t1, t2) if (t1.getClass == t2.getClass) => false
             case (u: UIntType, b: BoolType) => true
-            case (_, _) if(toTpe.getClass.getSuperclass.isInstance(e.tpe)) => false
+            case (_: SIntType, _: UIntType) => true
+            case (_: UIntType, _: SIntType) => true
+            case (_, _) if(toTpe.getClass.getSuperclass.isInstance(e.tpe)) => 
+              debug(s"Aborting cast from ${e.tpe.serialize} to ${toTpe.serialize}")
+              false
             case _ => true
           }
         case (SwExpressionKind, HwExpressionKind) => true

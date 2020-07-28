@@ -913,9 +913,9 @@ class ChiselDoCast(e: DoCast){
     rtrace(ctx, e, s"chiselize: ${e.expr.serialize}: ${e.expr}")
     trace(s"kind: ${e.expr.kind}")
     val uctx = ctx.unraw()
-    (Utils.isSimple(e.expr), e.expr.kind, e.tpe) match {
+    (Utils.isSimple(e.expr), e.expr.kind, e.tpe, e.expr.tpe.widthOption) match {
       // Bool to Int Special for Software & Hardware
-      case (_, SwExpressionKind, IntType(t, _)) if(e.expr.tpe.isInstanceOf[BoolType]) =>
+      case (_, SwExpressionKind, IntType(t, _), _) if(e.expr.tpe.isInstanceOf[BoolType]) =>
         ChiselTxtS("(if(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ") 1 else 0)")
       
       // No need to cast here for hardware => Bool is a subtype os UInt 
@@ -924,64 +924,69 @@ class ChiselDoCast(e: DoCast){
         
       // UInt Specials for Software
       // > Simple Expr
-      case (true, SwExpressionKind, UIntType(t, UnknownWidth(), _)) =>
+      case (true, SwExpressionKind, UIntType(t, UnknownWidth(), _), _) =>
         e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".U")
-      case (true, SwExpressionKind, UIntType(t, w, _))=> 
+      case (true, SwExpressionKind, UIntType(t, w, _), _) => 
         e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".U(") ++ w.chiselize(uctx) ++ ChiselTxtS(")")
       // > Require brace
-      case (false, SwExpressionKind, UIntType(t, UnknownWidth(), _)) => 
+      case (false, SwExpressionKind, UIntType(t, UnknownWidth(), _), _) => 
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").U") 
-      case (false, SwExpressionKind, UIntType(t, w, _)) => 
+      case (false, SwExpressionKind, UIntType(t, w, _), _) => 
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").U(") ++ w.chiselize(uctx) ++ ChiselTxtS(")")
         
       // SInt Specials for Software
       // > Simple Expr
-      case (true, SwExpressionKind, SIntType(t, UnknownWidth())) =>
+      case (true, SwExpressionKind, SIntType(t, UnknownWidth()), _) =>
         e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".S")
-      case (true, SwExpressionKind, SIntType(t, w))=> 
+      case (true, SwExpressionKind, SIntType(t, w), _)=> 
         e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".S(") ++ w.chiselize(uctx) ++ ChiselTxtS(")")
       // > Require brace
-      case (false, SwExpressionKind, SIntType(t, UnknownWidth())) => 
+      case (false, SwExpressionKind, SIntType(t, UnknownWidth()), _) => 
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").S") 
-      case (false, SwExpressionKind, SIntType(t, w)) => 
+      case (false, SwExpressionKind, SIntType(t, w), _) => 
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").S(") ++ w.chiselize(uctx) ++ ChiselTxtS(")")
         
       // UInt Specials for Hardware NB: asUInt cannot cast to given width 
       // > Simple Expr
-      case (true, HwExpressionKind, UIntType(t, UnknownWidth(), _)) =>
+      case (true, HwExpressionKind, UIntType(t, UnknownWidth(), _), _) =>
         e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".asUInt")
       // > Require brace
-      case (false, HwExpressionKind, UIntType(t, UnknownWidth(), _)) => 
+      case (false, HwExpressionKind, UIntType(t, UnknownWidth(), _), _) => 
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").asUInt")
-        
+      
+      case (true, HwExpressionKind, UIntType(t, wc, _), Some(we)) if(Utils.eq(wc, we)) =>
+        e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".asUInt")
+      case (false, HwExpressionKind, UIntType(t, wc, _), Some(we)) if(Utils.eq(wc, we)) =>
+        ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").asUInt")
+      
       // SInt Specials for Hardware  NB: asSInt cannot cast to given width 
       // > Simple Expr
-      case (true, HwExpressionKind, SIntType(t, UnknownWidth())) =>
+      case (true, HwExpressionKind, SIntType(t, UnknownWidth()), _) =>
         e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".asSInt")
       // > Require brace
-      case (false, HwExpressionKind, SIntType(t, UnknownWidth())) => 
+      case (false, HwExpressionKind, SIntType(t, UnknownWidth()), _) => 
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").asSInt") 
       
       // Bool Specials
-      case (_, _, BoolType(t, s)) if(s) => unsupportedChisel(ctx, e, "Signed BoolType unexpected here")
-      case (true, SwExpressionKind, BoolType(t, _)) if(e.kind == SwExpressionKind) => 
+      case (_, _, BoolType(t, s), _) if(s) => unsupportedChisel(ctx, e, "Signed BoolType unexpected here")
+      case (true, SwExpressionKind, BoolType(t, _), _) if(e.kind == SwExpressionKind) => 
         ChiselTxtS("(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, " != 0)")
-      case (true, SwExpressionKind, BoolType(t, _)) if(e.kind == HwExpressionKind) => 
+      case (true, SwExpressionKind, BoolType(t, _), _) if(e.kind == HwExpressionKind) => 
         e.expr.tpe match {
           case b: BoolType => e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".B")
           case _ => ChiselTxtS("(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, " != 0).B")
         }
       
         
-      case (false, SwExpressionKind, BoolType(t, _)) if(e.kind == SwExpressionKind) => 
+      case (false, SwExpressionKind, BoolType(t, _), _) if(e.kind == SwExpressionKind) => 
         ChiselTxtS("((") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ") != 0)")
-      case (false, SwExpressionKind, BoolType(t, _)) if(e.kind == HwExpressionKind) => 
+      case (false, SwExpressionKind, BoolType(t, _), _) if(e.kind == HwExpressionKind) => 
         e.expr.tpe match {
           case b: BoolType => ChiselTxtS("(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").B")
           case _ => ChiselTxtS("((") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ") != 0).B")
         }
       
-      case (isSimple, HwExpressionKind, BoolType(t, _)) =>
+      case (isSimple, HwExpressionKind, BoolType(t, _), _) =>
         val pre = if(isSimple) "" else "("
         val post = if(isSimple) "" else ")"
         val comp = e.expr.tpe match {
@@ -992,25 +997,25 @@ class ChiselDoCast(e: DoCast){
         ChiselTxtS(s"($pre") ++ e.expr.chiselize(uctx) ++ comp
       
       // x.asTypeOf(TypeOf(x)) => x
-      case (_, _, TypeOf(_, expr)) if(expr == e.expr) => e.expr.chiselize(uctx)
+      case (_, _, TypeOf(_, expr), _) if(expr == e.expr) => e.expr.chiselize(uctx)
       
       // asTypeOf(TypeOf(x)) => asTypeOf(x)
-      case (true, _, TypeOf(_, expr)) => 
+      case (true, _, TypeOf(_, expr), _) => 
         e.expr.chiselize(uctx) ++ ChiselTxtS(e, ctx, ".asTypeOf(") ++
         expr.chiselize(uctx) ++ ChiselTxtS(")")
-      case (false, _, TypeOf(_, expr)) => 
+      case (false, _, TypeOf(_, expr), _) => 
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(").asTypeOf(") ++
         expr.chiselize(uctx) ++ ChiselTxtS(")")
         
       // Classique asTypeOf => first cast as signed integer for sw int 
-      case (true, SwExpressionKind, _) => 
+      case (true, SwExpressionKind, _, _) => 
         e.expr.chiselize(uctx) ++ ChiselTxtS(e, ctx, ".S.asTypeOf(") ++
         e.tpe.chiselize(uctx) ++ ChiselTxtS(")")
-      case (false, SwExpressionKind, _) => 
+      case (false, SwExpressionKind, _, _) => 
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(").S.asTypeOf(") ++
         e.tpe.chiselize(uctx) ++ ChiselTxtS(")")
         
-      case (isS, _, v: VecType) => 
+      case (isS, _, v: VecType, _) => 
         val width = e.expr.tpe.widthOption match {
           case Some(w) => w.expr.evalBigIntOption() 
           case None => None 
@@ -1026,7 +1031,7 @@ class ChiselDoCast(e: DoCast){
         else
           ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(")") ++ cast
         
-      case (true, _, _) => 
+      case (true, _, _, _) => 
         e.expr.chiselize(uctx) ++ ChiselTxtS(e, ctx, ".asTypeOf(") ++
         e.tpe.chiselize(uctx) ++ ChiselTxtS(")")
       case _ => 

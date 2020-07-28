@@ -93,10 +93,12 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     
     
     result should contains ("for(i <- 0 until DBLW){")
-    result should contains ("when(count_live(i) > IT_DOWN(i).U) {")
+    result should contains ("when(count_live(i).asUInt > IT_DOWN(i).U) {")
+    // warning : SInt should have priority over UInt - See gitlab issue #11
+    // result should contains ("when(count_live(i) > IT_DOWN(i).S) {")
     result should contains ("count(i) := IT_DOWN(i).S(65.W)")
     result should contains ("stats_count(i) := stats_count(i)+1.U")
-    result should contains ("stats_total(i) := count(i)")
+    result should contains ("stats_total(i) := count(i).asTypeOf(UInt(64.W))")
     
     result should contains ("b_addr(DBLW-1,0) := a_addr")
     result should contains ("b_weird(DBLW-1,0) := VecInit.tabulate(DBLW)(_ => a_addr(0)(WWW-1))")

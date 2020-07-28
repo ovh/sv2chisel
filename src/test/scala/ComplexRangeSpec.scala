@@ -44,9 +44,9 @@ class ComplexRangeSpec extends Sv2ChiselSpec {
     result should contains ("val dword = Wire(Vec(64, Bool()))")
     result should contains ("val d_res = Wire(UInt(8.W))")
     result should contains ("val sel = Wire(UInt(64.W))")
-    result should contains ("a_res := a_vect(7,0).asTypeOf(UInt(8.W)) // == a_vect[ 7 : 0]")
+    result should contains ("a_res := a_vect(7,0).asUInt // == a_vect[ 7 : 0]")
     result should contains ("a_res := a_vect(15,8).asTypeOf(UInt(8.W)) // == a_vect[15 : 8]")
-    result should contains ("b_res := b_vect(7,0).asTypeOf(UInt(8.W)) // == b_vect[0 : 7]")
+    result should contains ("b_res := b_vect(7,0).asUInt // == b_vect[0 : 7]")
     result should contains ("b_res := b_vect(15,8).asTypeOf(UInt(8.W)) // == b_vect[8 :15]")
     result should contains ("d_res := dword(8.U*sel+7.U,8.U*sel).asTypeOf(UInt(8.W))")
     

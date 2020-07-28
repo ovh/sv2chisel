@@ -96,6 +96,10 @@ object Utils extends LazyLogging with InfoLogger {
     cleanTok(entry)
   }
   
+  def eq[T <: SVNode](n1: T, n2: T): Boolean = {
+    cleanTok(n1) == cleanTok(n2)
+  }
+  
   
   /** Unwind the causal chain until we hit the initial exception (which may be the first).
     *

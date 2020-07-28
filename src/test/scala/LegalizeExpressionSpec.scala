@@ -26,10 +26,12 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       |assign c = |{B_TRUE && a, (B_TRUE || B_FALSE) && b, C_UNKNOWN && b};
       |
       |wire [31:0] w;
+      |wire [31:0] wu;
       |wire [31:0] z;
       |assign w[14:12] = 3'b000;
       |assign w[31:16] = $signed(w[10:0]);
       |assign w[15:0] = $signed(z[10:0]);
+      |assign wu = $signed(w);
       |assign w = z*z+1;
       |
       |wire [31:0] ww;
@@ -55,6 +57,7 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     /// padding (bit extension is done properly)
     result should contains ("w(31,16) := w(10,0).asTypeOf(SInt(16.W)).asBools") 
     result should contains ("w(15,0) := z(10,0).asTypeOf(SInt(16.W)).asBools") 
+    result should contains ("wu := w.asTypeOf(SInt(32.W)).asUInt") 
     result should contains ("w := (z*z+1.U).asTypeOf(Vec(32, Bool()))") 
     
     result should contains ("ww(31,25) := Mux(w(6,5).asUInt === \"b00\".U(2.W), \"b0100000\".U(7.W), \"b0000000\".U(7.W)).asBools")
