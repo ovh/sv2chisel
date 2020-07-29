@@ -441,12 +441,13 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               
             case (o: PrimOps.ShiftOp, _) => 
               val (e: Expression, shft: Expression) = p.args match {
-                case Seq(expr, pow) => 
+                case Seq(expr, sh) => 
+                  lazy val pshft = processExpression(sh, UnknownExpressionKind, UnknownType())
                   val exp = processExpressionRec(expr, expected, baseTpe)
-                  val p = processExpression(pow, UnknownExpressionKind, UnknownType())
-                  exp.tpe match {
-                    case (_: IntType | _: UIntType | _:SIntType) => (exp, p)
-                    case _ => (doCast(exp, exp.kind, baseUInt), p)
+                  (exp.tpe, o) match {
+                    case (_:SIntType, _:PrimOps.Shr) => (exp, processExpression(sh, exp.kind, baseUInt))
+                    case (_: IntType | _: UIntType, _) =>  (exp, pshft)
+                    case _ => (doCast(exp, exp.kind, baseUInt), pshft) // SInt LogShr is here as well
                   }
                 case l => 
                   fatal(p, s"Got unexpected number of arguments ${l.length} for a ShiftOp where 2 were expected")

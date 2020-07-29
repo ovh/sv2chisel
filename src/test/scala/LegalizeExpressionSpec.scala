@@ -87,5 +87,21 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     result should contains ("lhsc(31,16) := auto_concat.lhsc_31_16")
 
   }
+  
+  it should "also deal with arithmetic shift right" in {
+    val result = emitInModule("""
+      |wire [16:0] a;
+      |wire [31:0] res;
+      |assign res = $signed(a) >>> 1;
+      |assign res = $signed(a) >> 1;
+      """.stripMargin
+    )
+    debug(result)
+    result should contains ("class Test() extends MultiIOModule {")
+    result should contains ("val a = Wire(UInt(17.W))")
+    result should contains ("val res = Wire(UInt(32.W))")
+    result should contains ("res := (a.asTypeOf(SInt(32.W)) >> 1.U).asUInt")
+    result should contains ("res := a.asTypeOf(SInt(32.W)).asUInt >> 1")
+  }
 
 }

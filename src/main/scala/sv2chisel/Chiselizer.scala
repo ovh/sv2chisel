@@ -812,22 +812,49 @@ class ChiselDoPrim(e: DoPrim){
               ChiselTxtS(", ") ++ expr.chiselize(uctx)
           case _ => unsupportedChisel(ctx,e, "Unsupported `power of` operation in hardware")
         }
-      case (_: Pow, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 2 were expected.") 
       /// Eq 
       case (e: Eq, Seq(e1, e2)) => 
         val op = if(ctx.isHardware) " === " else " == "
         e1.chiselize(uctx) ++ ChiselTxtS(e, ctx, op) ++ e2.chiselize(uctx)
-      case (_: Eq, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 2 were expected.") 
       /// Neq 
       case (e: Neq, Seq(e1, e2)) => 
         val op = if(ctx.isHardware) " =/= " else " != "
         e1.chiselize(uctx) ++ ChiselTxtS(e, ctx, op) ++ e2.chiselize(uctx)
-      case (_: Neq, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 2 were expected.") 
-      /// Neq 
+
+      /// LogicalShiftRight 
       case (e: LogShr, Seq(e1, e2)) => 
-        val op = if(ctx.isHardware) " >> " else " >>> "
+        val op = if(ctx.isHardware) " >> " else " >>> " // should not rely on context but on HwExpressionKind
+        (e1.tpe, e2.kind) match {
+          case (_: SIntType, SwExpressionKind) => // fine thanks to the bug (see below)
+            rwarn(ctx, e, "FIXME: This logical shift on a SInt only behaves as expected due to a bug (https://github.com/freechipsproject/chisel3/issues/1528)")
+          case (_: SIntType, HwExpressionKind) =>
+            rcritical(ctx, e, "FIXME: this logical shift will be treated as arithmetic shift")
+          case _ => 
+        }
+        
         e1.chiselize(uctx) ++ ChiselTxtS(e, ctx, op) ++ e2.chiselize(uctx)
-      case (_: LogShr, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 2 were expected.") 
+        
+      /// Arithmetic Shift Right 
+      case (e: Shr, Seq(e1, e2)) => 
+        val shTxt = e1.chiselize(uctx) ++ ChiselTxtS(e, ctx, " >> ") ++ e2.chiselize(uctx)
+        (e1.tpe, e2.kind) match {
+          case (s: SIntType, SwExpressionKind) => 
+            // glitch on static shift, see https://github.com/freechipsproject/chisel3/issues/1528
+            // if shift value is hardware, this will behave properly
+            e2.evalBigIntOption match {
+              case Some(bg) => 
+                ChiselTxtS(e, ctx, "(") ++ shTxt ++ ChiselTxtS(s").pad($bg)")
+              case _ => 
+                // it should 
+                ChiselTxtS(e, ctx, "(") ++ shTxt ++ ChiselTxtS(s").pad(") ++ e2.chiselize(ctx) ++ ChiselTxtS(")")
+            }
+          // if shift value is hardware, shift behaves properly
+          // if shifted value is not SInt we don't care so we don't want to add cumbersome logic
+          case _ => shTxt
+        }
+        
+        
+
       /// Incr 
       case (i: Incr, Seq(expr)) => 
         if(i.prefix){
