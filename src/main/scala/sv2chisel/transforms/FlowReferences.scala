@@ -399,14 +399,17 @@ class FlowReferences(
         case s: SubIndex =>
           // above notice concerning bundle somehow apply also here ...
           // definitely need to introduce some kind of reference target management
+          val index = processExpression(s.index, Some(SourceFlow))
           val expr = processExpression(s.expr, expected)
-          s.copy(expr = expr, flow = expr.flow)
+          s.copy(expr = expr, index = index, flow = expr.flow)
           
         case s: SubRange => 
           // above notice concerning bundle somehow apply also here ...
           // definitely need to introduce some kind of reference target management
           val expr = processExpression(s.expr, expected)
-          s.copy(expr = expr, flow = expr.flow)
+          val left = processExpression(s.left, Some(SourceFlow))
+          val right = processExpression(s.right, Some(SourceFlow))
+          s.copy(expr = expr, left = left, right = right, flow = expr.flow)
           
         case d: DoPrim => // all ops work the same
           // in valid verilog all operand of a primary operation are assumed to be SourceFlow
@@ -438,7 +441,13 @@ class FlowReferences(
           val expr = processExpression(a.expr, expected)
           a.copy(expr = expr, flow = expr.flow)
         
-        case _ => e
+        case d: DoCast => 
+          d.copy(expr = processExpression(d.expr, Some(SourceFlow)))
+          
+        case c: ComplexValues => 
+          c.mapExpr(e => processExpression(e, Some(SourceFlow)))
+        
+        case _ => trace(e, s"ignored flow propagation for ${e.serialize}"); e
       }
     }
     
