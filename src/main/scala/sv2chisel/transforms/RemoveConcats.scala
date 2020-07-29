@@ -255,7 +255,12 @@ class RemoveConcats(
           appendOption(preStmts, pre)
           appendOption(postStmts, post)
           val ref = Reference(c.tokens, newName, Seq(), tpe, HwExpressionKind, SinkFlow)
-          c.copy(loc = ref, expr = DoCast(ui, expr, ref.kind, TypeOf(ui, ref)))
+          // remove useless asUInt cast
+          val castExpr = expr match {
+            case DoCast(_,e,_, _:UIntType) => e
+            case e => e
+          }
+          c.copy(loc = ref, expr = DoCast(ui, castExpr, ref.kind, TypeOf(ui, ref)))
         
         case _ => c.copy(expr = expr)
       }

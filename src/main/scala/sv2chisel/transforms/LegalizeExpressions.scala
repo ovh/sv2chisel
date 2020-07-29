@@ -9,6 +9,7 @@ import sv2chisel.ir._
 // implicits
 import sv2chisel.ir.refreshTypes._
 import sv2chisel.ir.evalExpression._
+import sv2chisel.ir.expressionWidth._
 
 import collection.mutable.{HashMap, ArrayBuffer}
 
@@ -254,7 +255,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
       }
     }
     
-    def processExpressionRec(e: Expression, expected: ExpressionKind, baseTpe: Type): Expression = {
+    def processExpressionRec(e: Expression, expected: ExpressionKind, baseTpe: Type, requireWidth: Boolean = false): Expression = {
       val baseUInt = UIntType(UndefinedInterval, UnknownWidth(), NumberDecimal)
       e match {
         case r: Reference => r // nothing to do yet (done in doCast whenever necessary)
@@ -523,8 +524,15 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
             case (u: UIntType, None, Some(w), None) => u.copy(width = w)
             case (s: SIntType, None, Some(w), None) => s.copy(width = w)
             
+            case (_: SIntType, _, _, _) => 
+              if(requireWidth) 
+                critical(c, s"Unknown width for user cast to signed (${cast.tpe.serialize}), this will result into faulty sign extension and likely broken design")
+              cast.tpe
+
+            case (_: UIntType, _, _, _) => cast.tpe // don't care about width here => .asUInt 
+            
             case _ =>
-              critical(c, s"Unsupported user cast to type ${cast.tpe.serialize}")
+              critical(c, s"Unsupported user cast to type ${cast.tpe.serialize} (baseTpe: ${baseTpe.serialize})")
               cast.tpe
           }
           cast.copy(tpe = tpe)
@@ -535,7 +543,21 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           exprs.foreach(e => trace(e, s"After Concat expr: ${e.serialize} - ${e.kind} - ${e.tpe}"))
           val (kind, args) = castThemAll(exprs, baseUInt, Some(expected), true)
           args.foreach(e => debug(e, s"Concat args: ${e.serialize} - ${e.kind} - ${e.tpe}"))
-          c.copy(args = args, kind = kind, tpe = baseUInt)
+          
+          // let's try to compute the actual width of this concat
+          // 1st build the expression as a sum of each terms width
+          // 2nd then try to evaluate this expression if it is only made of
+          val tpe = c.copy(args = args).getWidthOption() match {
+            case Some(e) =>
+              val w = e.evalBigIntOption() match {
+                case Some(bg) => Width(bg)
+                case None => Width(e)
+              }
+              UIntType(UndefinedInterval, w, NumberDecimal)
+            case None => baseUInt
+          }
+          
+          c.copy(args = args, kind = kind, tpe = tpe)
           
         case r: ReplicatePattern => 
           val scaler = processExpression(r.scaler, SwExpressionKind, IntType(UndefinedInterval, NumberDecimal))
@@ -591,11 +613,11 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
       
     }
     
-    def processExpression(e: Expression, kind: ExpressionKind, tpe: Type): Expression = {
+    def processExpression(e: Expression, kind: ExpressionKind, tpe: Type, requireWidth: Boolean = false): Expression = {
       // to do : propagate expected type ?
       // handle 0.U => true.B conversion
       trace(e, s"Entering processExpression for ${e.getClass.getName} : ${e.serialize}")
-      doCast(processExpressionRec(e.mapType(processType), kind, tpe), kind, tpe)
+      doCast(processExpressionRec(e.mapType(processType), kind, tpe, requireWidth), kind, tpe)
     }
 
     def processType(t: Type): Type = {
@@ -608,7 +630,9 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
       (s match {
         case c: Connect => 
           val loc = processExpression(c.loc, HwExpressionKind, UnknownType())
-          val expr = processExpression(c.expr, HwExpressionKind, loc.tpe)
+          trace(c, s"c.loc ${c.loc.serialize} : ${c.loc.tpe.serialize}")
+          trace(c, s"loc tpe  ${loc.serialize} : ${loc.tpe.serialize}")
+          val expr = processExpression(c.expr, HwExpressionKind, loc.tpe, true)
           c.copy(loc = loc, expr = expr)
           
         case c: Conditionally => c.mapExpr(processExpression(_, HwExpressionKind, BoolType(UndefinedInterval)))

@@ -15,7 +15,7 @@ import org.scalatest._
 class LegalizeExpressionSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "LegalizeExpressionSpec" should "be properly emitted" in {
+  "LegalizeExpression" should "manage general types properly" in {
     val result = emitInModule("""
       |localparam [0:0] B_TRUE = 1;
       |localparam [0:0] B_FALSE = 0;
@@ -31,8 +31,9 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       |assign w[14:12] = 3'b000;
       |assign w[31:16] = $signed(w[10:0]);
       |assign w[15:0] = $signed(z[10:0]);
+      |assign w[14:0] = $signed({z[5:0], z[7:6]});
       |assign wu = $signed(w);
-      |assign w = z*z+1;
+      |assign w = z*z+z+1;
       |
       |wire [31:0] ww;
       |wire b;
@@ -57,12 +58,34 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     /// padding (bit extension is done properly)
     result should contains ("w(31,16) := w(10,0).asTypeOf(SInt(16.W)).asBools") 
     result should contains ("w(15,0) := z(10,0).asTypeOf(SInt(16.W)).asBools") 
+    result should contains ("w(14,0) := Cat(z(5,0), z(7,6)).asTypeOf(SInt(15.W)).asBools")
     result should contains ("wu := w.asTypeOf(SInt(32.W)).asUInt") 
-    result should contains ("w := (z*z+1.U).asTypeOf(Vec(32, Bool()))") 
+    result should contains ("w := (z*z+z+1.U).asTypeOf(Vec(32, Bool()))") 
     
     result should contains ("ww(31,25) := Mux(w(6,5).asUInt === \"b00\".U(2.W), \"b0100000\".U(7.W), \"b0000000\".U(7.W)).asBools")
     // ugly rendering but ... it works ...
     result should contains ("ww(31,25) := Mux(b, \"b01\".U(2.W).asTypeOf(Vec(7, Bool())), (Mux(b, \"b10\".U(2.W), \"b00\".U(2.W)).asTypeOf(Vec(7, Bool()))))")
+  }
+    
+  it should "also deal with mixed signed and concat" in {
+    val result = emitInModule("""
+      |wire [31:0] lhsc;
+      |wire [31:0] wu;
+      |assign {lhsc[15:0], lhsc[31:16]} = $signed(wu[10:0]);
+      """.stripMargin
+    )
+    debug(result)
+    result should contains ("class Test() extends MultiIOModule {")
+    result should contains ("val lhsc = Wire(Vec(32, Bool()))")
+    result should contains ("val wu = Wire(Vec(32, Bool()))")
+    result should contains ("val auto_concat = Wire(new Bundle {",
+                              "val lhsc_15_0 = Vec(16, Bool())",
+                              "val lhsc_31_16 = Vec(16, Bool())",
+                            "})")
+    result should contains ("auto_concat := wu(10,0).asTypeOf(SInt(32.W)).asTypeOf(auto_concat)")
+    result should contains ("lhsc(15,0) := auto_concat.lhsc_15_0")
+    result should contains ("lhsc(31,16) := auto_concat.lhsc_31_16")
+
   }
 
 }

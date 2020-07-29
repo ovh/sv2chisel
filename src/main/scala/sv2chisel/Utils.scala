@@ -34,6 +34,7 @@ object Utils extends LazyLogging with InfoLogger {
       case r: StringLit => true
       case r: Reference => true
       case d: DoCast => true
+      case d: Concat => true
       case r: Number => true
       case s: SubIndex => isSimple(s.expr)
       case s: SubRange => isSimple(s.expr)
