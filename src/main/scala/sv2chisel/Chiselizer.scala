@@ -614,7 +614,7 @@ class ChiselReference(e: Reference){
     if(e.name.size > 1 && e.name.head == '`'){
       unsupportedChisel(ctx,e, "Unsupported tick reference in this context")
     } else {
-      Seq(ChiselTxt(e, ctx, e.path.mkString("",".","") + e.name))
+      Seq(ChiselTxt(e, ctx, (e.path :+ e.name).mkString(".")))
     }
     
     // note : to re-integrate ??
@@ -1284,6 +1284,7 @@ class ChiselForGen(val f: ForGen) extends Chiselized {
 class ChiselDefInstance(val i: DefInstance) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     val iiCtxt = ctx.incr().incr()
+    val hctx = ctx.hw()
     
     def getParams(a: Assign): Seq[ChiselTxt] = {
       val params = a match {
@@ -1327,7 +1328,7 @@ class ChiselDefInstance(val i: DefInstance) extends Chiselized {
               Seq(ChiselLine(na, ctx, comment))
             case (r@Reference(_,_,_, _: BundleType,_, _), SinkFlow) => 
                 // default: cast with asTypeOf
-                val chi = r.chiselize(ctx)
+                val chi = r.chiselize(hctx)
                 Seq(ChiselLine(na, ctx, "")) ++ chi ++
                   ChiselTxtS(s" := ${i.name}.${na.name}.asTypeOf(") ++
                   chi ++ ChiselTxtS(")")
@@ -1335,7 +1336,7 @@ class ChiselDefInstance(val i: DefInstance) extends Chiselized {
             case (r@Reference(_,_,_, _: BundleType,_, _), SourceFlow) => 
                 // default: cast with asTypeOf
                 Seq(ChiselLine(na, ctx, s"${i.name}.${na.name} := ")) ++
-                  r.chiselize(ctx) ++
+                  r.chiselize(hctx) ++
                   ChiselTxtS(s".asTypeOf(${i.name}.${na.name})")
             
             // special case for undefined expression (nothing connected)
@@ -1346,15 +1347,18 @@ class ChiselDefInstance(val i: DefInstance) extends Chiselized {
             
             case (e, SourceFlow) => 
               Seq(ChiselLine(na, ctx, s"${i.name}.${na.name} := ")) ++
-                e.chiselize(ctx)
+                e.chiselize(hctx)
                 
             case (e, SinkFlow) => 
-              Seq(ChiselLine(na, ctx, "")) ++ e.chiselize(ctx) ++
-                ChiselTxtS(na, ctx, s" := ${i.name}.${na.name}")
+              val ref = na.assignExpr match {
+                case Some(exp) => ChiselTxtS(na, ctx, s" := ") ++ exp.chiselize(hctx)
+                case _ => ChiselTxtS(na, ctx, s" := ${i.name}.${na.name}")
+              }
+              Seq(ChiselLine(na, ctx, "")) ++ e.chiselize(hctx) ++ ref
                 
             case _ => 
               Seq(ChiselLine(na, ctx, s"${i.name}.${na.name} <> ")) ++
-                na.expr.chiselize(ctx) // UnknownType without more context here ...
+                na.expr.chiselize(hctx) // UnknownType without more context here ...
           }
         case _ => // to do => feasible thanks to flows
           unsupportedChisel(ctx,a, s" implicit port map as Module `${i.module.serialize}` is not known in current scope")

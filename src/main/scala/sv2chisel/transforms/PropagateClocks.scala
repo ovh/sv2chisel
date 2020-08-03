@@ -29,9 +29,9 @@ class PropagateClocks(val llOption: Option[logger.LogLevel.Value] = None) extend
               }.getOrElse("<error>")
               val portMap = i.portMap.flatMap(p => {
                 p match {
-                  case NamedAssign(_, n, _, _) if(n == ci || n == renamedClock) => None 
-                  case NamedAssign(_, _, r: Reference, _) if(r.serialize == ci) => None 
-                  case NoNameAssign(_, r: Reference, _) if(r.serialize == ci) => None
+                  case NamedAssign(_, n, _, _, _, _) if(n == ci || n == renamedClock) => None 
+                  case NamedAssign(_, _, r: Reference, _, _, _) if(r.serialize == ci) => None 
+                  case NoNameAssign(_, r: Reference, _, _, _, _) if(r.serialize == ci) => None
                   case _ => Some(p)
                 }
               })
@@ -50,7 +50,7 @@ class PropagateClocks(val llOption: Option[logger.LogLevel.Value] = None) extend
               }.getOrElse("<error>")
               val portMap = i.portMap.map(p => {
                 p match {
-                  case na @NamedAssign(_, n, _, _) if(n == renamedClock) =>  
+                  case na @NamedAssign(_, n, _, _, _, _) if(n == renamedClock) =>  
                     na.copy(name = ci)
                   case _ => p
                 }

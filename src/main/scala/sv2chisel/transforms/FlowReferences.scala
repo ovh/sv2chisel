@@ -138,7 +138,7 @@ class FlowReferences(
                   case (Some(a), f) if(a.flow == f) => 
                   
                   // DO UPDATE
-                  case (Some(NamedAssign(_, _, _, UnknownFlow)), f) => namedPorts(na.name) = na
+                  case (Some(NamedAssign(_, _, _, UnknownFlow, _, _)), f) => namedPorts(na.name) = na
                   case (None, f) => namedPorts += ((na.name, na))
                   
                   // ERROR on defined flow override
@@ -153,7 +153,7 @@ class FlowReferences(
                   case (a, f) if(a.flow == f) =>
                   
                   // DO UPDATE
-                  case (NoNameAssign(_, _, UnknownFlow), f) => 
+                  case (NoNameAssign(_, _, UnknownFlow, _, _, _), f) => 
                     if(t._2 < noNamePorts.size) {
                       noNamePorts(t._2) = na
                     } else { 

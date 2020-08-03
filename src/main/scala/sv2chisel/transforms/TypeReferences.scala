@@ -97,9 +97,45 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     }
   }
   
+  def processAssignSeq(assign: Seq[Assign], ref: Seq[(String, Type)]): Seq[Assign] = {
+    // process ports
+    val nna = assign.collect({case nna:NoNameAssign => nna})
+    val na = assign.collect({case na:NamedAssign => na})
+    val aa = assign.collect({case aa:AutoAssign => aa})
+    (aa, nna, na) match {
+      case (Seq(), Seq(), Seq()) => assign
+      case (aa, Seq(), Seq()) => critical(aa.head, s"Unsupported auto-assign"); assign
+      case (Seq(), nna, Seq()) =>
+        if(nna.length != ref.length){
+          critical(nna.head, s"Unnamed assignation list length (${nna.length}) mismatches declaration length (${ref.length})")
+          assign
+        } else {
+          nna.zip(ref).map({case (a, (n, t)) => a.copy(remoteName = Some(n), remoteType = Some(Utils.cleanTok(t)))})
+        }
+      case (Seq(), Seq(), na) =>
+        val refM = ref.toMap.mapValues(v => Some(Utils.cleanTok(v)))
+        na.map(a => {a.copy(remoteType = refM.getOrElse(a.name, None))})
+        
+      case _ => critical(assign.head, s"Unsupported mixed assign methods"); assign
+    }
+  }
+  
   def processStatement(s: Statement)(implicit refStore: RefStore): Statement = {
     trace(s, s"Entering processStatement for ${s.getClass.getName}")
-    s.mapStmt(processStatement).mapExpr(processExpression).mapType(processType)
+    s.mapStmt(processStatement).mapExpr(processExpression).mapType(processType) match {
+      case i: DefInstance =>
+        // let's fetch remote module if known
+        currentProject.get.findModule(i.module.serialize) match {
+          case Some(m) => 
+            val portMap = processAssignSeq(i.portMap, m.ports.map(p => (p.name, p.tpe)))
+            val paramMap = processAssignSeq(i.paramMap, m.params.map(p => (p.name, p.tpe)))
+            i.copy(portMap = portMap, paramMap = paramMap)
+
+          case _ => i
+        }
+
+      case st => st
+    }
   }
   
   /**
@@ -120,6 +156,7 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
    * Processing Module References
    */
   def processModule(m: Module): Module = {
+    currentProject.get.clearDescriptionCache() // ensure that we have latest results
     implicit val ref2Type = new RefStore() 
     ref2Type ++= remoteRefs
     

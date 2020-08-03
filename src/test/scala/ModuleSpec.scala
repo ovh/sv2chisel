@@ -160,16 +160,17 @@ class ModuleSpec extends Sv2ChiselSpec {
       |  parameter TEST = 1
       |)(
       |  input a,
-      |  output b
+      |  output [31:0] b
       |);
-      |assign b = TEST ? a : '0;
+      |assign b[15:0] = TEST ? {16{a}} : '0;
+      |assign b[31:16] = TEST ? {16{a}} : '1;
       |endmodule
       |
       |module Main#(
       |  parameter OPT
       |)(
       |  input i,
-      |  output o
+      |  output [31:0] o
       |);
       |mod instB (i, o);
       |endmodule
@@ -181,7 +182,7 @@ class ModuleSpec extends Sv2ChiselSpec {
 
     result should contains ("val instB = Module(new mod)")
     result should contains ("instB.a := i")
-    result should contains ("o := instB.b")
+    result should contains ("o := instB.b.asUInt")
   }
 
 }

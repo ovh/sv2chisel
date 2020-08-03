@@ -402,7 +402,14 @@ case class AutoAssign(tokens: Interval) extends Assign {
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = Unit
 }
-case class NamedAssign(tokens: Interval, name: String, expr: Expression, flow: Flow) extends Assign with HasName {
+case class NamedAssign(
+  tokens: Interval, 
+  name: String, 
+  expr: Expression, 
+  flow: Flow, 
+  remoteType : Option[Type] = None,
+  assignExpr : Option[Expression] = None
+) extends Assign with HasName {
   type T = NamedAssign
   def tpe : Type = expr.tpe
   def serialize: String = flow match {
@@ -415,14 +422,21 @@ case class NamedAssign(tokens: Interval, name: String, expr: Expression, flow: F
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = f(expr)
 }
-case class NoNameAssign(tokens: Interval, expr: Expression, flow: Flow) extends Assign {
+case class NoNameAssign(
+  tokens: Interval, 
+  expr: Expression, 
+  flow: Flow,
+  remoteName : Option[String] = None,
+  remoteType : Option[Type] = None,
+  assignExpr : Option[Expression] = None
+) extends Assign {
   type T = NoNameAssign
   def tpe : Type = expr.tpe
   def serialize: String = s"NoNameAssign(" + expr.serialize + ")"
   def mapExpr(f: Expression => Expression) = this.copy(expr = f(expr))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = f(expr)
-  def toNamed(name: String): NamedAssign = NamedAssign(tokens, name, expr, flow)
+  def toNamed(name: String): NamedAssign = NamedAssign(tokens, name, expr, flow, remoteType, assignExpr)
 }
 
 case class TypeInst(

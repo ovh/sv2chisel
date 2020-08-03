@@ -641,10 +641,52 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
         case t: Stop => t.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
         case d: DefLogic => d.copy(init = processExpression(d.init, HwExpressionKind, d.tpe))
         case i: DefInstance =>  
-          val ports = i.portMap.map(p => p match {
-            case na: NamedAssign => na.mapExpr(processExpression(_, HwExpressionKind, na.tpe))
-            case na: NoNameAssign => na.mapExpr(processExpression(_, HwExpressionKind, na.tpe))
-            case _ => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
+          val ports = i.portMap.zipWithIndex.map(t => t._1 match {
+            
+            case na@NamedAssign(_,_,_, SourceFlow, _, _) => 
+              trace(na, s"Processing port ${na.name} (#${t._2}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(na.tpe).serialize}")
+              na.mapExpr(processExpression(_, HwExpressionKind, na.remoteType.getOrElse(na.tpe)))
+            case na@NoNameAssign(_,_, SourceFlow, _, _, _) => 
+              trace(na, s"Processing port #${t._2} (${na.remoteName.getOrElse("<unknown>")}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(na.tpe).serialize}")
+              na.mapExpr(processExpression(_, HwExpressionKind, na.remoteType.getOrElse(na.tpe)))
+              
+            case na@NamedAssign(_,_,_, SinkFlow, _, _) => 
+              trace(na, s"Processing port ${na.name} (#${t._2}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(UnknownType()).serialize}")
+              val expr = processExpression(na.expr, HwExpressionKind, UnknownType())
+              na.remoteType match {
+                case Some(remoteTpe) => 
+                  // Create assignExpr with cast if necessary
+                  val refExpr = Reference(na.tokens, na.name, Seq(i.name), remoteTpe, HwExpressionKind, SourceFlow)
+                  val refCast = processExpression(refExpr, HwExpressionKind, expr.tpe)
+                  if(refExpr != refCast){
+                    na.copy(expr = expr, assignExpr = Some(refCast))
+                  } else {
+                    na.copy(expr = expr)
+                  }
+                case None => na.copy(expr = expr)
+              }
+              
+            case na@NoNameAssign(_,_, SinkFlow, _, _, _) => 
+              val remoteName = na.remoteName.getOrElse("<???>")
+              trace(na, s"Processing port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(UnknownType()).serialize}")
+              val expr = processExpression(na.expr, HwExpressionKind, UnknownType())
+              na.remoteType match {
+                case Some(remoteTpe) => 
+                  // Create assignExpr with cast if necessary
+                  val refExpr = Reference(na.tokens, remoteName, Seq(i.name), remoteTpe, HwExpressionKind, SourceFlow)
+                  val refCast = processExpression(refExpr, HwExpressionKind, expr.tpe)
+                  if(refExpr != refCast){
+                    if (remoteName == "<???>") {
+                      critical(na, s"Unknown remote ref for port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize} : ${remoteTpe.serialize}")
+                    }
+                    na.copy(expr = expr, assignExpr = Some(refCast))
+                  } else {
+                    na.copy(expr = expr)
+                  }
+                case _ => na.copy(expr = expr)
+              }
+              
+            case p => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
           })
           val params = i.paramMap.map(_.mapExpr(processExpression(_, SwExpressionKind, UnknownType())))
           i.copy(portMap = ports, paramMap = params)

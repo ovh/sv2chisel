@@ -379,8 +379,8 @@ class RemoveConcats(
       
       val portMap = i.portMap.map(p => {
         val (exp, name) = p match {
-          case NamedAssign(_, n, e, _) => (Some(e), s"_$n")
-          case NoNameAssign(_, e, _) => (Some(e), "")
+          case NamedAssign(_, n, e, _, _, _) => (Some(e), s"_$n")
+          case NoNameAssign(_, e, _, _, _, _) => (Some(e), "")
           case _ => (None, "")
         }
         val expr = exp match {
