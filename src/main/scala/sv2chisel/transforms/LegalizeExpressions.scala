@@ -483,13 +483,13 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               }
               p.copy(args = Seq(a), kind = a.kind, tpe = a.tpe)
               
-            case (o: PrimOps.BitOp, _) => //bitwise operator (expect BitNeg)
+            case (o: PrimOps.BitOp, _) => //bitwise operator (except BitNeg)
               val exprs = p.args.map(processExpressionRec(_, expected, baseTpe))
-              val (kind, args) = castThemAll(exprs, baseUInt, None)
-              p.copy(args = args, kind = kind)
+              val (kind, tpe, args) = castTypeAll(exprs, baseUInt, None)
+              p.copy(args = args, kind = kind, tpe = tpe)
               
             case (o: PrimOps.RedOp, _) => //reduction operator (unary)
-              val exprs = p.args.map(processExpressionRec(_, expected, baseTpe))
+              val exprs = p.args.map(processExpressionRec(_, expected, baseUInt))
               val (kind, args) = castThemAll(exprs, baseUInt, Some(HwExpressionKind))
               p.copy(args = args, kind = HwExpressionKind, tpe = BoolType(UndefinedInterval))
             

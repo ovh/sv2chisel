@@ -103,5 +103,44 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     result should contains ("res := (a.asTypeOf(SInt(32.W)) >> 1.U).asUInt")
     result should contains ("res := a.asTypeOf(SInt(32.W)).asUInt >> 1")
   }
+  
+  it should "properly manage reduction operators" in {
+    val result = emitInModule("""
+      |wire [31:0] a;
+      |wire [31:0] b;
+      |wire res;
+      |assign b[15:0] = '1;
+      |assign res = |(a & ~b);
+      """.stripMargin
+    )
+    debug(result)
+    result should contains ("class Test() extends MultiIOModule {")
+    result should contains ("val a = Wire(UInt(32.W))")
+    result should contains ("val b = Wire(Vec(32, Bool()))")
+    result should contains ("val res = Wire(Bool())")
+    result should contains ("b(15,0) := (65535.U).asTypeOf(Vec(16, Bool()))")
+    result should contains ("res := (a& ~b.asUInt).orR()")
+
+  }
+  
+  it should "properly manage bitwise operators on Bool" in {
+    val result = emitInModule("""
+      |wire a;
+      |wire b;
+      |wire c;
+      |wire w, r, o;
+      |assign w = a ^ b;
+      |assign r = w ^ c;
+      |assign o = (w & c) | (a & b);
+      |assign o = (w && c) || (a && b);
+      """.stripMargin
+    )
+    debug(result)
+    result should contains ("class Test() extends MultiIOModule {")
+    result should contains ( "w := a^b" )
+    result should contains ( "r := w^c" )
+    result should contains ( "o := (w&c)|(a&b)" )
+    result should contains ( "o := (w && c) || (a && b)" )
+  }
 
 }
