@@ -162,6 +162,15 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     
     //FIRST PASS => fill ref2Type    
     m.foreachStmt(visitStatement)
+    m.clock match {
+      case Some(c) => ref2Type += ((c, FullType(BoolType(UndefinedInterval), HwExpressionKind)))
+      case _ => 
+    }
+    m.reset match {
+      case Some(r) => ref2Type += ((r, FullType(BoolType(UndefinedInterval), HwExpressionKind)))
+      case _ => 
+    }
+    
     m.foreachPort(p => ref2Type += ((p.name, FullType(p.tpe, HwExpressionKind))))
     m.foreachParam(p => ref2Type += ((p.name, FullType(p.tpe, p.kind))))
     
