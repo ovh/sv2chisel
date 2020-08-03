@@ -24,8 +24,9 @@ trait ChiselMatchers extends Matchers {
   }
   class ChiselFlexStringsMatcher(expectedLines: Seq[String]) extends Matcher[String] {
     override def apply(verilog: String): MatchResult = {
+      val data = verilog.split("\n").map(_.trim.replaceAll("\\P{Print}\\[[0-9]+m", ""))
       MatchResult(
-        verilog.split("\n").map(_.trim).containsSlice(expectedLines),
+        data.containsSlice(expectedLines),
         verilog + "\n did not contain \"" + expectedLines + "\"",
         s"Emitted verilog contained $expectedLines"
       )

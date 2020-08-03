@@ -7,7 +7,7 @@ package transforms
 
 import sv2chisel.ir._
 
-import collection.mutable.{HashMap, ArrayBuffer}
+import collection.mutable.{HashMap, HashSet, ArrayBuffer}
 
 /** Resolve logic as wire or reg with appropriate clock (TODO: and reset)
   * Also legalize port reg 
@@ -28,7 +28,8 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
   }
   
   private def processModuleCore(m: DefModule): DefModule = {
-    val reg2clocks = new HashMap[String, String]()
+    val reg2clocks = new HashMap[String, Option[String]]()
+    val reg2critical = new HashSet[String]()
     val clocksUsageCounts = new HashMap[String, Int]()
     def registerClockUsage(clock: String, reason: String): Unit = {
       if (clocksUsageCounts.contains(clock)) {
@@ -62,16 +63,33 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
         case (false, false, Some(clock)) =>  
           getRefs(c.loc).foreach(r => {
             if(reg2clocks.contains(r.name)){
-              val declClock = reg2clocks(r.name)
-              if (declClock != clock) {
-                Utils.throwInternalError(s"Same declared object ${r.name} driven by at least 2 different clocks: ${declClock} and ${clock}.")
+              reg2clocks(r.name) match {
+                case Some(declClock) if (declClock != clock) => 
+                  critical(c, s"Same declared signal ${r.name} driven by at least 2 different clocks: ${declClock} and ${clock}.")
+                case None if(!reg2critical.contains(r.name)) => 
+                  critical(c, s"Signal ${r.name} is driven both by clock ${clock} and assigned combinationally. This probably means that ${r.name} is either a wire or a reg depending on a generate parameter. Please review and fix generated code.")
+                  reg2critical += r.name
+                case _ => // fine : same name (or error already raised)
               }
             } else {
-              reg2clocks += ((r.name, clock))
+              reg2clocks += ((r.name, Some(clock)))
               registerClockUsage(clock, "non blocking assignment")
             }
           })
-        case _ => // nothing to do
+        case _ => 
+          getRefs(c.loc).foreach(r => {
+            if(reg2clocks.contains(r.name)){
+              reg2clocks(r.name) match {
+                case Some(declClock) if(!reg2critical.contains(r.name)) => 
+                  critical(c, s"Signal ${r.name} is driven both by clock ${declClock} and assigned combinationally. This probably means that ${r.name} is either a wire or a reg depending on a generate parameter. Please review and fix generated code.")
+                  reg2critical += r.name
+                case _ => // fine : same kind (or error already raised)
+              }
+            } else {
+              reg2clocks += ((r.name, None))
+            }
+          })
+        
       }
       c // nothing to be modified yet
     }
@@ -181,29 +199,38 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
       
       (p.resolution, p.direction, clock) match {
         case (LogicUnresolved, _, None) => p.copy(resolution = LogicWire)
-        case (LogicUnresolved, d: Output, c: String) => 
+        case (LogicUnresolved, d: Output, Some(c)) => 
           info(p, s"Creating proper register declaration and connect for implicit output reg ${p.name}")
           createPortRegConnect(c)
           p.copy(clock = Reference(ui, c, Seq()), resolution = LogicWire)
           
-        case (LogicUnresolved, d: Direction, c: String) => 
+        case (LogicUnresolved, d: Direction, Some(c)) => 
           critical(p, s"H'ld a sec... ${d.serialize} reg? Are you trying to assign an input? (Resolved as wire)")
           p.copy(resolution = LogicWire)
           
         case (LogicRegister, d: Output, None) =>
-          warn(p, s"Inconsistent declaration as register of ${p.name} while never assigned in a clocked region (always @<pos|neg>edge <clock>). (resolved as wire declaration)")
+          if(!reg2critical.contains(p.name)){
+            warn(p, s"Inconsistent declaration as register of ${p.name} while never assigned in a clocked region (always @<pos|neg>edge <clock>). (resolved as wire declaration)")
+          } else {
+            warn(p, s"Due to previous error ${p.name} is resolved as wire declaration which is reportedly inaccurate at least for some part of the description.")
+          }
+            
           p.copy(resolution = LogicWire)
         
-        case (LogicWire, d: Output, c: String) =>
-          warn(p, s"Inconsistent declaration as wire of ${p.name} while assigned in a clocked region (always @<pos|neg>edge $c). (Resolved creating proper register declaration and connect for this implicit output reg)")
+        case (LogicWire, d: Output, Some(c)) =>
+          if(!reg2critical.contains(p.name)){
+            warn(p, s"Inconsistent declaration as wire of ${p.name} while assigned in a clocked region (always @<pos|neg>edge $c). (Resolved creating proper register declaration and connect for this implicit output reg)")
+          } else {
+            warn(p, s"Due to previous error ${p.name} is resolved creating proper register declaration and connect for this implicit output reg which is reportedly inaccurate at least for some part of the description.")
+          }
           createPortRegConnect(c)
           p.copy(clock = Reference(ui, c, Seq()), resolution = LogicWire)
           
-        case (LogicWire, d: Direction, c: String) =>
+        case (LogicWire, d: Direction, Some(c)) =>
           critical(p, s"Found clocked assignment for declared ${d.serialize} wire ${p.name}: cannot create register for input ports it does not make sense !")
           p.copy(clock = Reference(UndefinedInterval, c, Seq()), resolution = LogicRegister)
         
-        case (LogicRegister, d: Output, c: String) => 
+        case (LogicRegister, d: Output, Some(c)) => 
           info(p, s"Creating proper register declaration and connect for output reg ${p.name}")
           createPortRegConnect(c)
           p.copy(clock = Reference(ui, c, Seq()), resolution = LogicWire)
@@ -220,18 +247,26 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
       val clock = reg2clocks.getOrElse(l.name, None)
       (l.resolution, clock) match {
         case (LogicUnresolved, None) => l.copy(resolution = LogicWire)
-        case (LogicUnresolved, c: String) => 
+        case (LogicUnresolved, Some(c)) => 
           l.copy(clock = Reference(UndefinedInterval, c, Seq()), resolution = LogicRegister)
           
         case (LogicRegister, None) =>
-          warn(l, s"Inconsistent declaration as register of ${l.name} while never assigned in a clocked region (always @<pos|neg>edge <clock>). (resolved as wire declaration)")
+          if(!reg2critical.contains(l.name)){
+            warn(l, s"Inconsistent declaration as register of ${l.name} while never assigned in a clocked region (always @<pos|neg>edge <clock>). (resolved as wire declaration)")
+          } else {
+            warn(l, s"Due to previous error ${l.name} is resolved as wire declaration which is reportedly inaccurate at least for some part of the description.")
+          }
           l.copy(resolution = LogicWire)
         
-        case (LogicWire, c: String) =>
-          warn(l, s"Inconsistent declaration as wire of ${l.name} while assigned in a clocked region (always @<pos|neg>edge $c). (resolved as register declaration) ")
+        case (LogicWire, Some(c)) =>
+          if(!reg2critical.contains(l.name)){
+            warn(l, s"Inconsistent declaration as wire of ${l.name} while assigned in a clocked region (always @<pos|neg>edge $c). (resolved as register declaration) ")
+          } else {
+            warn(l, s"Due to previous error ${l.name} is resolved as register declaration which is reportedly inaccurate at least for some part of the description.")
+          }
           l.copy(clock = Reference(UndefinedInterval, c, Seq()), resolution = LogicRegister)
-        
-        case (LogicRegister, c: String) => 
+          
+        case (LogicRegister, Some(c)) => 
           l.copy(clock = Reference(UndefinedInterval, c, Seq()))
           
         case _ => l // nothing to do 
