@@ -4,15 +4,10 @@
 
 package sv2chisel
 
-import sv2chisel.ir._
-import sv2chisel.Utils.{time}
-import sv2chisel.transforms._
-
 import logger._
 
-
-object SV2ChiselApp extends App { // TODO: CLI options
-  // Loglevel should definitely be controlled through CLI options 
+// see README for another template example
+object SV2ChiselApp extends App {
   Logger.setLevel(LogLevel.Info)
   
   val basePath = "../github/picorv32"
