@@ -5,38 +5,55 @@
 lazy val ScalaTestVersion = "3.0.5"
 lazy val AntlrVersion     = "4.7.1"
 
+lazy val commonSettings = Seq (
+  resolvers ++= Seq(
+    Resolver.sonatypeRepo("snapshots"),
+    Resolver.sonatypeRepo("releases")
+  ),
+  organization := "com.ovhcloud",
+  scalaVersion := "2.12.10",
+  version := "0.1.0-SNAPSHOT",
+  libraryDependencies ++= Seq(
+    "org.scalatest" %% "scalatest" % ScalaTestVersion % Test,
+    "org.scalacheck" %% "scalacheck" % "1.14.3" % "test",
+    "org.apache.commons" % "commons-text" % "1.7"
+  ),
+  scalacOptions ++= Seq(
+    "-deprecation",
+    "-language:implicitConversions"
+  ),
+  scalacOptions in Compile in doc ++= Seq(
+    "-feature",
+    "-diagrams",
+    "-diagrams-max-classes", "250",
+    "-doc-version", version.value,
+    "-doc-title", name.value,
+    "-sourcepath", (baseDirectory in ThisBuild).value.toString
+  )
+)
+
 lazy val root = (project in file("."))
   .enablePlugins(Antlr4Plugin)
+  .settings(commonSettings: _*)
   .settings(
-    inThisBuild(
-      List(
-        organization := "com.ovhcloud",
-        scalaVersion := "2.12.10",
-        version := "0.1.0-SNAPSHOT"
-      )),
     name := "sv2chisel",
-    
     libraryDependencies ++= Seq(
-      "org.scalatest" %% "scalatest" % ScalaTestVersion % Test,
-      "org.scalacheck" %% "scalacheck" % "1.14.3" % "test",
       "org.antlr"     % "antlr4"     % AntlrVersion,
-      "org.apache.commons" % "commons-text" % "1.7"
     ),
     antlr4GenListener in Antlr4 := false,
     antlr4GenVisitor in Antlr4 := true,
-    antlr4PackageName in Antlr4 := Option("sv2chisel.antlr"),
-    scalacOptions ++= Seq(
-      "-deprecation"
-    ),
-    scalacOptions in Compile in doc ++= Seq(
-      "-feature",
-      "-diagrams",
-      "-diagrams-max-classes", "250",
-      "-doc-version", version.value,
-      "-doc-title", name.value,
-      "-sourcepath", (baseDirectory in ThisBuild).value.toString
-    ),
-    
-    // Compile / unmanagedResources / includeFilter := "*.sv"
-    includeFilter in Compile in unmanagedResources  := "*.sv"
+    antlr4PackageName in Antlr4 := Option("sv2chisel.antlr")
   )
+  .aggregate(helpers)
+  
+lazy val helpers = (project in file("helpers"))
+  .settings(commonSettings: _*)
+  .settings(
+    name := "sv2chisel-helpers",
+    
+    libraryDependencies ++= Seq(
+      "edu.berkeley.cs" %% "chisel3" % "3.3.2"
+    )
+  )
+
+

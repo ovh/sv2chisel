@@ -675,7 +675,7 @@ class ChiselSubIndex(e: SubIndex){
 
 class ChiselSubRange(e: SubRange){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    def addVecImpl = ctx.src.addDep(PackageRef(UndefinedInterval, "fpga.utils.vecconvert", "_"))
+    def addVecImpl = ctx.src.addDep(PackageRef(UndefinedInterval, "sv2chisel.helpers.vecconvert", "_"))
     (e.expr.tpe, e.flow) match {
       case (v: VecType, _) => addVecImpl
       case (_:UIntType | _: SIntType, SourceFlow) => // implemented in Bits (superclass of UInt & SInt)

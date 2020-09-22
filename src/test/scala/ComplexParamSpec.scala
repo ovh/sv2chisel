@@ -63,7 +63,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     )
     debug(result)
     result should contains ("import chisel3._")
-    result should contains ("import fpga.utils.vecconvert._")
+    result should contains ("import sv2chisel.helpers.vecconvert._")
     
     result should contains ("class Test() extends MultiIOModule {")
 
