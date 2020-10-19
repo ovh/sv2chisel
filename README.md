@@ -9,7 +9,7 @@ The obtained Chisel is intended to be manually refactored to benefit from the ad
 Important notice: **sv2chisel** was developed with a test-driven development methodology, and is hence not fully covering (System)Verilog syntax.
 This means it might probably *not* work out-of-the-box with your own code, some slight adjustment might be required either in input Verilog, output Chisel or both.
 
-**sv2chisel** emerged as a research effort, if you use it or borrow some concepts in your own work, please cite the associated paper (bibtex entry below).
+**sv2chisel** emerged as a research effort, if you use it or borrow some concepts in your own work, please cite the [associated paper](https://hal.archives-ouvertes.fr/hal-02949112/document) (bibtex entry below).
 
 # Content
 The current repository contains 2 projects:
@@ -162,7 +162,7 @@ Here we are, here is precisely where the whole fun starts, and where this step-b
 Please refer to [Chisel documentation](https://www.chisel-lang.org) for user-guide and example around Chisel's generation powers.
 
 # Citing this work
-If you use this work or borrow some concept for your own research, please cite the following paper:
+If you use this work or borrow some concept for your own research, please cite the following [paper](https://hal.archives-ouvertes.fr/hal-02949112/document):
 ```bibtex
 @inproceedings{bruant2020sv2chisel,
   author    = {Jean Bruant and
