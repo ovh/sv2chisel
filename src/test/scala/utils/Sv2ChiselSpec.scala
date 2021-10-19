@@ -23,6 +23,15 @@ abstract class Sv2ChiselSpec extends AnyFlatSpec with ChiselMatchers with EasyLo
       |""".stripMargin
   }
   
+  def wrapInPackage(body: String, name : String = "Test") : String = {
+    s"""
+      |package $name;
+      |""".stripMargin ++ 
+        body.split("\n").mkString("    ", "\n    ", "") ++ """
+      |endpackage
+      |""".stripMargin
+  }
+  
   def emitInModule(body: String) : String = {
     val str = wrapInModule(body)
     debug(str)

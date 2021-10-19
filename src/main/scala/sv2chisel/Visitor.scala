@@ -1394,7 +1394,7 @@ class Visitor(
   
   private def visitType_declaration(ctx: Type_declarationContext, attr: VerilogAttributes): Statement = {
     ctx.data_type match {
-      case null => 
+      case null => // barely used old-C-style of typedef in 2 statements (this would be the second, actual typedef) 
         ctx.getChild(2) match {
           case i: IdentifierContext => unsupportedStmt(ctx, "TO DO simple type alias")
           case o: Identifier_with_bit_selectContext => unsupportedStmt(ctx, "TO DO type alias")
@@ -1407,12 +1407,15 @@ class Visitor(
               case _ => throwParserError(ctx)
             }
         }
-      case dt => 
-        val (tpe, _) = getDataType(dt, true) // not sure about that true here ???
+      case dt => // all typedef combined with actual type defition
+        val (tpe, _) = getDataType(dt, isHw = true) // assuming hardware (could be questioned)
         val id = ctx.identifier.asScala match {
           case Seq(i) => i.getText
           case _ => throwParserError(ctx)
         }
+        if(!ctx.variable_dimension.asScala.isEmpty) 
+          unsupported.raiseIt(ctx, s"Unsupported variable_dimension within context ${getRawText(ctx)}")
+          
         DefType(ctx.getSourceInterval, attr, id, tpe)
     }
   }

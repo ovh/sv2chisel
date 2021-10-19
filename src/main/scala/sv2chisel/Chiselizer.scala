@@ -508,8 +508,12 @@ class ChiselDefType(val t: DefType) extends Chiselized {
         Seq(ChiselLine(t, ctx, s"class ${t.name} extends Bundle {")) ++
           b.fields.flatMap(_.chiselize(ctx.hw().incr())) ++
           Seq(ChiselLine(ctx, "} "))
-
-      case _ => unsupportedChisel(ctx, t, s"DefType with type ${t.tpe.serialize}") 
+      
+      case tpe => // assuming alias case
+        Seq(ChiselLine(t, ctx, s"object ${t.name} {"),
+          ChiselLine(ctx.incr(), s"def apply() = ")) ++
+          tpe.chiselize(ctx.hw()) ++
+          Seq(ChiselLine(ctx, "} "))
     }
   }
 }
