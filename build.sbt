@@ -2,7 +2,7 @@
 // license that can be found in the LICENSE file.
 // Copyright 2020 The sv2chisel Authors. All rights reserved.
 
-lazy val ScalaTestVersion = "3.0.5"
+lazy val ScalaTestVersion = "3.2.2"
 lazy val AntlrVersion     = "4.7.1"
 lazy val CirceVersion     = "0.14.1"
 

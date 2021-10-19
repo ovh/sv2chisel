@@ -12,8 +12,9 @@ import chisel3._
 import chisel3.stage.ChiselStage
 
 import org.scalatest._
+import flatspec._
 
-class vecconvertSpec extends FlatSpec with VerilogMatchers {
+class vecconvertSpec extends AnyFlatSpec with VerilogMatchers {
   val setTestRunDir = Array("--target-dir", "test_run_dir")
 
   "Ascii literals" should "just works" in {

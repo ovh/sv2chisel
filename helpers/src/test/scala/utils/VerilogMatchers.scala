@@ -5,6 +5,7 @@
 package sv2chiselHelpersTests.utils
 
 import org.scalatest._
+import matchers.should._
 
 trait VerilogMatchers extends Matchers {
   import matchers._

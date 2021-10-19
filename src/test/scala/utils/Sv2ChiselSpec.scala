@@ -6,10 +6,11 @@ package sv2chiselTests.utils
 
 import sv2chisel._
 import org.scalatest._
+import flatspec._
 
 import logger._
 
-abstract class Sv2ChiselSpec extends FlatSpec with ChiselMatchers with EasyLogging {
+abstract class Sv2ChiselSpec extends AnyFlatSpec with ChiselMatchers with EasyLogging {
   
   def emit(input: String): String = Driver.emitChisel(Project("test", input))
   // to do add optional param & ports 
