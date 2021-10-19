@@ -72,11 +72,15 @@ case class UnrecognizedDescription(tokens: Interval) extends Description {
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
 }
 
-abstract class Header extends Description {
+abstract class Header extends Statement {
   type T <: Header
+  def mapExpr(f: Expression => Expression) = this.asInstanceOf[T]
+  def mapType(f: Type => Type) = this.asInstanceOf[T]
   def mapStmt(f: Statement => Statement) = this.asInstanceOf[T]
   def mapString(f: String => String) = this.asInstanceOf[T]
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.asInstanceOf[T]
+  def foreachExpr(f: Expression => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = Unit
   def foreachStmt(f: Statement => Unit): Unit = Unit
   def foreachString(f: String => Unit): Unit = Unit
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
@@ -850,7 +854,7 @@ case class DoCall(
   * STATEMENTS 
   *
   */
-sealed abstract class Statement extends SVNode {
+sealed abstract class Statement extends Description {
   type T <: Statement
   def mapInterval(f: Interval => Interval): T
   def mapStmt(f: Statement => Statement): T

@@ -5,6 +5,11 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
+- package import
+- typedef alias
+- function
+- package path reversed
+
 - fix disabled cast from SInt to UInt (or double cast ??) => required by elaboration
 - fix systematic .U cast => cause issue with not and minus primops => need case for:
   - negative literal

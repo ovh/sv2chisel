@@ -50,6 +50,7 @@ package object chiselize extends EasyLogging {
   implicit def sourceFileToChisel(s: SourceFile) = new ChiselSourceFile(s)
 
   implicit def descriptionToChisel(s: Description) = new ChiselDescription(s)
+  implicit def headerToChisel(s: Header) = new ChiselHeader(s)
 
   implicit def packageRefToChisel(s: PackageRef) = new ChiselPackageRef(s)
 
@@ -222,9 +223,8 @@ class ChiselSourceFile(val src: SourceFile) extends Chiselized {
 class ChiselDescription(val d: Description) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     d match {
-      case h: ImportPackages => h.chiselize(ctx)
+      case s: Statement => s.chiselize(ctx)
       case m: DefModule => m.chiselize(ctx)
-      case c: CompilerDirective => Seq(ChiselLine(c, ctx, "// " + c.text + "\n"))
       case p: DefPackage => p.chiselize(ctx)
       case _ => unsupportedChisel(ctx,d)
     }
@@ -424,6 +424,7 @@ class ChiselType(val t: Type) extends Chiselized {
 class ChiselStatement(val s: Statement) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     s match {
+      case h: Header => h.chiselize(ctx)
       case b: SimpleBlock => b.chiselize(ctx)
       case l: DefLogic => l.chiselize(ctx)
       case t: DefType => t.chiselize(ctx)
@@ -447,6 +448,16 @@ class ChiselStatement(val s: Statement) extends Chiselized {
         unsupportedChisel(ctx,s, s"Unknown statement")
     }
     
+  }
+}
+
+class ChiselHeader(val s: Statement) extends Chiselized {
+  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
+    s match {
+      case h: ImportPackages => h.chiselize(ctx)
+      case c: CompilerDirective => Seq(ChiselLine(c, ctx, "// " + c.text + "\n"))
+      case _ => unsupportedChisel(ctx,s, s"Unknown header")
+    }
   }
 }
 

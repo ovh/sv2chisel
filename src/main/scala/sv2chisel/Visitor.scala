@@ -123,6 +123,17 @@ class Visitor(
     DefPackage(ctx.getSourceInterval, attr, id, body)
   }
   
+  private def visitPackageImport(ctx: Package_import_declarationContext): ImportPackages = {
+    val packages = ctx.package_import_item.asScala.map{ p => 
+      p.identifier.asScala match {
+        case Seq(h) => PackageRef(ctx.getSourceInterval(),h.getText())
+        case Seq(h,q) => PackageRef(ctx.getSourceInterval(),h.getText(),q.getText())
+        case _ => throwParserError(ctx)
+      }
+    }
+    ImportPackages(ctx.getSourceInterval(),packages)
+  }
+  
   private def visitHeader(ctx: Header_textContext): Header = {
     ctx.getChild(0) match {
       case c : Compiler_directiveContext => 
@@ -143,15 +154,8 @@ class Visitor(
 
       case a: Design_attributeContext => DesignAttribute(a.getSourceInterval,visitAttributeInstance(a.attribute_instance))
 
-      case i: Package_import_declarationContext => 
-        val packages = i.package_import_item.asScala.map{ p => 
-          p.identifier.asScala match {
-            case Seq(h) => PackageRef(i.getSourceInterval(),h.getText())
-            case Seq(h,q) => PackageRef(i.getSourceInterval(),h.getText(),q.getText())
-            case _ => throwParserError(ctx)
-          }
-        }
-        ImportPackages(i.getSourceInterval(),packages)
+      case i: Package_import_declarationContext => visitPackageImport(i)
+        
     }
   }
   
@@ -473,7 +477,7 @@ class Visitor(
   
   private def getPath(ctx: Package_or_class_scoped_pathContext): Reference = {
     unsupported.check(ctx)
-    val path = ctx.package_or_class_scoped_path_item.asScala.map(getPathItem)
+    val path = ctx.package_or_class_scoped_path_item.asScala.map(getPathItem).reverse
     val intv = ctx.getSourceInterval()
     path match {
       case Seq()  => throwParserError(ctx)
@@ -1418,7 +1422,7 @@ class Visitor(
     val dt = ctx.data_type_or_implicit
     (dt, ctx.type_declaration, ctx.package_import_declaration, ctx.net_type_declaration) match {
       case (null, null, null, td) => unsupportedStmt(td, "net_type_declaration")
-      case (null, null, pi, null) => unsupportedStmt(pi, "package_import_declaration")
+      case (null, null, pi, null) => visitPackageImport(pi)
       case (null, td, null, null) => visitType_declaration(td, attr)
       case (dt, null, null, null) =>
         val (tpe, res) = visitData_type_or_implicit(dt, true)

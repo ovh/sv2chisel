@@ -10,11 +10,11 @@ import logger._
 object SV2ChiselApp extends App {
   Logger.setLevel(LogLevel.Info)
   
-  val basePath = "../github/picorv32"
+  val basePath = "tree_filters"
   val files = Seq(
-    "picorv32.v",
+    "tf_p.sv",
   )
-  val project = Project("picorv32", basePath, files)
+  val project = Project("tree_filters", basePath, files)
   
   Driver.emitChisel(project, "chisel_gen")
 
