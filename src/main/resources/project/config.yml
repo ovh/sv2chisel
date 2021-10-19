@@ -1,0 +1,18 @@
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file.
+# Copyright 2020 The sv2chisel Authors. All rights reserved.
+
+# Config file format: list of projects
+- name: MyProject #project name, optional
+  emissionPath: "chisel_gen/my_project" #base path of translated files, optional
+  basePath: "src/main/resources/project/hdl" #base path of files to be translated, optional
+  files: #list of files to be translated into chisel, at least one file is required
+    - my_package.sv
+    - my_module.sv
+  
+# - name: MyProjectB
+#   base_in_path: ""
+#   base_out_path: ""
+#   files:
+#     - my_package.sv
+#     - my_module.sv

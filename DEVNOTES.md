@@ -5,7 +5,6 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- package import
 - typedef alias
 - function
 - package path reversed
@@ -104,7 +103,6 @@ object ModuleName {
 
 #### Low-hanging fruits
 
-0./ Add CLI options to main
 1./ Add More Test-cases
     - improve/fix TODO left in ComplexParamSpec
 

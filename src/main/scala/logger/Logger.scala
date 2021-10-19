@@ -37,7 +37,7 @@ object LogLevel extends Enumeration {
     case "info"  => LogLevel.Info
     case "debug" => LogLevel.Debug
     case "trace" => LogLevel.Trace
-    case level => throw new Exception(s"Unknown LogLevel '$level'")
+    case l => throw new Exception(s"Unknown LogLevel '$l'. Valid values: error, warn, struct, info, debug, trace")
   }
 }
 
