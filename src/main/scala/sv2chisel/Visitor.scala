@@ -1138,6 +1138,18 @@ class Visitor(
         }
     }
   }
+  private def visitTypeRes(ctx: Net_port_typeContext, isHw: Boolean) : (Type, LogicResolution) = {
+    ctx match {
+      case null => (BoolType(UndefinedInterval), LogicUnresolved)
+      case c => unsupported.check(ctx)
+        c.data_type_or_implicit match {
+          case null => 
+            unsupported.raiseIt(ctx, s"To investigate? weird Net_port_typeContext: `${getRawText(ctx)}`")
+            (BoolType(UndefinedInterval), LogicUnresolved)
+          case cdi => visitData_type_or_implicit(cdi, isHw)
+        }
+    }
+  }
   
   
   private def getVariableDim(ctx: Variable_dimensionContext): Type = {
@@ -1173,13 +1185,41 @@ class Visitor(
     }
   }
 
-  private def visitPortsDeclaration(ctx: List_of_port_declarationsContext): Seq[Port] = {
+  private def visitPortsDeclaration(ctx: List_of_port_declarationsContext): (Seq[Port], Seq[String]) = {
     ctx match {
-      case null => Seq()
+      case null => (Seq(), Seq())
       case list =>
-        unsupported.check(ctx)
+        // nonansi port listing prior inline declaration 
+        // warning only here because this list of declared port name is purely informative
+        val declaredPortNames = list.nonansi_port.asScala.map(p => {
+          (p.identifier, p.nonansi_port__expr) match {
+            case (null, expr) => expr.identifier_doted_index_at_end.asScala match {
+              case Seq(id) => id.identifier.asScala match {
+                  case Seq(name) => 
+                    if(!id.range_expression.asScala.isEmpty) 
+                      critical(ctx, s"NonAnsi port with unexpected range_expression");
+                    name.getText()
+                  case s => 
+                    warn(ctx, s"NonAnsi port with unexpected identifier: ${s.map(_.getText()).mkString(".")}");
+                    ""
+                }
+              case s => 
+                warn(ctx, s"NonAnsi port with unexpected identifier: ${s.map(_.getText()).mkString(".")}");
+                ""
+            }
+            case (name, null) => 
+              warn(ctx, s"NonAnsi port with identifier only: ${name.getText()}");
+              ""
+            case (name, expr) => 
+              warn(ctx, s"NonAnsi port with both identifier: ${name.getText()} and expr:${expr.getText()}");
+              ""
+            case _ => throwParserError(p)
+          }
+          
+        })
+        
         var previousDirection : Option[Direction] = None
-        list.list_of_port_declarations_ansi_item.asScala.map(p => {
+        val ports = list.list_of_port_declarations_ansi_item.asScala.map(p => {
           val attr = visitAttributes(p.attribute_instance.asScala)
           val decl = p.ansi_port_declaration
           val direction = (decl.port_direction, previousDirection) match {
@@ -1212,13 +1252,61 @@ class Visitor(
           
           (resolution, decl.constant_expression) match {
             case (_, null) => Port(p.getSourceInterval(), attr, name, direction, fullType, resolution)
-            case (LogicRegister, a) => Port(p.getSourceInterval(), attr, name, direction, fullType, resolution).copy(init = getExpression(a.expression))
+            case (LogicRegister, a) => Port(p.getSourceInterval(), attr, name, direction, fullType, resolution, getExpression(a.expression))
             case _ => 
               unsupported.raiseIt(ctx, "Unexpected assign on a none register logic")
               Port(p.getSourceInterval(), attr, name, direction, fullType, resolution)
           }
         })
+        (ports, declaredPortNames)
     }
+  }
+  
+  private def visitNonansi_port_declaration(ctx: Nonansi_port_declarationContext): Statement = {
+    val attr = visitAttributes(ctx.attribute_instance.asScala)
+    
+    val (direction, (tpe, resolution)) = (ctx.KW_INPUT,ctx.KW_OUTPUT,ctx.KW_INOUT) match {
+      case (d, null, null) => (Input(d.getSourceInterval()), visitTypeRes(ctx.net_or_var_data_type, isHw = true))
+      case (null, d, null) => (Output(d.getSourceInterval()), visitTypeRes(ctx.net_or_var_data_type, isHw = true))
+      case (null, null, d) => (Inout(d.getSourceInterval()), visitTypeRes(ctx.net_port_type, isHw = true))
+      case _ => 
+        unsupported.raiseIt(ctx, s"Unsupported port declaration style")
+        (Input(ctx.getSourceInterval()), (BoolType(UndefinedInterval), LogicUnresolved))
+    }
+    
+    // IDs for INPUT and INOUT
+    val portA = ctx.list_of_variable_identifiers match {
+      case null => Seq()
+      case l => l.list_of_variable_identifiers_item.asScala.map(id => {
+        val name = id.identifier.getText()
+        
+        val unpacked = id.variable_dimension.asScala.map(getVariableDim)
+          .collect {case u: UnpackedVecType => u}
+        
+        val fullType = getFullType(unpacked, tpe)
+        
+        Port(id.getSourceInterval(), attr, name, direction, fullType, resolution)
+      })
+    }
+    // OUTPUTS
+    val portB = ctx.list_of_variable_port_identifiers match {
+      case null => Seq()
+      case l => l.list_of_tf_variable_identifiers.list_of_tf_variable_identifiers_item.asScala.map(id => {
+        val name = id.identifier.getText()
+        
+        val unpacked = id.variable_dimension.asScala.map(getVariableDim)
+          .collect {case u: UnpackedVecType => u}
+        
+        val fullType = getFullType(unpacked, tpe)
+        
+        id.expression match {
+          case null => Port(id.getSourceInterval(), attr, name, direction, fullType, resolution)
+          case e => Port(id.getSourceInterval(), attr, name, direction, fullType, resolution, getExpression(e))
+        }
+      })
+    }
+    
+    getStmtOrSimpleBlock(ctx, portA ++ portB)
   }
   
   private def getMinTypMaxExpression(ctx: Mintypmax_expressionContext): Expression = {
@@ -2126,15 +2214,15 @@ class Visitor(
       case i: ModuleItemItemContext =>
         val attr = visitAttributes(i.attribute_instance.asScala)
         visitModule_item_item(i.module_item_item, attr)
+      case i: ModulePortDeclContext => visitNonansi_port_declaration(i.nonansi_port_declaration)
+        
       case i: ModuleSpecBlockContext => unsupportedStmt(i, "ModuleSpecBlock")
       case i: ModuleProgDeclContext => unsupportedStmt(i, "ModuleProgDecl")
       case i: ModuleDeclContext => unsupportedStmt(i, "ModuleDecl")
       case i: ModuleIntfDeclContext => unsupportedStmt(i, "ModuleIntfDecl")
       case i: ModuleTimeDeclContext => unsupportedStmt(i, "ModuleTimeDecl")
-      case i: ModulePortDeclContext => unsupportedStmt(i, "ModulePortDecl")
       case _ => throwParserError(ctx)
     }
-    
     
   }
   
@@ -2145,11 +2233,21 @@ class Visitor(
     val attr = visitAttributes(h.attribute_instance.asScala)
     val name = getRefText(h.identifier)
     val params = visitParams(h.parameter_port_list)
-    val ports = visitPortsDeclaration(ctx.list_of_port_declarations)
-     
-    val body = SimpleBlock(ctx.module_item.asScala.map(visitModule_item))
+    
+    // ports are considered directly as the first statements in all cases
+    val (ports, declared) = visitPortsDeclaration(ctx.list_of_port_declarations)
+    val body = SimpleBlock(ports ++ ctx.module_item.asScala.map(visitModule_item))
 
-    Module(ctx.getSourceInterval(), attr,name,params,EmptyStmt,ports,body)
+    val module = Module(ctx.getSourceInterval(), attr,name,params,body)
+    
+    // check nonansi ports against actual port declaration
+    val inlineDeclared = module.ports.map(p => p.name).toSet
+    declared.foreach(name => {
+      if(!inlineDeclared.contains(name))
+        warn(ctx, s"Missing inline declaration for advertised nonansi port $name (ignored)")
+    })
+    
+    module
   }
   
 }

@@ -45,12 +45,29 @@ class ModuleSpec extends Sv2ChiselSpec {
   }
   
   // Test Inputs
-  it should "be properly emitted with IOs" in {
+  it should "be properly emitted with arg-style IOs" in {
     val result = emit(s"""
       |module CustomModule(
       |  input a,
       |  output b
       |);
+      |assign b = a;
+      |endmodule
+      """.stripMargin
+    )
+    debug(result)
+    result should contains ("class CustomModule() extends MultiIOModule {")
+    result should contains ("val a = IO(Input(Bool()))")
+    result should contains ("val b = IO(Output(Bool()))")
+    result should contains ("b := a")
+  }
+  
+  it should "be properly emitted with inline style IOs" in {
+    val result = emit(s"""
+      |module CustomModule(a,b);
+      |  input a;
+      |  output b;
+      |
       |assign b = a;
       |endmodule
       """.stripMargin

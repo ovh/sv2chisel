@@ -268,13 +268,14 @@ class ChiselModule(val m: Module) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     val mCtxt = ctx.incr()
     val pCtxt = mCtxt.incr()
-
-    val (ports, kind) = (m.clock, m.reset) match {
+    
+    // filter out clock & reset ports provided by MultiIOModule if inference succeeded earlier
+    val (mod, kind) = (m.clock, m.reset) match {
       case (_, Some(r)) => 
         unsupportedChisel(ctx, m, "Reset inference unsupported for now")
-        (m.ports, "MultiIOModule")
-      case (Some(c), None) => (m.ports.filterNot(p => p.name == c), "MultiIOModule")
-      case (None, None) => (m.ports, "RawModule")
+        (m, "MultiIOModule")
+      case (Some(c), None) => (m.mapPort(p => if(p.name == c) EmptyStmt else p), "MultiIOModule")
+      case (None, None) => (m, "RawModule")
     }
     
     val comma = Seq(ChiselTxt(mCtxt, ","))
@@ -284,15 +285,13 @@ class ChiselModule(val m: Module) extends Chiselized {
     // use override def desiredName = m.name for emission consistency? 
     // s += ChiselLine(m, ctx, s"class ${m.name.toCamel(ctx)}(")
     s += ChiselLine(m, ctx, s"class ${m.name}(")
-    if(m.params.size > 0) {
-      s ++= m.params.map(_.chiselize(pCtxt, true) ++ comma).flatten
+    if(mod.params.size > 0) {
+      s ++= mod.params.map(_.chiselize(pCtxt, true) ++ comma).flatten
       s += ChiselLine(mCtxt, s") extends $kind {")
     } else {
       s += ChiselTxt(mCtxt, s") extends $kind {")
     }
-    s ++= m.preBody.chiselize(mCtxt)
-    s ++= ports.map(_.chiselize(mCtxt)).flatten
-    s ++= m.body.chiselize(mCtxt)
+    s ++= mod.body.chiselize(mCtxt)
     s += ChiselLine(ctx, "}")
   }
 }
@@ -436,6 +435,7 @@ class ChiselStatement(val s: Statement) extends Chiselized {
       case c: Conditionally => c.chiselize(ctx)
       case i: DefInstance => i.chiselize(ctx)
       case s: Switch => s.chiselize(ctx)
+      case p: Port => p.chiselize(ctx)
       
       case p: Print => Seq(ChiselLine(s, ctx, p.serialize))
       case RawScala(str) => 

@@ -83,9 +83,9 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
     m.foreachParam(p => knownParams += (p.name))
     
     
-    // WARNING : to do handle the added statement pre-io
+    // WARNING : handle the added statement pre-io
     val mod = m.mapParam(processParam).asInstanceOf[Module]
-    mod.copy(preBody = (mod.preBody, stmts.toSeq) match {
+    mod.copy(body = (mod.body, stmts.toSeq) match {
         case (b: Statement, Seq()) => b
         case (s: Block, st) => s.prependStmts(st)
         case (s: Statement, st) => SimpleBlock(s.tokens, st ++ Seq(s))

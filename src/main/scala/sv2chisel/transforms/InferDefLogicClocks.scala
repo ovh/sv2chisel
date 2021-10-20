@@ -156,28 +156,28 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
     }
 
     // module used for second pass
-    val module = m.mapStmt(visitStatement).asInstanceOf[Module]
+    val moduleNext = m.mapStmt(visitStatement).asInstanceOf[Module]
     
     // SECOND PASS => use reg2clocks to fix registers definitions
     val rectifiedOutputRegStmt = ArrayBuffer[Statement]()
     val renameMap = new RenameMap()
     
-    val (clock, updatedPorts) = clocksUsageCounts.keys.toSeq match {
+    val (clock, module) = clocksUsageCounts.keys.toSeq match {
       // to do add parameter to allow clock rename or not (no rename => rawmodule + withClock)
-      case Seq() => (Some("clock"), module.ports)
+      case Seq() => (Some("clock"), moduleNext)
       case Seq(e) => 
         renameMap.add(Rename(e, "clock", true)) // very important for submodules (and consistency)
-        val ports = module.ports.map(p => {
+        val m = moduleNext.mapPort(p => {
           if(p.name == e){
             p.copy(isDefaultClock = Some(e)) // required for clock propagation 
           } else {
             p
           }
         })
-        (Some("clock"), ports)
+        (Some("clock"), m)
       case _ => 
-        critical(module, "Multi-clock currently unsupported")
-        (None, module.ports) // not supported at emission for now
+        critical(moduleNext, "Multi-clock currently unsupported")
+        (None, moduleNext) // not supported at emission for now
     }
     
     
@@ -276,6 +276,7 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
     def processStatement(s: Statement): Statement = {
       s match {
         case r: DefLogic => processLogic(r)
+        case p: Port => processPort(p)
         case _ => s.mapStmt(processStatement)
       }
     }
@@ -283,16 +284,15 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
     // Note statement must be placed right after IOs because in scala 
     val comment = Seq(Comment(UndefinedInterval,s"NOTE: The following statements are auto generated based on existing output reg of the original verilog source"))
     
-    val ports = updatedPorts.map(processPort)
     val body = (module.body, rectifiedOutputRegStmt.size) match {
       case (b, 0) => b.mapStmt(processStatement)
       case (b: Block, _) =>  
         b.mapStmt(processStatement).prependStmts(comment ++ rectifiedOutputRegStmt)
-      case (s: Statement, _) => SimpleBlock(s.tokens, comment ++ rectifiedOutputRegStmt ++ Seq(s))
+      case (s: Statement, _) => SimpleBlock(s.tokens, comment ++ rectifiedOutputRegStmt ++ Seq(processStatement(s)))
     }
     
     currentProject.get.clearDescriptionCache() // clock & reset have been modified
-    val res = renameReferences(module.copy(ports = ports, body = body, clock = clock), renameMap)
+    val res = renameReferences(module.copy(body = body, clock = clock), renameMap)
     seenModules += ((m.name, res))
     res
   }

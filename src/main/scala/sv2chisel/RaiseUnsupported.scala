@@ -49,7 +49,7 @@ class RaiseUnsupported(
       case c: Net_declarationContext => checkNetDecl(c)
       case c: Module_header_commonContext => checkModuleHeader(c)
       case c: Net_or_var_data_typeContext => checkVarDataType(c)
-      case c: List_of_port_declarationsContext => checkPortsDeclaration(c)
+      case c: Net_port_typeContext => checkPortType(c)
       case c: Continuous_assignContext => checkAssign(c)
       case c: Cond_predicateContext => checkCondExpression(c)
       case c: Data_typeContext => checkDataType(c)
@@ -427,6 +427,14 @@ class RaiseUnsupported(
     checkNetType(ctx.net_type)
   }
   
+  def checkPortType(ctx: Net_port_typeContext): Unit = {
+    ctx.KW_INTERCONNECT() match {
+      case null => 
+      case k => raiseIt(ctx, s"Unsupported keyword ${k.getText()}")
+    }
+    checkNetType(ctx.net_type)
+  }
+  
   def checkVarDim(ctx: Variable_dimensionContext): Unit = {
     ctx.MUL() match {
       case null => 
@@ -437,19 +445,6 @@ class RaiseUnsupported(
       case _ => raiseIt(ctx, s"Unsupported data type as variable dimension ${ctx.getText()}")
     }
   }
-  
-  private def checkPortsDeclaration(ctx: List_of_port_declarationsContext) {
-    ctx match {
-      case null => 
-      case list => 
-        list.nonansi_port.asScala match {
-          case Seq() => 
-          case l    => raiseIt(ctx, s"Unsupported non ANSI port declaration ${l.foreach(_.getText())}")
-        }
-        
-    }
-  }
-  
 
   
 }

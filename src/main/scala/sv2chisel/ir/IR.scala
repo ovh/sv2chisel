@@ -12,7 +12,7 @@ import sv2chisel.ir.evalExpression._
 import Utils.{dec2string, indent, trim}
 
 import scala.math.BigDecimal.RoundingMode._
-import collection.mutable.{LinkedHashMap, HashMap, HashSet}
+import collection.mutable.{LinkedHashMap, HashMap, HashSet, ArrayBuffer}
 
 case object UndefinedInterval extends Interval(-1,-1) {
   override def toString : String = "UndefinedInterval"
@@ -1776,15 +1776,24 @@ case class Port(
     // contains original port name if modified
     isDefaultClock: Option[String] = None,
     isDefaultReset: Option[String] = None
-  ) extends SVNode with IsDeclaration {
+  ) extends Statement with IsDeclaration {
   type T = Port
   private def serial_init : String = init match {
     case _: UndefinedExpression => ""
     case e => s"= ${e.serialize}"
   }
   def serialize: String = attributes.serialize + s"${direction.serialize} ${resolution.serialize} $name : ${tpe.serialize} ${serial_init}" 
-  def mapType(f: Type => Type): Port = this.copy(tpe=f(tpe))
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
+  def mapStmt(f: Statement => Statement): T = this
+  def mapExpr(f: Expression => Expression): T = this.copy(init=f(init), clock=f(clock), reset=f(reset))
+  def mapType(f: Type => Type): T = this.copy(tpe=f(tpe))
+  def mapString(f: String => String): T = this.copy(name = f(name))
+  def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes): T = this.copy(attributes = f(attributes))
+  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = {f(init); f(clock); f(reset)}
+  def foreachType(f: Type => Unit): Unit = f(tpe)
+  def foreachString(f: String => Unit): Unit = f(name)
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 object Port {
   def apply(
@@ -1796,6 +1805,17 @@ object Port {
     resolution: LogicResolution
   ): Port = {
     Port(tokens, attributes,name, direction, tpe, resolution, UndefinedExpression(), UndefinedExpression(), UndefinedExpression())
+  }
+  def apply(
+    tokens: Interval, 
+    attributes: VerilogAttributes,
+    name: String,
+    direction: Direction,
+    tpe: Type,
+    resolution: LogicResolution,
+    init: Expression
+  ): Port = {
+    Port(tokens, attributes,name, direction, tpe, resolution, init, UndefinedExpression(), UndefinedExpression())
   }
 }
 
@@ -1890,16 +1910,43 @@ abstract class DefModule extends Description with IsDeclaration {
   val attributes : VerilogAttributes
   val name : String
   val params : Seq[DefParam]
-  val ports : Seq[Port]
   val clock : Option[String]
   val reset: Option[String]
+  val body: Statement
   protected def serializeHeader(tpe: String): String =
     s"$tokens: $tpe $name :${attributes.serialize}${indent(params.map("\n" + _.serialize).mkString)}${indent(ports.map("\n" + _.serialize).mkString)}\n"
   type T <: DefModule
-  def mapPort(f: Port => Port): T
+  
+  // dynamically retrieve ports
+  private def fetchPorts(stmt: Statement): Seq[Port] = {
+    stmt match {
+      case p: Port => Seq(p)
+      case st => 
+        // ugly imperative style, missing a real map option on the IR 
+        val ports = ArrayBuffer[Seq[Port]]()
+        st.foreachStmt(s => ports += fetchPorts(s))
+        ports.toSeq.flatten
+    }
+  }
+  lazy val ports : Seq[Port] = fetchPorts(body)
+
+  // foreach can be implemented right away (no need for copy)
+  def foreachPort(f: Port => Unit): Unit = ports.foreach(f)
+  def foreachParam(f: DefParam => Unit): Unit = params.foreach(f)
+  def foreachStmt(f: Statement => Unit): Unit = f(body)
+  def foreachString(f: String => Unit): Unit = f(name)
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
+  
+  // map need the copy
+  protected def mapPortStatement(s: Statement, f: Port => Statement): Statement = {
+    s match {
+      case p: Port => f(p)
+      case st => st.mapStmt(s => mapPortStatement(s, f))
+    }
+  }
+  
+  def mapPort(f: Port => Statement): T
   def mapParam(f: DefParam => DefParam): T
-  def foreachPort(f: Port => Unit): Unit
-  def foreachParam(f: DefParam => Unit): Unit
 }
 /** Internal Module
   *
@@ -1910,26 +1957,21 @@ case class Module(
     attributes: VerilogAttributes,
     name: String,
     params: Seq[DefParam],
-    preBody: Statement, 
-    ports: Seq[Port],
     body: Statement,
     clock : Option[String] = None,
     reset: Option[String] = None
   ) extends DefModule {
   type T = Module
   def serialize: String = serializeHeader("module") + indent("\n" + body.serialize)
-  def mapPort(f: Port => Port): T = this.copy(ports = ports map f)
+
+  def mapPort(f: Port => Statement): T = this.copy(body = mapPortStatement(body, f))
+  
   def mapParam(f: DefParam => DefParam): T = this.copy(params = params map f)
-  def mapStmt(f: Statement => Statement): T = this.copy(preBody = f(preBody), body = f(body))
+  def mapStmt(f: Statement => Statement): T = this.copy(body = f(body))
   def mapString(f: String => String): T = this.copy(name = f(name))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes): T = this.copy(attributes = f(attributes))
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   
-  def foreachStmt(f: Statement => Unit): Unit = {f(preBody) ; f(body)}
-  def foreachPort(f: Port => Unit): Unit = ports.foreach(f)
-  def foreachParam(f: DefParam => Unit): Unit = params.foreach(f)
-  def foreachString(f: String => Unit): Unit = f(name)
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 
 case class CompanionModule(
@@ -1941,7 +1983,6 @@ extends DefModule {
   
   val tokens : Interval = UndefinedInterval
   val attributes: VerilogAttributes = NoVerilogAttribute
-  val ports: Seq[Port] = Seq()
   val body: Statement = EmptyStmt
   val params : Seq[DefParam] = Seq()
   val clock : Option[String] = None
@@ -1949,17 +1990,16 @@ extends DefModule {
   
   def serialize: String = serializeHeader("module")
   def mapStmt(f: Statement => Statement): T = this
-  def mapPort(f: Port => Port): T = this
+  def mapPort(f: Port => Statement): T = this
   def mapParam(f: DefParam => DefParam): T = this.copy(paramSeq = paramSeq.map(_.map(f)))
   def mapString(f: String => String): T = this.copy(name = f(name))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes): T = this
   def mapInterval(f: Interval => Interval) = this
   
-  def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachPort(f: Port => Unit): Unit = Unit
-  def foreachParam(f: DefParam => Unit): Unit = paramSeq.foreach(_.foreach(f))
-  def foreachString(f: String => Unit): Unit = f(name)
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  override def foreachStmt(f: Statement => Unit): Unit = Unit
+  override def foreachPort(f: Port => Unit): Unit = Unit
+  override def foreachParam(f: DefParam => Unit): Unit = paramSeq.foreach(_.foreach(f))
+  override def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
 }
 /** External Module
   *
@@ -1970,7 +2010,7 @@ case class ExtModule(
     tokens: Interval, 
     attributes: VerilogAttributes,
     name: String,
-    ports: Seq[Port],
+    body: Statement, // contain only port statements
     defname: String,
     params: Seq[DefParam],
     clock : Option[String] = None,
@@ -1979,17 +2019,12 @@ case class ExtModule(
   
   def serialize: String = serializeHeader("extmodule") +
     indent(s"\ndefname = $defname\n" + params.map(_.serialize).mkString("\n"))
-  def mapStmt(f: Statement => Statement): T = this
-  def mapPort(f: Port => Port): ExtModule = this.copy(ports = ports map f)
-  def mapParam(f: DefParam => DefParam): ExtModule = this.copy(params = params map f)
-  def mapString(f: String => String): ExtModule = this.copy(name = f(name))
-  def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes): ExtModule = this.copy(attributes = f(attributes))
-  def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   
-  def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachPort(f: Port => Unit): Unit = ports.foreach(f)
-  def foreachParam(f: DefParam => Unit): Unit = params.foreach(f)
-  def foreachString(f: String => Unit): Unit = f(name)
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
+  def mapStmt(f: Statement => Statement): T = this.copy(body = f(body))
+  def mapPort(f: Port => Statement): T = this.copy(body = mapPortStatement(body, f))
+  def mapParam(f: DefParam => DefParam): T = this.copy(params = params map f)
+  def mapString(f: String => String): T = this.copy(name = f(name))
+  def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes): T = this.copy(attributes = f(attributes))
+  def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
 }
 

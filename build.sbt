@@ -52,7 +52,7 @@ lazy val root = (project in file("."))
     antlr4GenVisitor in Antlr4 := true,
     antlr4PackageName in Antlr4 := Option("sv2chisel.antlr")
   )
-  .aggregate(helpers)
+  // .aggregate(helpers)
   
 lazy val helpers = (project in file("helpers"))
   .settings(commonSettings: _*)
