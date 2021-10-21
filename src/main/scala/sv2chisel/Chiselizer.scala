@@ -316,7 +316,7 @@ class ChiselDefFunction(val f: DefFunction) extends Chiselized {
     val comma = Seq(ChiselTxt(mCtxt, ", "))
     val s = ArrayBuffer[ChiselTxt]()
 
-    s += ChiselLine(f, ctx, s"function ${f.name}(")
+    s += ChiselLine(f, ctx, s"def ${f.name}(")
     s ++= f.ports.map(_.chiselizeAsArgument(pCtxt) ++ comma).flatten.dropRight(1)
     s += ChiselTxt(mCtxt, s")")
     f.tpe match {
@@ -526,7 +526,7 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
       case (LogicRegister, _) => "RegInit" // optimizations required here 
       case (LogicWire, u:UndefinedExpression)=> "Wire" 
       case (LogicWire, _) => "WireDefault" 
-      case _ => Utils.throwInternalError(s"Unexpected unresolved logic in chiselize step ${s.serialize}")
+      case _ => unsupportedChisel(ctx,s,s"Unexpected unresolved logic in chiselize step ${s.serialize}"); "Wire"
     }
     
     // to do : proper management of clock & reset for non trivial cases
