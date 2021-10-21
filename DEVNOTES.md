@@ -5,9 +5,11 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- typedef alias
+- [warn] scala/sv2chisel/Utils.scala:71:73: unreachable code
+  [warn]       case n: Statement => n.mapExpr(cleanTok).mapType(cleanTok).mapStmt(cleanTok)
+
 - function
-- package path reversed
+
 
 - fix disabled cast from SInt to UInt (or double cast ??) => required by elaboration
 - fix systematic .U cast => cause issue with not and minus primops => need case for:

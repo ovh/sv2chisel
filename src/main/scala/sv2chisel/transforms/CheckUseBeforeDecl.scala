@@ -51,6 +51,8 @@ class CheckUseBeforeDecl(val llOption: Option[logger.LogLevel.Value] = None) ext
       case l: DefLogic => refStore += ((l.name, FullType(l.tpe, HwExpressionKind)))
       case p: DefParam => refStore += ((p.name, FullType(p.tpe, p.kind)))
       case t: DefType => refStore += ((t.name, FullType(t.tpe, HwExpressionKind)))
+      case f: DefFunction => refStore += ((f.name, FullType(f.tpe, HwExpressionKind)))
+      case p: Port => refStore += ((p.name, FullType(p.tpe, HwExpressionKind)))
       case f: ForGen =>
         f.init match {
           case na: NamedAssign => refStore += ((na.name, FullType(IntType(na.tokens, NumberDecimal), SwExpressionKind)))
@@ -81,7 +83,6 @@ class CheckUseBeforeDecl(val llOption: Option[logger.LogLevel.Value] = None) ext
     ref2Type ++= remoteRefs
     
     //FIRST PASS => fill ref2Type    
-    m.foreachPort(p => ref2Type += ((p.name, FullType(p.tpe, HwExpressionKind))))
     m.foreachParam(p => ref2Type += ((p.name, FullType(p.tpe, SwExpressionKind))))
     m.copy(body = processStatement(m.body))
     

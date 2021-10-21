@@ -9,16 +9,18 @@ import sv2chisel.ir._
 
 import collection.mutable.{HashMap, ArrayBuffer}
 
-class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends DefModuleBasedTransform {
+class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
   
   class UsageStore() {
     private val arithmeticUsageCount = new HashMap[String, Int]()
     private val stringAssignedCount = new HashMap[String, Int]()
     // simple apply or slice operator translation
+    private val blockAccessCount = new HashMap[String, Int]()
     private val indexAccessCount = new HashMap[String, Int]()
     private val rangeAccessCount = new HashMap[String, Int]()
     // much harder conversion > will be avoided in all cases
     // see connect & update implicits within fpga-vac-chisel (PR 20)
+    private val blockAssignCount = new HashMap[String, Int]()
     private val indexAssignCount = new HashMap[String, Int]()
     private val rangeAssignCount = new HashMap[String, Int]()
     
@@ -43,6 +45,21 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
         registerIndexAssign(ref)
       } else {
         registerIndexAccess(ref)
+      }
+    }
+    def registerBlockAccess(ref: String): Unit = {
+      val count = blockAccessCount.getOrElse(ref, 0) + 1
+      blockAccessCount.update(ref, count)
+    }
+    def registerBlockAssign(ref: String): Unit = {
+      val count = blockAssignCount.getOrElse(ref, 0) + 1
+      blockAssignCount.update(ref, count)
+    }
+    def registerBlock(ref: String, assign: Boolean): Unit = {
+      if (assign) {
+        registerBlockAssign(ref)
+      } else {
+        registerBlockAccess(ref)
       }
     }
     
@@ -79,7 +96,7 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
         false
       } else {
         val bitRefs = indexAccessCount.getOrElse(ref, 0) + rangeAccessCount.getOrElse(ref, 0)
-        val arithCount = arithmeticUsageCount.getOrElse(ref, 0) 
+        val arithCount = arithmeticUsageCount.getOrElse(ref, 0) + blockAssignCount.getOrElse(ref, 0)
         trace(s"Ref $ref > bitRefs: $bitRefs ; arithCount: $arithCount")
         arithCount >= bitRefs
       }
@@ -127,20 +144,22 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
     }
   }
     
-  def processModule(m: DefModule): DefModule = {
+  def processDescription(m: Description): Description = {
     val store = new UsageStore()
     
     //FIRST PASS => fill store
     // assign : true is the expression is an assignement target
     // returns 
-    def visitExpression(e: Expression, assign: Boolean): Option[String] = {
+    def visitExpression(e: Expression, assign: Boolean, whole : Boolean = true): Option[String] = {
       e.foreachType(visitType)
       e match {
-        case r: Reference => Some(r.serialize)
+        case r: Reference => 
+          if (whole) store.registerBlock(r.serialize, assign)
+          Some(r.serialize)
         case s: SubField => 
           s.expr match {
             case r: Reference => Some(s"${r.serialize}.${s.name}")  
-            case exp => visitExpression(exp, assign) match {
+            case exp => visitExpression(exp, assign, false) match {
                 case None => None 
                 case Some(ref) => Some(s"$ref.${s.name}")
               }
@@ -152,7 +171,7 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
               store.registerIndex(r.serialize, assign)
               Some(s"${r.serialize}[_]")
             case exp =>
-              visitExpression(exp, assign) match {
+              visitExpression(exp, assign, false) match {
                 case None => None 
                 case Some(ref) => 
                   trace(s, s"registering index ${if(assign) "assign" else "access"} for ${ref}")
@@ -168,7 +187,7 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
               store.registerRange(r.serialize, assign)
               Some(s"${r.serialize}[_]")
             case exp =>
-              visitExpression(exp, assign) match {
+              visitExpression(exp, assign, false) match {
                 case None => None 
                 case Some(ref) => 
                   trace(s, s"registering range ${if(assign) "assign" else "access"} for ${ref}")
@@ -180,7 +199,7 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
         case p: DoPrim =>
           if(assign) critical(p, "Should not try to assign to a primary op")
           p.args.foreach(a => {
-            visitExpression(a, assign) match {
+            visitExpression(a, assign, whole) match {
               case None => //
               case Some(ref) => store.registerArithUsage(ref)
             }
@@ -188,15 +207,15 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
           None
         case c: DoCast =>
           if(assign) critical(c, "Should not try to assign to a cast operator")
-          visitExpression(c.expr, assign)
+          visitExpression(c.expr, assign, whole)
           None
         case c: DoCall =>
           if(assign) critical(c, "Should not try to assign to a function call")
-          c.args.foreach(visitExpression(_, assign))
+          c.args.foreach(visitExpression(_, assign, whole))
           None
         case c: Concat =>
           // could be both way 
-          c.args.foreach(visitExpression(_, assign))
+          c.args.foreach(visitExpression(_, assign, whole))
           None
         case n: NamedAssign => None // TODO ??? 
         case n: NoNameAssign => None // TODO ???
@@ -222,6 +241,14 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
               visitExpression(c.expr, false)
           // }
           
+          
+        case p: Port => 
+          store.registerType(p.name, p.tpe)
+          s.foreachExpr(visitExpression(_, false))
+          
+        case f: DefFunction => 
+          store.registerType(f.name, f.tpe)
+          s.foreachStmt(visitStatement)
           
         case l: DefLogic => 
           store.registerType(l.name, l.tpe)
@@ -254,7 +281,6 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
     }
     
     m.foreachStmt(visitStatement)
-    m.foreachPort(p => store.registerType(p.name, p.tpe))
     
     store.traceIt()
     
@@ -263,14 +289,12 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Def
     def processStatement(s: Statement): Statement = {
       s match {
         case d: DefLogic => d.copy(tpe = store.getType(d.name))
+        case p: Port => p.copy(tpe = store.getType(p.name))
+        case f: DefFunction => f.copy(tpe = store.getType(f.name)).mapStmt(processStatement)
         case _ => s.mapStmt(processStatement)
       }
     }
     
-    def processPort(p: Port): Port = {
-      p.copy(tpe = store.getType(p.name))
-    }
-    
-    m.mapPort(processPort).mapStmt(processStatement)
+    m.mapStmt(processStatement)
   }
 }

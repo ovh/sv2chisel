@@ -63,9 +63,9 @@ package object chiselize extends EasyLogging {
   
   implicit def defParamToChisel(s: DefParam) = new ChiselDefParam(s)
   
-  implicit def defPortToChisel(s: Port) = new ChiselPort(s)
-  
   implicit def statementToChisel(s: Statement) = new ChiselStatement(s)
+  implicit def defPortToChisel(s: Port) = new ChiselPort(s)
+  implicit def defFunctionToChisel(s: DefFunction) = new ChiselDefFunction(s)
   implicit def simpleBlockToChisel(s: SimpleBlock) = new ChiselSimpleBlock(s)
   implicit def defLogicToChisel(s: DefLogic) = new ChiselDefLogic(s)
   implicit def defTypeToChisel(s: DefType) = new ChiselDefType(s)
@@ -278,20 +278,59 @@ class ChiselModule(val m: Module) extends Chiselized {
       case (None, None) => (m, "RawModule")
     }
     
-    val comma = Seq(ChiselTxt(mCtxt, ","))
+    val comma = Seq(ChiselTxt(mCtxt, ", "))
     val s = ArrayBuffer[ChiselTxt]()
-    // not sure that last minute rename is a good idea ....
-    // it might broke tons of instances
-    // use override def desiredName = m.name for emission consistency? 
-    // s += ChiselLine(m, ctx, s"class ${m.name.toCamel(ctx)}(")
+
     s += ChiselLine(m, ctx, s"class ${m.name}(")
     if(mod.params.size > 0) {
-      s ++= mod.params.map(_.chiselize(pCtxt, true) ++ comma).flatten
+      s ++= mod.params.map(_.chiselize(pCtxt, true) ++ comma).flatten.dropRight(1)
       s += ChiselLine(mCtxt, s") extends $kind {")
     } else {
       s += ChiselTxt(mCtxt, s") extends $kind {")
     }
     s ++= mod.body.chiselize(mCtxt)
+    s += ChiselLine(ctx, "}")
+  }
+}
+
+class ChiselDefFunction(val f: DefFunction) extends Chiselized {
+  
+  private def removeImplicitReturn(s: Statement): Statement = {
+    def applyToLastStatement(s: Statement, f: Statement => Statement): Statement = {
+      s match {
+        case b:SimpleBlock => b.copy(stmts = b.stmts.dropRight(1) :+ applyToLastStatement(b.stmts.last, f))
+        case st => f(st)
+      }
+    }
+    applyToLastStatement(s, s => s match {
+        case Connect(_,_,Reference(_,n,_,_,_,_),e,_,_) if(f.name == n) => ExpressionStatement(e)
+        case _ => s 
+      }
+    )
+  }
+  
+  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
+    val mCtxt = ctx.incr()
+    val pCtxt = mCtxt.incr()
+    
+    val comma = Seq(ChiselTxt(mCtxt, ", "))
+    val s = ArrayBuffer[ChiselTxt]()
+
+    s += ChiselLine(f, ctx, s"function ${f.name}(")
+    s ++= f.ports.map(_.chiselizeAsArgument(pCtxt) ++ comma).flatten.dropRight(1)
+    s += ChiselTxt(mCtxt, s")")
+    f.tpe match {
+      case _:VoidType =>
+      case u:UnknownType => 
+        unsupportedChisel(ctx,u, "non-usable UnknownType")
+        s += ChiselTxt(mCtxt, s" =")
+      case tpe => 
+        s += ChiselTxt(mCtxt, s": ")
+        s ++= tpe.chiselize(mCtxt.hw(), scalaTypeOnly = true)
+        s += ChiselTxt(mCtxt, s" =")
+    }
+    s += ChiselTxt(mCtxt, s" {")
+    s ++= removeImplicitReturn(f.mapPort(_ => EmptyStmt).body).chiselize(mCtxt)
     s += ChiselLine(ctx, "}")
   }
 }
@@ -329,6 +368,9 @@ class ChiselPort(val p: Port) extends Chiselized {
       p.tpe.chiselize(ctx.hw()) ++ 
       Seq(ChiselTxt(ctx, s"))"))
   }
+  def chiselizeAsArgument(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
+    Seq(ChiselTxt(p, ctx, s"${p.name}:")) ++ p.tpe.chiselize(ctx.hw(),scalaTypeOnly=true)
+  }
 }
 
 class ChiselField(val f: Field) extends Chiselized {
@@ -347,8 +389,25 @@ class ChiselField(val f: Field) extends Chiselized {
 }
 
 class ChiselType(val t: Type) extends Chiselized {
-  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
+  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = chiselize(ctx, false)
+  
+  def chiselize(ctx: ChiselEmissionContext, scalaTypeOnly: Boolean): Seq[ChiselTxt] = {
     val iCtxt = ctx.incr()
+    
+    def getVec(tpe: Seq[Type], w: Expression): Seq[ChiselTxt] = {
+      tpe match {
+        case Seq(t) if(scalaTypeOnly) => 
+          ChiselTxtS(t, ctx, s"Vec[") ++ t.chiselize(ctx, scalaTypeOnly) ++ Seq(ChiselTxt(ctx, "]"))
+            
+        case Seq(t) => 
+          ChiselTxtS(t, ctx, s"Vec(") ++ w.chiselize(ctx) ++ ChiselTxtS(", ") ++
+            t.chiselize(ctx) ++
+            Seq(ChiselTxt(ctx, ")"))
+          
+        case _ => unsupportedChisel(ctx,t, "TODO? MixedVec Type")
+      }
+    }
+    
     t match {
       case v : VecType if(!ctx.isHardware) =>
         v.tpe match {
@@ -358,26 +417,10 @@ class ChiselType(val t: Type) extends Chiselized {
           case _ => unsupportedChisel(ctx,t, "MixedVec Type in scala context")
         }
     
-      case p@PackedVecType(_, tpe, b, d) =>
-        tpe match {
-          case Seq(t) => 
-            ChiselTxtS(t, ctx, s"Vec(") ++ p.getWidth.chiselize(ctx) ++ ChiselTxtS(", ") ++
-              t.chiselize(ctx) ++
-              Seq(ChiselTxt(ctx, ")"))
-            
-          case _ => unsupportedChisel(ctx,t, "TODO? MixedVec Type")
-        }
-    
-      case u@UnpackedVecType(_, tpe, b, d) =>
-        tpe match {
-          case Seq(t) => 
-            ChiselTxtS(t, ctx, s"Vec(") ++ u.getWidth.chiselize(ctx) ++ ChiselTxtS(", ") ++
-              t.chiselize(ctx) ++
-              Seq(ChiselTxt(ctx, ")"))
-            
-          case _ => unsupportedChisel(ctx,t, "TODO? MixedVec Type")
-        }
+      case p :PackedVecType => getVec(p.tpe, p.getWidth)
+      case u :UnpackedVecType => getVec(u.tpe, u.getWidth)
       
+      case b: BundleType if(scalaTypeOnly) => unsupportedChisel(ctx,b, "cannot refer to anonymous Bundle as scalaType")
       case b: BundleType =>
         Seq(ChiselTxt(t, ctx, s"new Bundle { ")) ++
           b.fields.map(_.chiselize(iCtxt)).flatten ++
@@ -393,22 +436,27 @@ class ChiselType(val t: Type) extends Chiselized {
         (i.width, ctx.isHardware) match {
           case (_, false) => ChiselTxtS(i.tokens, "UInt")
           case (UnknownWidth(), _) => ChiselTxtS(i.tokens, "UInt")
+          case (w, _) if(scalaTypeOnly) => ChiselTxtS(i.tokens, "UInt")
           case (w, _) => ChiselTxtS(i.tokens, "UInt(") ++ w.chiselize(ctx) ++ ChiselTxtS(")")
         }
       case i: SIntType => 
         i.width match {
           case UnknownWidth() => ChiselTxtS(i.tokens, "SInt")
+          case w if(scalaTypeOnly) => ChiselTxtS(i.tokens, "SInt")
           case w => ChiselTxtS(i.tokens, "SInt(") ++ w.chiselize(ctx) ++ ChiselTxtS(")")
         }
         
       case t: TypeOf => 
+        if(scalaTypeOnly) unsupportedChisel(ctx,t, "cannot use typeOf as scalaType")
         ChiselTxtS(t.tokens, "chiselTypeOf(") ++ t.expr.chiselize(ctx) ++ ChiselTxtS(")")
 
       
+      case b: BoolType if(ctx.isHardware && scalaTypeOnly) => ChiselTxtS(b.tokens, "Bool")
       case b: BoolType if(ctx.isHardware) => ChiselTxtS(b.tokens, "Bool()")
       case b: BoolType => ChiselTxtS(b.tokens, "Boolean")
       case u: UserRefType => 
         u.tpe match {
+          case b: BundleType if(scalaTypeOnly) => ChiselTxtS(u.tokens, u.serialize)
           case b: BundleType => ChiselTxtS(u.tokens, "new " + u.serialize)
           case _ => ChiselTxtS(u.tokens, u.serialize)
         }
@@ -426,6 +474,7 @@ class ChiselStatement(val s: Statement) extends Chiselized {
       case h: Header => h.chiselize(ctx)
       case b: SimpleBlock => b.chiselize(ctx)
       case l: DefLogic => l.chiselize(ctx)
+      case f: DefFunction => f.chiselize(ctx)
       case t: DefType => t.chiselize(ctx)
       case p: DefParam => p.chiselize(ctx, false)
       case c: Comment => c.chiselize(ctx)
@@ -436,6 +485,7 @@ class ChiselStatement(val s: Statement) extends Chiselized {
       case i: DefInstance => i.chiselize(ctx)
       case s: Switch => s.chiselize(ctx)
       case p: Port => p.chiselize(ctx)
+      case e: ExpressionStatement => Seq(ChiselLine(e, ctx, "")) ++ e.expr.chiselize(ctx)
       
       case p: Print => Seq(ChiselLine(s, ctx, p.serialize))
       case RawScala(str) => 

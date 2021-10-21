@@ -26,6 +26,8 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
   def visitStatement(s: Statement)(implicit refStore: RefStore): Unit = {
     s match {
       case l: DefLogic => refStore += ((l.name, FullType(l.tpe, HwExpressionKind)))
+      case p: Port => refStore += ((p.name, FullType(p.tpe, HwExpressionKind)))
+      case f: DefFunction => refStore += ((f.name, FullType(f.tpe, HwExpressionKind)))
       case p: DefParam => 
         trace(p, s"${p.name}: ${p.kind} ${p.tpe.serialize}")
         refStore += ((p.name, FullType(p.tpe, p.kind)))
@@ -171,7 +173,6 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
       case _ => 
     }
     
-    m.foreachPort(p => ref2Type += ((p.name, FullType(p.tpe, HwExpressionKind))))
     m.foreachParam(p => ref2Type += ((p.name, FullType(p.tpe, p.kind))))
     
     // SECOND PASS => use ref2Type to fill reference type

@@ -12,7 +12,7 @@ import sv2chisel.ir.widthExpressionType._
 
 import collection.mutable.{HashMap, ArrayBuffer}
 
-class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends DefModuleBasedTransform {
+class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
   private val ui = UndefinedInterval
   private val ut = UnknownType()
   private val uw = UnknownWidth()
@@ -24,7 +24,7 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
     DoPrim(ui, PrimOps.Sub(ui), Seq(par, UIntLiteral(ui, 1, uw, NumberDecimal)), HwExpressionKind)
   }
 
-  def processModule(m: DefModule): DefModule = {
+  def processDescription(m: Description): Description = {
     // SINGLE PASS 
     
     def getFilling(e: Expression, tpe: Type, bit: String): Expression = {

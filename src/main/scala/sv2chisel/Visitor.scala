@@ -5,7 +5,7 @@
 package sv2chisel
 
 import org.antlr.v4.runtime.{ParserRuleContext,CommonTokenStream, Token}
-import org.antlr.v4.runtime.tree.{AbstractParseTreeVisitor, ParseTreeVisitor, TerminalNode}
+import org.antlr.v4.runtime.tree.{AbstractParseTreeVisitor, ParseTreeVisitor, ParseTree, TerminalNode}
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer}
 import scala.util.matching.Regex
@@ -34,6 +34,14 @@ class Visitor(
   private val ut = UnknownType()
   private val uk = UnknownExpressionKind
   private val uw = UnknownWidth()
+  
+  // debug Helper
+  def printClasses(ctx: ParseTree, indent: Int = 0): Unit = {
+    for (i <- 0 until ctx.getChildCount()) {
+      println(" "* indent + s"$i -> ${ctx.getChild(i).getText()} (${ctx.getChild(i).getClass()})")
+      printClasses(ctx.getChild(i), indent + 2)
+    }
+  }
   
   // underlying unsupported logger
   private val unsupported = new RaiseUnsupported(unsupportedMode, tokenStream, path)
@@ -72,6 +80,163 @@ class Visitor(
     }
   }
   
+
+  private def visitData_type_or_void(ctx: Data_type_or_voidContext): (Type, LogicResolution) = {
+    (ctx.KW_VOID, ctx.data_type) match {
+      case (null, dtp) => getDataType(dtp, true)
+      case (v, null) => (VoidType(ctx.getSourceInterval), LogicUnresolved)
+      case _ => throwParserError(ctx)
+    }
+  }
+  
+  // tf_port_item:
+  //     ( attribute_instance )* ( tf_port_direction )? ( KW_VAR )? ( data_type_or_implicit )?
+  //     ( identifier ( variable_dimension )* ( ASSIGN expression )? )?;
+  
+  private def visitTf_port_item(p: Tf_port_itemContext): Port = {
+    
+    val attr = visitAttributes(p.attribute_instance.asScala)
+
+    val direction = p.tf_port_direction.getChild(0) match {
+      case pd: Port_directionContext => getPortDirection(pd)
+      case _ => 
+        unsupported.raiseIt(p, s"Unsupported undefined port direction for port ${getRawText(p)}." +
+        "Defaulting to Input direction");
+        Input(UndefinedInterval)
+    }
+    
+    p.KW_VAR match {
+      case null =>
+      case c => unsupported.raiseIt(p, s"${c.getText} keyword in function port") 
+    }
+    
+    val ((tpe, resolution), argname) = (p.data_type_or_implicit, p.identifier) match {
+      case (null, null) => 
+        unsupported.raiseIt(p, s"Illegal function arg declaration: ${getRawText(p)}")
+        ((BoolType(UndefinedInterval), LogicUnresolved), "???")
+      case (null, name) => ((BoolType(UndefinedInterval), LogicUnresolved), name.getText())
+      case (tpe, null) => 
+        // weird Parsing case: no identifier is to be understood as identifier is parsed as type 
+        // not sure if legal verilog though... so checking if it makes sense...!
+        visitData_type_or_implicit(tpe, true) match {
+          case (u: UserRefType, LogicUnresolved) if(u.name == tpe.getText()) => 
+            warn(p, s"Potentially illegal function arg declaration: ${getRawText(p)}: Using ${u.name} as identifier.")
+            ((BoolType(UndefinedInterval), LogicUnresolved), u.name)
+          case _ => 
+            unsupported.raiseIt(p, s"Missing identifier in function arg declaration: ${getRawText(p)}.")
+            ((BoolType(UndefinedInterval), LogicUnresolved), "???")
+        }
+        
+      // NB: we assume synthesizable hardware within function while it might be a very restrictive choice ...
+      case (tpe, name) => (visitData_type_or_implicit(tpe, true), name.getText())
+    }
+    
+    val unpacked = p.variable_dimension.asScala.map(getVariableDim)
+      .collect {case u: UnpackedVecType => u}
+    
+    val fullType = getFullType(unpacked, tpe)
+    
+    val default = p.expression match {
+      case null => UndefinedExpression()
+      case e => getExpression(e)
+    }
+    Port(p.getSourceInterval, attr, argname, direction, fullType, resolution, default)
+  }
+  
+  
+  // unfortunate partial code duplication with visitTf_port_item due to duplication in parser tree
+  private def visitTf_port_declaration(ctx: Tf_port_declarationContext): Seq[Port] = {
+    val attr = visitAttributes(ctx.attribute_instance.asScala)
+
+    val direction = ctx.tf_port_direction.getChild(0) match {
+      case pd: Port_directionContext => getPortDirection(pd)
+      case _ => 
+        unsupported.raiseIt(ctx, s"Unsupported undefined port direction for port ${getRawText(ctx)}." +
+        "Defaulting to Input direction");
+        Input(UndefinedInterval)
+    }
+    
+    ctx.KW_VAR match {
+      case null =>
+      case c => unsupported.raiseIt(ctx, s"${c.getText} keyword in function port") 
+    }
+    
+    val (tpe, resolution) = ctx.data_type_or_implicit match {
+      case null => (BoolType(UndefinedInterval), LogicUnresolved)
+      case cdi => visitData_type_or_implicit(cdi, true) // we assume synthesizable hardware ...
+    }
+    
+    ctx.list_of_tf_variable_identifiers.list_of_tf_variable_identifiers_item.asScala.map(item => {
+
+      val argname = item.identifier.getText()
+      
+      val unpacked = item.variable_dimension.asScala.map(getVariableDim)
+        .collect {case u: UnpackedVecType => u}
+      val fullType = getFullType(unpacked, tpe)
+      
+      val init = item.expression match {
+        case null => UndefinedExpression()
+        case e => getExpression(e)
+      }
+      Port(item.getSourceInterval, attr, argname, direction, fullType, resolution, init)
+    })
+    
+  }
+  
+  // task_and_function_declaration_common:
+  //     ( identifier DOT | class_scope )? identifier
+  //     ( SEMI ( tf_item_declaration )*
+  //       | LPAREN tf_port_list RPAREN SEMI ( block_item_declaration )*
+  //     )
+  //     ( statement_or_null )*
+  // ;
+  case class FTBase(
+    name: String,
+    stmt: Statement
+  )
+  private def visitTask_and_function_declaration_common(ctx: Task_and_function_declaration_commonContext): FTBase = {
+    ctx.class_scope match {
+      case null =>
+      case c => unsupported.raiseIt(ctx, s"Complex function name, got: ${c.getText}") 
+    }
+    val name = ctx.identifier.asScala match {
+      case Seq() => throwParserError(ctx)
+      case Seq(id) => id.getText()
+      case s => s.map(_.getText()).mkString(".")
+    }
+    
+    val portItems = ctx.tf_port_list match {
+      case null => Seq()
+      case l => l.tf_port_item.asScala.map(visitTf_port_item)
+    }
+    
+    val stmts = ctx.tf_item_declaration.asScala.map(d => d.getChild(0) match {
+      case b: Block_item_declarationContext => Seq(visitBlock_item_declaration(b))
+      case p: Tf_port_declarationContext => visitTf_port_declaration(p)
+    }).flatten ++ ctx.statement_or_null.asScala.map(visitStatement_or_null)
+    
+    val stmt = getStmtOrSimpleBlock(ctx, portItems ++ stmts)
+    
+    FTBase(name, stmt)
+  }
+  
+  private def visitFunction_declaration(ctx: Function_declarationContext): Statement = {
+    ctx.lifetime match {
+      case null =>
+      case k => unsupported.raiseIt(ctx, s"Unsupported lifetime ${k.getText()}")
+    }
+    val returnType = ctx.function_data_type_or_implicit match {
+      case null => UnknownType(ctx.getSourceInterval)
+      case tpe => tpe.getChild(0) match {
+        case dtv: Data_type_or_voidContext => visitData_type_or_void(dtv)._1
+        case idt: Implicit_data_typeContext => getImplicitDataType(idt)
+      }
+    }
+    val base = visitTask_and_function_declaration_common(ctx.task_and_function_declaration_common)
+    
+    DefFunction(ctx.getSourceInterval, base.name, base.stmt, returnType)
+  }
+  
   private def visitPackage_item(ctx: Package_itemContext): Statement = {
     val attr = visitAttributes(ctx.attribute_instance.asScala)
     ctx.package_item_item.getChild(0) match {
@@ -79,8 +244,8 @@ class Visitor(
       case d: Data_declarationContext => visitData_declaration(d, attr)
       case l: Local_parameter_declarationContext => getStmtOrSimpleBlock(ctx, visitLocal_parameter_declaration(l, attr))
       case p: Parameter_declarationContext => getStmtOrSimpleBlock(ctx, visitParameter_declaration(p, attr))
+      case f: Function_declarationContext => visitFunction_declaration(f)
       
-      case f: Function_declarationContext => unsupportedStmt(f, "TODO function_declaration")
       case p: Package_export_declarationContext => unsupportedStmt(p, "TODO ? package_export_declaration")
       
       case t: Task_declarationContext => unsupportedStmt(t, "task_declaration")
@@ -110,7 +275,7 @@ class Visitor(
         val decl = id1.getText
         val closing = id2.getText
         if(decl != closing)
-          unsupported.raiseIt(ctx, "Inconsistent package identifiers found, using ${id1.getText} while ignoring ${id2.getText}")
+          unsupported.raiseIt(ctx, s"Inconsistent package identifiers found, using ${id1.getText} while ignoring ${id2.getText}")
         decl
       case _ => throwParserError(ctx)
     }
@@ -267,11 +432,7 @@ class Visitor(
       case null => // ok
       case _ => unsupported.raiseIt(ctx, "random qualifier is not supported")
     }
-    val (tpe, res) = (ctx.data_type_or_void.KW_VOID, ctx.data_type_or_void.data_type) match {
-      case (null, dtp) => getDataType(dtp, true)
-      case (v, null) => unsupportedType(ctx, "void in bundle field")
-      case _ => throwParserError(ctx)
-    }
+    val (tpe, res) = visitData_type_or_void(ctx.data_type_or_void)
     
     val l = ctx.list_of_variable_decl_assignments.variable_decl_assignment
       .asScala.map(d => visitVariable_decl_assignment(d, tpe, res, attr))
@@ -1184,6 +1345,15 @@ class Visitor(
         .reduceRight((a,b) => a.copy(tpe=Seq(b)))
     }
   }
+  
+  private def getPortDirection(ctx: Port_directionContext): Direction = {
+    (ctx.KW_INPUT,ctx.KW_OUTPUT,ctx.KW_INOUT) match {
+      case (d, null, null) => Input(d.getSourceInterval())
+      case (null, d, null) => Output(d.getSourceInterval())
+      case (null, null, d) => Inout(d.getSourceInterval())
+      case _ => unsupported.raiseIt(ctx, s"Unsupported port direction ${ctx}"); Input(ctx.getSourceInterval())
+    }
+  }
 
   private def visitPortsDeclaration(ctx: List_of_port_declarationsContext): (Seq[Port], Seq[String]) = {
     ctx match {
@@ -1227,13 +1397,7 @@ class Visitor(
               unsupported.raiseIt(ctx, s"Unsupported undefined port direction for port ${getRawText(p)}. Defaulting to Input direction");
               Input(UndefinedInterval)
             case (null, Some(d)) => d.mapInterval(_ => UndefinedInterval)
-            case (pd, _) => 
-              (pd.KW_INPUT,pd.KW_OUTPUT,pd.KW_INOUT) match {
-                case (d, null, null) => Input(d.getSourceInterval())
-                case (null, d, null) => Output(d.getSourceInterval())
-                case (null, null, d) => Inout(d.getSourceInterval())
-                case _ => unsupported.raiseIt(ctx, s"Unsupported port direction ${pd}"); Input(pd.getSourceInterval())
-              }
+            case (pd, _) => getPortDirection(pd)
           }
           previousDirection = Some(direction)
           val (tpe, res) = visitTypeRes(decl.net_or_var_data_type, true)

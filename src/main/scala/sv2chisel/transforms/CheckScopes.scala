@@ -61,6 +61,14 @@ class CheckScopes(val llOption: Option[logger.LogLevel.Value] = None) extends De
         refStore += ((t.name, FullType(t.tpe, HwExpressionKind)))
         t.mapExpr(processExpression).mapType(processType)
         
+      case f: DefFunction => 
+        refStore += ((f.name, FullType(f.tpe, HwExpressionKind)))
+        f.mapExpr(processExpression).mapType(processType)
+        
+      case p: Port => 
+        refStore += ((p.name, FullType(p.tpe, HwExpressionKind)))
+        p.mapExpr(processExpression).mapType(processType)
+        
       case f: ForGen =>
         f.init match {
           case na: NamedAssign => refStore += ((na.name, FullType(IntType(na.tokens, NumberDecimal), SwExpressionKind)))
@@ -95,8 +103,7 @@ class CheckScopes(val llOption: Option[logger.LogLevel.Value] = None) extends De
   def processModule(m: Module): Module = {
     val ref2Type = new RefStore() 
     ref2Type ++= remoteRefs
-       
-    m.foreachPort(p => ref2Type += ((p.name, FullType(p.tpe, HwExpressionKind))))
+    
     m.foreachParam(p => ref2Type += ((p.name, FullType(p.tpe, SwExpressionKind))))
     m.copy(body = processStatement(m.body, ref2Type))
     

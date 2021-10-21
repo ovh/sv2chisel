@@ -54,10 +54,14 @@ abstract class Transform extends LazyLogging {
     }
     
     def processStatement(s: Statement): Statement = {
-      s.mapExpr(processExpression).mapStmt(processStatement)
+      val updated = s match {
+        case p: Port => renameMap.update(p)
+        case st => st
+      }
+      updated.mapExpr(processExpression).mapStmt(processStatement)
     }
     
-    module.mapPort(renameMap.update) match {
+    module match {
       case m: Module => m.copy(body = processStatement(m.body))
       case m => m
     }

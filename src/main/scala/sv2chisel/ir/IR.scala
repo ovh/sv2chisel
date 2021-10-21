@@ -801,7 +801,7 @@ case class Concat(
     flow : Flow = UnknownFlow
   ) extends Expression {
   type T = Concat
-  def serialize: String = s"Concat(${indent(args.map(a => s"\n${a.serialize}: ${a.tpe.serialize}").mkString)})\n"
+  def serialize: String = s"Concat(${indent(args.map(a => s"\n${a.serialize}: <${a.tpe.serialize}>").mkString)})\n"
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapExpr(f: Expression => Expression) = this.copy(args = args map f)
   def mapType(f: Type => Type) = this
@@ -895,6 +895,32 @@ case class DefInstance(
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 
+case class DefFunction(
+  tokens: Interval,
+  name: String,
+  body: Statement,
+  tpe: Type
+) extends Statement with IsDeclaration with FetchPort {
+  val attributes: VerilogAttributes = NoVerilogAttribute
+  type T = DefFunction
+  def serialize: String = s"function $name : ${indent(body.serialize)}\n"  
+  
+  def mapPort(f: Port => Statement): T = this.copy(body = mapPortStatement(body, f))
+  def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
+  def mapStmt(f: Statement => Statement) = this.copy(body = f(body))
+  def mapExpr(f: Expression => Expression) = this
+  def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
+  def mapString(f: String => String) = this.copy(name = f(name))
+  def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
+  
+  def foreachPort(f: Port => Unit): Unit = ports.map(f)
+  def foreachStmt(f: Statement => Unit): Unit = f(body)
+  def foreachExpr(f: Expression => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = f(tpe)
+  def foreachString(f: String => Unit): Unit = f(name)
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+}
+
 case class DefType(
   tokens: Interval,
   attributes: VerilogAttributes,
@@ -902,7 +928,7 @@ case class DefType(
   tpe: Type
 ) extends Statement with IsDeclaration {
   type T = DefType
-  def serialize: String = s"DefType($name, ${tpe.serialize})"  
+  def serialize: String = s"type $name: <${tpe.serialize}>"  
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   def mapStmt(f: Statement => Statement) = this
   def mapExpr(f: Expression => Expression) = this
@@ -985,7 +1011,7 @@ case class DefLogic(
   ) extends Statement with IsDeclaration {
   type T = DefLogic
   def serialize: String = {
-    val header = s"${resolution.serialize} $name : ${tpe.serialize}"
+    val header = s"${resolution.serialize} $name : <${tpe.serialize}>"
     resolution match {
       case LogicRegister => header + s", clock => ${clock.serialize} ; reset => (${reset.serialize}, ${init.serialize})" + attributes.serialize
       case _             => header
@@ -1267,7 +1293,7 @@ case class Connect(
     blocking: Boolean
   ) extends Statement with HasVerilogAttributes {
   type T = Connect
-  def serialize: String =  s"${loc.serialize} : ${loc.tpe.serialize} := ${expr.serialize} : ${expr.tpe.serialize}" + attributes.serialize
+  def serialize: String =  s"${loc.serialize}:<${loc.tpe.serialize}> := ${expr.serialize}:<${expr.tpe.serialize}>" + attributes.serialize
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   def mapStmt(f: Statement => Statement) = this
   def mapExpr(f: Expression => Expression) = this.copy(loc = f(loc), expr = f(expr))
@@ -1279,6 +1305,26 @@ case class Connect(
   def foreachType(f: Type => Unit): Unit = Unit
   def foreachString(f: String => Unit): Unit = Unit
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
+}
+
+// simple wrapper, typical use case: last function statement = return value 
+case class ExpressionStatement(
+    expr: Expression
+  ) extends Statement {
+  type T = ExpressionStatement
+  val tokens = expr.tokens
+  def serialize: String =  s"${expr.serialize}:<${expr.tpe.serialize}>"
+  def mapInterval(f: Interval => Interval) = this
+  def mapStmt(f: Statement => Statement) = this
+  def mapExpr(f: Expression => Expression) = this.copy(expr = f(expr))
+  def mapType(f: Type => Type) = this
+  def mapString(f: String => String) = this
+  def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
+  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = f(expr)
+  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachString(f: String => Unit): Unit = Unit
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
 }
 
 case class Stop(tokens: Interval, attributes: VerilogAttributes, ret: Expression, clk: Expression, en: Expression) extends Statement with HasVerilogAttributes {
@@ -1452,6 +1498,17 @@ abstract class Type extends SVNode {
   def foreachType(f: Type => Unit): Unit
   def foreachWidth(f: Width => Unit): Unit
   def widthOption: Option[Width]
+}
+
+case class VoidType(tokens: Interval) extends Type {
+  type T = VoidType
+  def mapType(f: Type => Type): T = this
+  def mapWidth(f: Width => Width): T = this
+  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = Unit
+  def widthOption: Option[Width] = None
+  def mapInterval(f: Interval => Interval): T = this.copy(tokens = f(tokens))
+  def serialize: String = "void"
 }
 
 case class RawScalaType(str: String) extends Type {
@@ -1730,7 +1787,7 @@ case class AsyncResetType(tokens: Interval) extends GroundType {
 
 case class UnknownType(tokens: Interval) extends Type {
   type T = UnknownType
-  def serialize: String = s"$tokens: ?"
+  def serialize: String = s"<?>"
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = this
@@ -1782,7 +1839,8 @@ case class Port(
     case _: UndefinedExpression => ""
     case e => s"= ${e.serialize}"
   }
-  def serialize: String = attributes.serialize + s"${direction.serialize} ${resolution.serialize} $name : ${tpe.serialize} ${serial_init}" 
+  def serialize: String = attributes.serialize + s"${direction.serialize} ${resolution.serialize} $name : <${tpe.serialize}> ${serial_init}" 
+
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   def mapStmt(f: Statement => Statement): T = this
   def mapExpr(f: Expression => Expression): T = this.copy(init=f(init), clock=f(clock), reset=f(reset))
@@ -1860,7 +1918,7 @@ case class DefParam(
   ) extends Statement with IsDeclaration {
   type T = DefParam
   def serialize: String = {
-    val header = attributes.serialize + s"param $name: ${tpe.serialize}" 
+    val header = attributes.serialize + s"param $name: <${tpe.serialize}>" 
     value match {
       case Some(e) => header + s" = ${e.serialize}"
       case _ => header
@@ -1905,17 +1963,8 @@ case class DefPackage(
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 
-/** Base class for modules */
-abstract class DefModule extends Description with IsDeclaration {
-  val attributes : VerilogAttributes
-  val name : String
-  val params : Seq[DefParam]
-  val clock : Option[String]
-  val reset: Option[String]
-  val body: Statement
-  protected def serializeHeader(tpe: String): String =
-    s"$tokens: $tpe $name :${attributes.serialize}${indent(params.map("\n" + _.serialize).mkString)}${indent(ports.map("\n" + _.serialize).mkString)}\n"
-  type T <: DefModule
+trait FetchPort {
+  def body: Statement
   
   // dynamically retrieve ports
   private def fetchPorts(stmt: Statement): Seq[Port] = {
@@ -1929,13 +1978,7 @@ abstract class DefModule extends Description with IsDeclaration {
     }
   }
   lazy val ports : Seq[Port] = fetchPorts(body)
-
-  // foreach can be implemented right away (no need for copy)
-  def foreachPort(f: Port => Unit): Unit = ports.foreach(f)
-  def foreachParam(f: DefParam => Unit): Unit = params.foreach(f)
-  def foreachStmt(f: Statement => Unit): Unit = f(body)
-  def foreachString(f: String => Unit): Unit = f(name)
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
+  
   
   // map need the copy
   protected def mapPortStatement(s: Statement, f: Port => Statement): Statement = {
@@ -1944,6 +1987,26 @@ abstract class DefModule extends Description with IsDeclaration {
       case st => st.mapStmt(s => mapPortStatement(s, f))
     }
   }
+}
+
+/** Base class for modules */
+abstract class DefModule extends Description with IsDeclaration with FetchPort {
+  val attributes : VerilogAttributes
+  val name : String
+  val params : Seq[DefParam]
+  val clock : Option[String]
+  val reset: Option[String]
+  val body: Statement
+  protected def serializeHeader(tpe: String): String =
+    s"$tokens: $tpe $name :${attributes.serialize}${indent(params.map("\n" + _.serialize).mkString)}${indent(ports.map("\n" + _.serialize).mkString)}\n"
+  type T <: DefModule
+
+  // foreach can be implemented right away (no need for copy)
+  def foreachPort(f: Port => Unit): Unit = ports.foreach(f)
+  def foreachParam(f: DefParam => Unit): Unit = params.foreach(f)
+  def foreachStmt(f: Statement => Unit): Unit = f(body)
+  def foreachString(f: String => Unit): Unit = f(name)
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
   
   def mapPort(f: Port => Statement): T
   def mapParam(f: DefParam => DefParam): T

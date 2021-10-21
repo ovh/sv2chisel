@@ -43,11 +43,11 @@ class RemoveConcats(
     def visitStatement(s: Statement): Unit = {
       s match {
         case l: DefLogic => refs += l.name
+        case p: Port => refs += p.name
         case _ => s.foreachStmt(visitStatement)
       }
     }
     
-    m.foreachPort(p => refs += p.name)
     m.foreachParam(p => refs += p.name)
     m.foreachStmt(visitStatement)
     

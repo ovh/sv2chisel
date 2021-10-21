@@ -277,6 +277,7 @@ class FlowReferences(
       s match {
         case c: DefParam => visitDefParam(c)
         case c: Connect => visitConnect(c)
+        case p: Port => visitPort(p)
         case _ => s.foreachStmt(visitStatement)
       }
     }
@@ -292,7 +293,6 @@ class FlowReferences(
       }
     }
     
-    m.foreachPort(visitPort)
     // TO DO : we are missing includes here ...
     m.foreachParam(visitDefParam)
     m.foreachStmt(visitStatement)
