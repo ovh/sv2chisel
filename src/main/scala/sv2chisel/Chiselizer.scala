@@ -110,6 +110,7 @@ package object chiselize extends EasyLogging {
   implicit def typeToChisel(s: Type) = new ChiselType(s)
   implicit def widthToChisel(s: Width) = new ChiselWidth(s)
   implicit def fieldToChisel(s: Field) = new ChiselField(s)
+  implicit def enumFieldToChisel(s: EnumField) = new ChiselEnumField(s)
   
   def getRef(e: Expression): Reference = {
     e match {
@@ -223,7 +224,7 @@ class ChiselSourceFile(val src: SourceFile) extends Chiselized {
 class ChiselDescription(val d: Description) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     d match {
-      case s: Statement => s.chiselize(ctx)
+      case s: IsolatedStatement => s.body.chiselize(ctx)
       case m: DefModule => m.chiselize(ctx)
       case p: DefPackage => p.chiselize(ctx)
       case _ => unsupportedChisel(ctx,d)
@@ -283,7 +284,7 @@ class ChiselModule(val m: Module) extends Chiselized {
 
     s += ChiselLine(m, ctx, s"class ${m.name}(")
     if(mod.params.size > 0) {
-      s ++= mod.params.map(_.chiselize(pCtxt, true) ++ comma).flatten.dropRight(1)
+      s ++= mod.params.map(_.chiselize(pCtxt, forceType=true) ++ comma).flatten.dropRight(1)
       s += ChiselLine(mCtxt, s") extends $kind {")
     } else {
       s += ChiselTxt(mCtxt, s") extends $kind {")
@@ -341,14 +342,21 @@ class ChiselDefParam(val p: DefParam) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext, forceType: Boolean): Seq[ChiselTxt] = {
     val (tokens, value, tpe) = (p.value, p.tpe) match {
       case (None, t: UnknownType) => (UndefinedInterval, Seq(), Seq(ChiselTxt(ctx, s"Int")))
-      case (None, t: Type) => (UndefinedInterval, Seq(), t.chiselize(ctx))
+      case (None, t: Type) => (UndefinedInterval, Seq(), t.chiselize(ctx, scalaTypeOnly = true))
       case (Some(e), t: UnknownType) => // TO DO : remove should be done before
         val tpe = e match {
           case s: StringLit => "String"
           case _ => "Int"
         }
         (e.tokens, eq ++ e.chiselize(ctx), Seq(ChiselTxt(ctx, tpe)))
-      case (Some(e), t: Type) => (e.tokens, eq ++ e.chiselize(ctx), t.chiselize(ctx))
+      case (Some(e), t: Type) => 
+        // priority of HwExpressionKind value over ctx hw/sw
+        val eCtx = e.kind match {
+          case HwExpressionKind => ctx.hw() 
+          case SwExpressionKind => ctx.sw()
+          case _ => ctx 
+        }
+        (e.tokens, eq ++ e.chiselize(eCtx), t.chiselize(eCtx, scalaTypeOnly = true))
     }
 
     (forceType, value, p.tpe) match {
@@ -384,6 +392,21 @@ class ChiselField(val f: Field) extends Chiselized {
         
       case _ => 
         Seq(ChiselLine(f, ctx, s"$decl ")) ++ f.tpe.chiselize(ctx.incr())
+    }
+  }
+}
+
+class ChiselEnumField(val f: EnumField) extends Chiselized {
+  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = chiselize(ctx, false)
+  def chiselize(ctx: ChiselEmissionContext, forceValues: Boolean): Seq[ChiselTxt] = {
+    val decl = s"val ${f.name} ="
+    forceValues match {
+      case true => 
+        Seq(ChiselLine(f, ctx, s"$decl Val(")) ++
+          f.value.chiselize(ctx.incr()) ++
+          Seq(ChiselTxt(f, ctx, ")"))
+        
+      case false => Seq(ChiselLine(f, ctx, s"$decl Value"))
     }
   }
 }
@@ -425,9 +448,7 @@ class ChiselType(val t: Type) extends Chiselized {
         Seq(ChiselTxt(t, ctx, s"new Bundle { ")) ++
           b.fields.map(_.chiselize(iCtxt)).flatten ++
           Seq(ChiselLine(ctx, "}"))
-      // to do : downto should be recorded in a hashmap for later affectation
-      // or add declaration to reference type propagation
-      // ...
+
       case u: UnknownType => 
         unsupportedChisel(ctx,u, "non-usable UnknownType")
       
@@ -462,6 +483,7 @@ class ChiselType(val t: Type) extends Chiselized {
         }
         
       case r: RawScalaType => ChiselTxtS(r.tokens, r.str)
+      case s: StringType => ChiselTxtS(s.tokens, "String")
       
       case _ => unsupportedChisel(ctx,t, "Unsupported Type: " + t)
     }
@@ -476,7 +498,7 @@ class ChiselStatement(val s: Statement) extends Chiselized {
       case l: DefLogic => l.chiselize(ctx)
       case f: DefFunction => f.chiselize(ctx)
       case t: DefType => t.chiselize(ctx)
-      case p: DefParam => p.chiselize(ctx, false)
+      case p: DefParam => p.chiselize(ctx, forceType=false)
       case c: Comment => c.chiselize(ctx)
       case c: Connect => c.chiselize(ctx)
       case i: IfGen => i.chiselize(ctx)
@@ -552,11 +574,24 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
 
 class ChiselDefType(val t: DefType) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
+    def addHwEnumDep() = ctx.src.addDep(PackageRef(UndefinedInterval, "sv2chisel.helpers.enum", "_"))
     
     t.tpe match {
       case b: BundleType => 
         Seq(ChiselLine(t, ctx, s"class ${t.name} extends Bundle {")) ++
           b.fields.flatMap(_.chiselize(ctx.hw().incr())) ++
+          Seq(ChiselLine(ctx, "} "))
+          
+      case e: EnumType if(e.isGeneric) => 
+        addHwEnumDep()
+        Seq(ChiselLine(t, ctx, s"object ${t.name} extends GenericHwEnum {")) ++
+          e.fields.flatMap(_.chiselize(ctx.hw().incr())) ++
+          Seq(ChiselLine(ctx, "} "))
+          
+      case e: EnumType => 
+        addHwEnumDep()
+        Seq(ChiselLine(t, ctx, s"object ${t.name} extends CustomHwEnum {")) ++
+          e.fields.flatMap(_.chiselize(ctx.hw().incr(), forceValues = true)) ++
           Seq(ChiselLine(ctx, "} "))
       
       case tpe => // assuming alias case
@@ -807,7 +842,21 @@ class ChiselMappedValues(e: MappedValues){
 class ChiselSeqValues(e: SeqValues){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     (ctx.isHardware, e.kind) match {
-      case (true, HwExpressionKind) => unsupportedChisel(ctx,e, "HW SeqValues: TODO")
+      case (true, HwExpressionKind) => 
+        val values = e.tpe match {
+          case v: VecType if(v.downto) => e.values.reverse
+          case v: VecType => e.values
+          case _ => rcritical(ctx, e, s"unexpected type for SeqValues ${e.serialize}") ; e.values
+        }
+        
+        if (values.isEmpty) {
+          unsupportedChisel(ctx,e, "Empty VecInit are not allowed")
+        } else {
+          ChiselTxtS(e, ctx, "VecInit(") ++
+            values.map(_.chiselize(ctx) ++ ChiselTxtS(", ")).flatten.dropRight(1) ++
+            ChiselTxtS(")")
+        }
+      
       case (false, SwExpressionKind) => 
         val values = e.tpe match {
           case v: VecType if(v.downto) => e.values.reverse

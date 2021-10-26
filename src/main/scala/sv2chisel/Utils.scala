@@ -68,7 +68,12 @@ object Utils extends LazyLogging with InfoLogger {
           case e => e 
         }
       
-      case n: Statement => n.mapExpr(cleanTok).mapType(cleanTok).mapStmt(cleanTok)
+      case n: Statement => 
+        n.mapExpr(cleanTok).mapType(cleanTok).mapStmt(cleanTok).mapVerilogAttributes(cleanTok) match {
+          case p: Port => p.copy(direction = cleanTok(p.direction))
+          case s => s
+        }
+        
       case n: AlwaysComb => n.copy(trig = cleanTok(n.trig))
       case n: AlwaysFF => n.copy(trig = cleanTok(n.trig))
       case n: UndefinedEventControl => n
@@ -77,14 +82,6 @@ object Utils extends LazyLogging with InfoLogger {
       case n: Field => n.copy(flip = cleanTok(n.flip), tpe = cleanTok(n.tpe))
       case n: Type => n.mapType(cleanTok).mapWidth(cleanTok)
       case n: Direction => n
-      case n: Port => n.copy(
-        attributes = cleanTok(n.attributes),
-        direction = cleanTok(n.direction),
-        tpe = cleanTok(n.tpe),
-        init = cleanTok(n.init),
-        clock = cleanTok(n.clock),
-        reset = cleanTok(n.reset)
-      )
       case n: StringParam => n.copy(value = cleanTok(n.value))
       case n: Param => n
     }).asInstanceOf[T]

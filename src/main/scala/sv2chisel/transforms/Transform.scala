@@ -220,7 +220,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
   
   private def processDescriptionWrapper(d: Description): Description = {
     d match {
-      case i: ImportPackages => importedPackages ++= i.packages; refOutdated = true
+      case IsolatedStatement(_, i: ImportPackages) => importedPackages ++= i.packages; refOutdated = true
       case _ =>
     }
     processDescription(d)

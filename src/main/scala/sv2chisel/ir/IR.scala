@@ -72,6 +72,18 @@ case class UnrecognizedDescription(tokens: Interval) extends Description {
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
 }
 
+case class IsolatedStatement(tokens: Interval, body: Statement) extends Description {
+  type T = IsolatedStatement
+  def serialize: String = body.serialize
+  def mapStmt(f: Statement => Statement) = this.copy(body = f(body))
+  def mapString(f: String => String) = this
+  def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
+  def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
+  def foreachStmt(f: Statement => Unit): Unit = f(body)
+  def foreachString(f: String => Unit): Unit = Unit
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+}
+
 abstract class Header extends Statement {
   type T <: Header
   def mapExpr(f: Expression => Expression) = this.asInstanceOf[T]
@@ -209,10 +221,10 @@ abstract class PrimOp extends SVNode {
 }
 
 
-sealed trait ExpressionKind
-case object UnknownExpressionKind extends ExpressionKind
-case object HwExpressionKind extends ExpressionKind
-case object SwExpressionKind extends ExpressionKind
+sealed trait ExpressionKind { def serialize : String }
+case object UnknownExpressionKind extends ExpressionKind { def serialize : String = "??" }
+case object HwExpressionKind extends ExpressionKind { def serialize : String = "Hw" }
+case object SwExpressionKind extends ExpressionKind { def serialize : String = "Sw" }
 
 // IMPORTANT NOTICE: although flows can help to infer remote reference flows 
 // !! They are only valid locally !! 
@@ -239,6 +251,8 @@ sealed abstract class Expression extends SVNode {
   def foreachExpr(f: Expression => Unit): Unit
   def foreachType(f: Type => Unit): Unit
   def foreachWidth(f: Width => Unit): Unit
+  
+  final def ftpe : String = s"${tpe.serialize}@${kind.serialize}"
 }
 case class RawScalaExpression(str: String, kind: ExpressionKind) extends Expression {
   type T = RawScalaExpression
@@ -377,7 +391,7 @@ case class Reference(
     flow: Flow = UnknownFlow
   ) extends Expression with HasName {
   type T = Reference
-  def serialize: String = path.mkString("",".","") + name
+  def serialize: String = (path :+ name).mkString(".")
   def mapExpr(f: Expression => Expression): Reference = this
   def mapType(f: Type => Type): Reference = this
   def mapWidth(f: Width => Width): Reference = this
@@ -451,7 +465,7 @@ case class TypeInst(
     flow : Flow = UnknownFlow
   ) extends Expression {
   type T = TypeInst
-  def serialize: String = s"InstOf[${tpe.serialize}]"  
+  def serialize: String = s"InstOf[${ftpe}]"  
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapExpr(f: Expression => Expression) = this
   def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
@@ -641,7 +655,7 @@ case class AssignPattern(tokens: Interval, assign: Seq[(Expression, Expression)]
   type T = AssignPattern
   def mapType(f: Type => Type) = this.copy(tpe=f(tpe))
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
-  def serialize: String = s"AssignPattern${assign.map(t => s"${t._1.serialize} -> ${t._2.serialize}").mkString("(", ",", ")")}"
+  def serialize: String = s"AssignPattern${assign.map(t => s"${t._1.serialize} -> ${t._2.serialize}").mkString("(", ",", ")")}:<${tpe.serialize}@${kind.serialize}>"
   def mapExpr(f: Expression => Expression) = this.copy(assign = assign.map(t => (f(t._1), f(t._2))))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = assign.foreach(t => {
@@ -666,7 +680,7 @@ case class SeqValues(tokens: Interval, values: Seq[Expression], kind: Expression
   type T = SeqValues
   def mapType(f: Type => Type) = this.copy(tpe=f(tpe))
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
-  def serialize: String = s"SeqValues${values.mkString("(", ",", ")")}"
+  def serialize: String = s"SeqValues${values.map(_.serialize).mkString("(", ",", ")")}:<${tpe.serialize}@${kind.serialize}>"
   def mapExpr(f: Expression => Expression) = this.copy(values = values.map(f))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = values.foreach(f)
@@ -801,7 +815,7 @@ case class Concat(
     flow : Flow = UnknownFlow
   ) extends Expression {
   type T = Concat
-  def serialize: String = s"Concat(${indent(args.map(a => s"\n${a.serialize}: <${a.tpe.serialize}>").mkString)})\n"
+  def serialize: String = s"Concat(${indent(args.map(a => s"\n${a.serialize}: <${a.ftpe}>").mkString)}): <${ftpe}>\n"
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapExpr(f: Expression => Expression) = this.copy(args = args map f)
   def mapType(f: Type => Type) = this
@@ -820,7 +834,7 @@ case class DoCast(
   ) extends Expression {
   type T = DoCast
   def flow: Flow = SourceFlow
-  def serialize: String = s"(${expr.serialize}).asTypeOf(${tpe.serialize})"
+  def serialize: String = s"(${expr.serialize}).asTypeOf(${ftpe})"
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapExpr(f: Expression => Expression) = this.copy(expr = f(expr))
   def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
@@ -854,7 +868,7 @@ case class DoCall(
   * STATEMENTS 
   *
   */
-sealed abstract class Statement extends Description {
+sealed abstract class Statement extends SVNode {
   type T <: Statement
   def mapInterval(f: Interval => Interval): T
   def mapStmt(f: Statement => Statement): T
@@ -1293,7 +1307,7 @@ case class Connect(
     blocking: Boolean
   ) extends Statement with HasVerilogAttributes {
   type T = Connect
-  def serialize: String =  s"${loc.serialize}:<${loc.tpe.serialize}> := ${expr.serialize}:<${expr.tpe.serialize}>" + attributes.serialize
+  def serialize: String =  s"${loc.serialize}:<${loc.ftpe}> := ${expr.serialize}:<${expr.ftpe}>" + attributes.serialize
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   def mapStmt(f: Statement => Statement) = this
   def mapExpr(f: Expression => Expression) = this.copy(loc = f(loc), expr = f(expr))
@@ -1313,7 +1327,7 @@ case class ExpressionStatement(
   ) extends Statement {
   type T = ExpressionStatement
   val tokens = expr.tokens
-  def serialize: String =  s"${expr.serialize}:<${expr.tpe.serialize}>"
+  def serialize: String =  s"${expr.serialize}:<${expr.ftpe}>"
   def mapInterval(f: Interval => Interval) = this
   def mapStmt(f: Statement => Statement) = this
   def mapExpr(f: Expression => Expression) = this.copy(expr = f(expr))
@@ -1490,6 +1504,14 @@ case class Field(tokens: Interval, attributes: VerilogAttributes, name: String, 
   }
 }
 
+case class EnumField(tokens: Interval, name: String, value: Expression) extends SVNode with HasName {
+  type T = EnumField
+  def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
+  def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def serialize: String = s"$name = ${value.serialize}"
+}
+
 /** Types of [[SVNode]] */
 abstract class Type extends SVNode {
   type T <: Type
@@ -1531,7 +1553,7 @@ case class UserRefType(
   ) extends Type with HasName {
   type T = UserRefType
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def serialize: String = path.mkString("",".","") + name
+  def serialize: String = (path :+ name).mkString(".")
   def mapType(f: Type => Type) = this.copy(tpe=f(tpe))
   def mapWidth(f: Width => Width) = this.copy(tpe=tpe.mapWidth(f))
   def foreachWidth(f: Width => Unit): Unit = tpe.foreachWidth(f)
@@ -1620,15 +1642,33 @@ case class FixedType(tokens: Interval, width: Width, point: Width) extends Groun
 
 case class BundleType(tokens: Interval, fields: Seq[Field]) extends AggregateType {
   type T = BundleType
-  def serialize: String = "new Bundle { " + indent(fields.map(_.serialize
+  def serialize: String = "Bundle { " + indent(fields.map(_.serialize
   ).mkString("\n","\n", "")) + "\n}"
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def mapType(f: Type => Type) =
-    BundleType(tokens, fields map (x => x.copy(tpe = f(x.tpe))))
+  def mapType(f: Type => Type) = this.copy(fields = fields.map(x => x.copy(tpe = f(x.tpe))))
   def foreachType(f: Type => Unit): Unit = fields.foreach{ x => f(x.tpe) }
   def mapWidth(f: Width => Width) = this
   def foreachWidth(f: Width => Unit): Unit = Unit
   def widthOption: Option[Width] = None // TODO ?
+}
+
+case class EnumType(tokens: Interval, fields: Seq[EnumField], tpe: Type, kind: ExpressionKind) extends AggregateType {
+  type T = EnumType
+  def serialize: String = s"Enum: <${tpe.serialize}@${kind.serialize}> { " + indent(fields.map(_.serialize
+  ).mkString("\n","\n", "")) + "\n}"
+  def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
+  def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
+  def foreachType(f: Type => Unit): Unit = f(tpe)
+  def mapWidth(f: Width => Width) = this
+  def foreachWidth(f: Width => Unit): Unit = Unit
+  def widthOption: Option[Width] = tpe.widthOption
+  
+  def isGeneric: Boolean = {
+    fields.zipWithIndex.map({
+      case (EnumField(_,_,n:Number), i) => n.getInt == i
+      case _ => false
+    }).reduce(_ && _)
+  }
 }
 
 abstract class VecType extends AggregateType {
@@ -1641,6 +1681,7 @@ abstract class VecType extends AggregateType {
   def downtoStr : String = if (downto) "downto" else "upto"
   
   def foreachType(f: Type => Unit): Unit = tpe.foreach(f)
+  def mapType(f: Type => Type): T
   
   def foreachWidth(f: Width => Unit): Unit = f(Width(bound))
   
@@ -1918,7 +1959,7 @@ case class DefParam(
   ) extends Statement with IsDeclaration {
   type T = DefParam
   def serialize: String = {
-    val header = attributes.serialize + s"param $name: <${tpe.serialize}>" 
+    val header = attributes.serialize + s"param $name: <${tpe.serialize}@${kind.serialize}>" 
     value match {
       case Some(e) => header + s" = ${e.serialize}"
       case _ => header

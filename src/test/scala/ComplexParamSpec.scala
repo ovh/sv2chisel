@@ -15,7 +15,9 @@ import org.scalatest._
 class ComplexParamSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "Assign Pattern" should "be properly emitted" in {
+  behavior of "ComplexParam"
+  
+  it should "support assign patterns" in {
     val result = emitInModule(s"""
       |// might contain more than the RAM due to moves
       |localparam DBLW = 2;
@@ -105,5 +107,56 @@ class ComplexParamSpec extends Sv2ChiselSpec {
 
     
   }
-
+  
+  it should "support complex tables" in {
+    val result = emitInModule(s"""
+      |// comment
+      |localparam string STR = "string";
+      |localparam string TABLE_STR [2:0] = '{"test", "truc", "bidule"};
+      |localparam logic [1:0] TABLE_CONCAT [2:0] = '{2'd3, 2'd2, 2'd1};
+      |localparam DBLW = 5;
+      |localparam logic [DBLW-1:0]       en  = '{default:'0}; 
+      |localparam logic [DBLW-1:0][64:0] cnt = '{default:'0};
+      |
+      |// avoid UInt inference for en
+      |localparam enH = en[0];
+      |localparam enT = en[DBLW-1];
+      """.stripMargin
+    )
+    debug(result)
+    result should contains ("import chisel3._")
+    
+    result should contains ("val STR = \"string\"")
+    // NB: reverse is expected to preserve the indexes TABLE_STR[0] = "bidule"
+    result should contains ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
+    
+    result should contains ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
+    result should contains ("val en: Vec[Bool] = (0.U).asTypeOf(Vec(DBLW, Bool()))")
+    result should contains ("val cnt: Vec[UInt] = (0.U).asTypeOf(Vec(DBLW, UInt(65.W)))")
+  }
+  
+  it should "support complex tables in package" in {
+    val result = emit(wrapInPackage(s"""
+      |// comment
+      |localparam string STR = "string";
+      |localparam string TABLE_STR [2:0] = '{"test", "truc", "bidule"};
+      |localparam logic [1:0] TABLE_CONCAT [2:0] = '{2'd3, 2'd2, 2'd1};
+      |localparam DBLW = 5;
+      |localparam logic [DBLW-1:0]       en  = '{default:'0}; 
+      |localparam logic [DBLW-1:0][64:0] cnt = '{default:'0};
+      |
+      """.stripMargin
+    ))
+    debug(result)
+    result should contains ("import chisel3._")
+    
+    result should contains ("val STR = \"string\"")
+    // NB: reverse is expected to preserve the indexes TABLE_STR[0] = "bidule"
+    result should contains ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
+    
+    result should contains ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
+    result should contains ("val en: Vec[Bool] = (0.U).asTypeOf(Vec(DBLW, Bool()))")
+    // no InferUInt in package params
+    result should contains ("val cnt: Vec[Vec[Bool]] = (0.U).asTypeOf(Vec(DBLW, Vec(65, Bool())))")
+  }
 }

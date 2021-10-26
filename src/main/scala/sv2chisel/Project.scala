@@ -36,7 +36,7 @@ class Project(name: String) extends EasyLogging {
       val (src, tokens) = Parser.parseFile(f, basePath)
       src.foreachDescription(d => {
         d match {
-          case IncludeHeader(_, s) => addFiles(Seq(s))
+          case IsolatedStatement(_, IncludeHeader(_, s)) => addFiles(Seq(s))
           // to do : hierarchy mode 
           // add submodules files found in path & not already in project
           // same for packages 

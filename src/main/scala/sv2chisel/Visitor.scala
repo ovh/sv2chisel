@@ -63,7 +63,7 @@ class Visitor(
   private def visitDescription(ctx: DescriptionContext): Description = {
     ctx.getChild(0) match {
       case m: Module_declarationContext => visitModule(m)
-      case h: Header_textContext => visitHeader(h)
+      case h: Header_textContext => IsolatedStatement(ctx.getSourceInterval(), visitHeader(h))
       case p: Package_declarationContext => visitPackage_declaration(p)
       
       case u: Udp_declarationContext => unsupportedDesc(u, "Udp_declarationContext")
@@ -221,10 +221,7 @@ class Visitor(
   }
   
   private def visitFunction_declaration(ctx: Function_declarationContext): Statement = {
-    ctx.lifetime match {
-      case null =>
-      case k => unsupported.raiseIt(ctx, s"Unsupported lifetime ${k.getText()}")
-    }
+    unsupported.check(ctx.lifetime)
     val returnType = ctx.function_data_type_or_implicit match {
       case null => UnknownType(ctx.getSourceInterval)
       case tpe => tpe.getChild(0) match {
@@ -386,23 +383,32 @@ class Visitor(
     }
   }
   
-  private def getIntegerType(ctx: Integer_typeContext, signed: Boolean, isHw: Boolean): (Type, LogicResolution) = {
+  private def getIntegerAtomType(ctx: Integer_atom_typeContext, signed: Boolean, isHw: Boolean): Type = {
     val itvl = ctx.getSourceInterval()
+    val w = getIntegerWidth(ctx)
+    (signed, isHw) match {
+      case (true, true) => SIntType(itvl,w)
+      case (false, true) => UIntType(itvl,w, NumberDecimal)
+      case (_, false) => IntType(itvl, NumberDecimal)
+    }
+  }
+  
+  private def getIntegerVectorType(ctx: Integer_vector_typeContext, signed: Boolean, isHw: Boolean): Type = {
+    val itvl = ctx.getSourceInterval()
+    // ctx might be logic, bit or reg
+    (isHw, ctx.KW_REG) match {
+      case (_, null) => BoolType(itvl, signed)
+      case (false, reg) => 
+        unsupported.raiseIt(ctx, s"Unsupported reg keyword in software context ${getRawText(ctx)} (ignored)")
+        BoolType(itvl, signed)
+      case (true, reg) => BoolType(itvl, signed)
+    }
+  }
+  
+  private def getIntegerType(ctx: Integer_typeContext, signed: Boolean, isHw: Boolean): (Type, LogicResolution) = {
     (ctx.integer_atom_type, ctx.integer_vector_type) match {
-      case (a, null) => 
-        val w = getIntegerWidth(a)
-        val t = (signed, isHw) match {
-          case (true, true) => SIntType(itvl,w)
-          case (false, true) => UIntType(itvl,w, NumberDecimal)
-          case (_, false) => IntType(itvl, NumberDecimal)
-        }
-        (t, LogicUnresolved)
-      case (null, r) => 
-        val t = isHw match {
-          case true => BoolType(itvl, signed)
-          case false => throwParserError(ctx)
-        }
-        (t, getResolution(r))
+      case (a, null) => (getIntegerAtomType(a, signed, isHw), LogicUnresolved)
+      case (null, r) => (getIntegerVectorType(r, signed, isHw), getResolution(r))
       case _ => throwParserError(ctx)
     }
   }
@@ -445,6 +451,34 @@ class Visitor(
     }
   }
   
+  private def getEnumBaseType(ctx: Enum_base_typeContext, isHw: Boolean): (Type, LogicResolution) = {
+    val signed = isSigned(ctx.signing)
+    val (t, r) = (ctx.getChild(0)) match {
+      case a:Integer_atom_typeContext => (getIntegerAtomType(a, signed, isHw), LogicUnresolved)
+      case v:Integer_vector_typeContext => (getIntegerVectorType(v, signed, isHw), getResolution(v))
+      case i:IdentifierContext => (UserRefType(i.getSourceInterval, i.getText(), Seq()), LogicUnresolved)
+      case p:Packed_dimensionContext => (getPackedDim(p), LogicUnresolved)
+      case _ => throwParserError(ctx)
+    }
+    ctx.variable_dimension match {
+      case null => (t, r)
+      case dim => (getFullType(Seq(getVariableDim(ctx.variable_dimension)).collect{case u: UnpackedVecType => u}, t), r)
+    }
+  }
+  
+  // enum_name_declaration:
+  //  identifier ( LSQUARE_BR integral_number ( COLON integral_number )? RSQUARE_BR )? ( ASSIGN expression )?;
+  private def getEnumNameDecl(ctx: Enum_name_declarationContext): EnumField = {
+    ctx.integral_number.asScala match {
+      case Seq() =>
+      case _ => unsupported.raiseIt(ctx, s"advanced enum name declaration (ignoring bracket content)") 
+    }
+    ctx.expression match {
+      case null => EnumField(ctx.getSourceInterval(), ctx.identifier.getText(), UndefinedExpression())
+      case e => EnumField(ctx.getSourceInterval(), ctx.identifier.getText(), getExpression(e))
+    }
+  }
+  
   private def getDataTypeUsual(ctx: Data_type_usualContext, isHw: Boolean): (Type, LogicResolution) = {
     trace(ctx, s"getDataTypeUsual ${getRawText(ctx)}")
     val dtp = ctx.data_type_primitive
@@ -454,7 +488,11 @@ class Visitor(
       
     val (tpe, res) = (dtp, enum, struct, pack) match {
       case (p, Seq(), null, null) => getDataPrimitiveType(p, isHw)
-      case (null, s, null, null) => unsupportedType(ctx, "TO DO enum")
+      case (null, s, null, null) => 
+        val (t, r) = getEnumBaseType(ctx.enum_base_type, isHw)
+        trace(ctx, s"enum base type = ${t.serialize}")
+        (EnumType(ctx.getSourceInterval(), s.map(getEnumNameDecl), t, HwExpressionKind), r) // TODO: review HwExpression
+        
       case (null, Seq(), s, null) => 
         s.getText match {
           case "struct" => 
@@ -474,7 +512,7 @@ class Visitor(
       .collect {case u: UnpackedVecType => u.asPackedVecType}
     (packed, tpe) match {
       case (Seq(), _) => (tpe, res)
-      case (s, BoolType(_, true)) => (getFullType(s.dropRight(1), s.last.asSIntType()), res)
+      case (s, BoolType(_, true)) => (getFullType(s.dropRight(1), s.last.asSIntType()), res) // signed case
       case (s, _) => (getFullType(s, tpe), res)
     }
   }
@@ -1504,19 +1542,21 @@ class Visitor(
           case (Some(bg), _) => (UIntType(v.bound.tokens, Width(bg+1), NumberDecimal), HwExpressionKind)
           case (_, Some(u:Number)) => (v.asUIntType(), HwExpressionKind)
           case (_, Some(u:UIntLiteral)) => (v.asUIntType(), HwExpressionKind)
-          case _ => (BoolType(v.bound.tokens), HwExpressionKind)
+          // this HwExpressionKind might be a bit restrictive in usage ...
+          // should depends on inner kind and rely on InferUInt & LegalizeExpression Transforms for further interpretation
+          case _ => (t, HwExpressionKind)
         }
       case (_, Some(u:UIntLiteral)) =>(u.tpe, HwExpressionKind)
       case (_, Some(n:Number)) if(n.width != UnknownWidth()) =>
         (UIntType(n.tokens, n.width, n.base), HwExpressionKind)
       case _ => (t, SwExpressionKind)
     }
-    trace(ctx, s"param $name: ${updatedTpe.serialize} $kind")
     
     val tpe = ctx.unpacked_dimension.asScala match {
       case Seq() => updatedTpe
       case s => getFullType(s.map(getUnpackedDim),updatedTpe)
     }
+    trace(ctx, s"param $name: ${tpe.serialize} $kind")
 
     DefParam(ctx.getSourceInterval(), attr, name, tpe, value, kind)
   }
@@ -1652,8 +1692,8 @@ class Visitor(
           case o: Identifier_with_bit_selectContext => unsupportedStmt(ctx, "TO DO type alias")
           case _ =>
             (ctx.KW_ENUM, ctx.KW_STRUCT, ctx.KW_UNION, ctx.KW_CLASS) match {
-              case (e, null, null, null) => unsupportedStmt(ctx, "TO DO enum")
-              case (null, s, null, null) => unsupportedStmt(ctx, "TO DO struct")
+              case (e, null, null, null) => unsupportedStmt(ctx, "TO DO enum typedef")
+              case (null, s, null, null) => unsupportedStmt(ctx, "TO DO struct typedef")
               case (null, null, u, null) => unsupportedStmt(ctx, "typedef union")
               case (null, null, null, c) => unsupportedStmt(ctx, "typedef class")
               case _ => throwParserError(ctx)

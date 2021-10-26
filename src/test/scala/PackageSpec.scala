@@ -29,7 +29,7 @@ class PackageSpec extends Sv2ChiselSpec {
 
     result should contains ("package object my_package {")
     result should contains ("val test = 0")
-    result should contains ("val A: Boolean = 1")
+    result should contains ("val A: Boolean = true")
     result should contains ("}")
 
   }

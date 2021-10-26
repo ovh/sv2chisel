@@ -16,15 +16,8 @@ import collection.mutable.{HashMap, ArrayBuffer}
 class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
   implicit var srcFile = currentSourceFile
   implicit var stream = currentStream
-
-  def processDescription(d: Description): Description = {
-    d match {
-      case m: Module => processModule(m)
-      case d => d
-    }  
-  }
   
-  private def processModule(m: Module): Module = {
+  def processDescription(d: Description): Description = {
     // Insert cast wherever needed 
     // update kind whenever needed to push cast as UInt as far as possible:
     // ref.U + 1.U should be (ref+1).U
@@ -596,12 +589,35 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
             case _ => f
           }
         case a: AssignPattern => 
-          val assigns = a.assign.map(t => {(
-            processExpression(t._1, UnknownExpressionKind, UnknownType()),
-            processExpressionRec(t._2, expected, baseTpe)
-          )})
+
+          val assigns = a.assign.zipWithIndex.map { case (t, i) => {
+            val localBaseType = baseTpe match {
+              case v: VecType => v.tpe match {
+                case Seq(t) => t
+                case _ => critical(a, s"Unsupported MixedVecType"); UnknownType() 
+              }
+              case b: BundleType => 
+                // try to rely on name when defined (could otherwise try sequential but it is risky)
+                t._1 match {
+                  case n:NamedAssign => b.fields.find(_.name == n.name).map(_.tpe).getOrElse(UnknownType())
+                  case _ => UnknownType()
+                }
+              case u:UIntType => BoolType(u.tokens)
+              case _ => UnknownType() // not usable
+            }
+            (processExpression(t._1, UnknownExpressionKind, UnknownType()),
+              processExpressionRec(t._2, expected, localBaseType))
+          }}
           val (kind, tpe, values) = castTypeAll(assigns.map(_._2), baseUInt, None)
-          a.copy(assign = assigns.map(_._1).zip(values), kind = kind, tpe = tpe)
+
+          val resultingType = (baseTpe, tpe) match {
+            case (_, _:UnknownType) => baseTpe // non usuable
+            case (v: VecType, _) => v.mapType(_ => tpe)
+            case _ => baseTpe
+          }
+          trace(a, s"Processing AssignPattern with baseType: ${baseTpe.serialize} -- retrieved innerType ${tpe.serialize}")
+          
+          a.copy(assign = assigns.map(_._1).zip(values), kind = kind, tpe = resultingType)
         
         case na: NamedAssign => na.mapExpr(processExpressionRec(_, expected, baseTpe))
         
@@ -697,6 +713,9 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
       }).mapStmt(processStatement).mapType(processType)
     }
     
-    m.mapStmt(processStatement(_)).mapParam(p => p.mapExpr(processExpression(_, p.kind, p.tpe)))
+    d.mapStmt(processStatement(_)) match {
+      case m: Module => m.mapParam(p => p.mapExpr(processExpression(_, p.kind, p.tpe)))
+      case d => d
+    }
   }
 }

@@ -3,6 +3,7 @@
 // Copyright 2020 The sv2chisel Authors. All rights reserved.
 
 package sv2chisel.helpers
+package enum
 
 import chisel3._
 

@@ -61,6 +61,7 @@ class RaiseUnsupported(
       case c: Package_declarationContext => checkPackage(c)
       case c: Case_statementContext => checkCase(c)
       case c: Loop_statementContext => checkLoop(c)
+      case c: LifetimeContext => checkLifetime(c)
       
       case c => Utils.throwInternalError(s"Unsupported ParserRuleContext ${c.getClass}")
     }
@@ -284,6 +285,18 @@ class RaiseUnsupported(
     }
   }
   
+  def checkLifetime(ctx: LifetimeContext): Unit = {
+    ctx match {
+      case null =>
+      case k => 
+        (k.KW_AUTOMATIC, k.KW_STATIC) match {
+          case (auto, null) => // ok 
+          case (null, stat) => raiseIt(ctx, s"Unsupported `static` keywork, all variable and function are treated as `automatic`") 
+          case _ => 
+        }
+    }
+  }
+  
   def checkDataDecl(ctx: Data_declarationContext): Unit = {
     ctx.KW_CONST match {
       case null =>
@@ -293,17 +306,11 @@ class RaiseUnsupported(
       case null =>
       case k => raiseIt(ctx, s"Unsupported keyword ${ctx.getText()}")
     }
-    ctx.lifetime match {
-      case null =>
-      case k => raiseIt(ctx, s"Unsupported context ${ctx.getText()}")
-    }
+    checkLifetime(ctx.lifetime)
   }
   
   def checkPackage(ctx: Package_declarationContext): Unit = {
-    ctx.lifetime match {
-      case null =>
-      case k => raiseIt(ctx, s"Unsupported context ${ctx.getText()}")
-    }
+    checkLifetime(ctx.lifetime)
     ctx.timeunits_declaration match {
       case null =>
       case k => raiseIt(ctx, s"Unsupported context ${ctx.getText()}")
@@ -318,10 +325,7 @@ class RaiseUnsupported(
   }
   
   def checkModuleHeader(ctx: Module_header_commonContext): Unit = {
-    ctx.lifetime match {
-      case null =>
-      case k => raiseIt(ctx, s"Unsupported lifetime ${k.getText()}")
-    }
+    checkLifetime(ctx.lifetime)
     ctx.package_import_declaration.asScala match {
       case Seq() =>
       case s => raiseIt(ctx, s"Unsupported package_import_declaration within context ${ctx.getText()}")

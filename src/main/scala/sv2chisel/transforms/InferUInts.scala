@@ -144,8 +144,13 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Des
     }
   }
     
-  def processDescription(m: Description): Description = {
+  def processDescription(d: Description): Description = {
     val store = new UsageStore()
+    val publicLocalParam = d match {
+      case _: Module => false 
+      case _ => true // cannot infer properly because usage is unknown (not only local)
+    }
+    
     
     //FIRST PASS => fill store
     // assign : true is the expression is an assignement target
@@ -241,6 +246,10 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Des
               visitExpression(c.expr, false)
           // }
           
+        // Localparams might be hardware
+        case p: DefParam if(p.kind == HwExpressionKind && !publicLocalParam) => 
+          store.registerType(p.name, p.tpe)
+          s.foreachExpr(visitExpression(_, false))
           
         case p: Port => 
           store.registerType(p.name, p.tpe)
@@ -280,7 +289,7 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Des
       }
     }
     
-    m.foreachStmt(visitStatement)
+    d.foreachStmt(visitStatement)
     
     store.traceIt()
     
@@ -290,11 +299,12 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Des
       s match {
         case d: DefLogic => d.copy(tpe = store.getType(d.name))
         case p: Port => p.copy(tpe = store.getType(p.name))
+        case p: DefParam if(p.kind == HwExpressionKind && !publicLocalParam) => p.copy(tpe = store.getType(p.name))
         case f: DefFunction => f.copy(tpe = store.getType(f.name)).mapStmt(processStatement)
         case _ => s.mapStmt(processStatement)
       }
     }
     
-    m.mapStmt(processStatement)
+    d.mapStmt(processStatement)
   }
 }

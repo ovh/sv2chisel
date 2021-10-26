@@ -127,6 +127,7 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
         case (u: UnknownType, _) => expected
         case _ => e.tpe
       }
+      trace(s"Process expression ${e.serialize} e.tpe = ${e.tpe.serialize} ; expected = ${expected.serialize}")
       
       val exp = e match {
         case FillingBitPattern(_, bit, kind, _) => getFilling(e, tpe, bit) // kind to be used ?
