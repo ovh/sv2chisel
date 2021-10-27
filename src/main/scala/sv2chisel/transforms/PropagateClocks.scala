@@ -7,8 +7,6 @@ package transforms
 
 import sv2chisel.ir._
 
-import collection.mutable.{HashMap, ArrayBuffer}
-
 /** propagate infered clocks to def instance
   * 
   * 
@@ -37,7 +35,7 @@ class PropagateClocks(val llOption: Option[logger.LogLevel.Value] = None) extend
               })
               i.copy(portMap = portMap, clock = Some(ci))
 
-            case (None, Some(cm)) => 
+            case (None, Some(cm@_)) => 
               // update port map for instance
               critical(i, "TODO: update port map for instance")
               i

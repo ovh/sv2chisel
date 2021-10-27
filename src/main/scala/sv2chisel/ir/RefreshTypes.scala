@@ -16,8 +16,6 @@ package object refreshTypes {
   implicit def subIndexToSubIndexRefreshType(e: SubIndex) = new SubIndexRefreshType(e)
 }
 
-import refreshTypes._
-
 class SubRangeRefreshType(s: SubRange) extends LazyLogging with InfoLogger {
   var currentSourceFile : Option[SourceFile] = None
   var currentStream : Option[CommonTokenStream] = None
@@ -29,12 +27,11 @@ class SubRangeRefreshType(s: SubRange) extends LazyLogging with InfoLogger {
     trace(s, s"SubRange: ${s.serialize}")
     trace(Utils.getStackHere("sv2chisel.transforms.TypeReferences.process"))
     val ui = UndefinedInterval
-    val uk = UnknownExpressionKind 
     
     s.expr.tpe match {
       case v: VecType =>
         v.tpe match {
-          case Seq(t) => 
+          case Seq(_:Type) => 
             val tpe = s.right match {
               case Number(_,"0",_,_,_) => v.mapBound(_ => s.left)
               case _ => v.mapBound(_ => DoPrim(ui, PrimOps.Sub(ui), Seq(s.left, Utils.safeOperand(s.right))))
@@ -43,8 +40,8 @@ class SubRangeRefreshType(s: SubRange) extends LazyLogging with InfoLogger {
           case _ => 
             critical(s, s"Unsupported mixed vec type: ${s.serialize}") ; s
         }
-      case u: SIntType => critical(s, s"Unsupported conversion of range to SInt: ${s.serialize}") ; s
-      case u: UIntType =>
+      case _: SIntType => critical(s, s"Unsupported conversion of range to SInt: ${s.serialize}") ; s
+      case _: UIntType =>
         debug(s, s"Converting range to UInt: ${s.serialize}")
         // update UIntType width according to range if known
         // Note : conversion of Vec downto to UInt (up to) : SubRanges are downto

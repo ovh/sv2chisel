@@ -57,7 +57,6 @@ class FlowReferences(
     val llOption: Option[logger.LogLevel.Value] = None, 
     val assumeValidVerilog: Boolean = true) extends DescriptionBasedTransform {
   private val ui = UndefinedInterval
-  private val nv = NoVerilogAttribute
   
   class ModuleStore() {
     class ModulePorts(val name: String){
@@ -115,7 +114,7 @@ class FlowReferences(
           case s => info(s.head, s"Declaring actual port directions for module $name")
         }
         
-        val decl = ports.map(p => {
+        ports.foreach(p => {
           val flow = p.direction match {
             case _:Input => SourceFlow // NOTE: the connected expr shall be a source flow  
             case _:Output => SinkFlow
@@ -138,8 +137,8 @@ class FlowReferences(
                   case (Some(a), f) if(a.flow == f) => 
                   
                   // DO UPDATE
-                  case (Some(NamedAssign(_, _, _, UnknownFlow, _, _)), f) => namedPorts(na.name) = na
-                  case (None, f) => namedPorts += ((na.name, na))
+                  case (Some(NamedAssign(_, _, _, UnknownFlow, _, _)), _) => namedPorts(na.name) = na
+                  case (None, _) => namedPorts += ((na.name, na))
                   
                   // ERROR on defined flow override
                   case (Some(a), f) if(a.flow != f) => 
@@ -153,7 +152,7 @@ class FlowReferences(
                   case (a, f) if(a.flow == f) =>
                   
                   // DO UPDATE
-                  case (NoNameAssign(_, _, UnknownFlow, _, _, _), f) => 
+                  case (NoNameAssign(_, _, UnknownFlow, _, _, _), _) => 
                     if(t._2 < noNamePorts.size) {
                       noNamePorts(t._2) = na
                     } else { 
@@ -178,9 +177,9 @@ class FlowReferences(
           case (false, _, _, _: NoNameAssign) => getSeqFlows(declaration.values.toSeq, ports)
           case (_, false, _, _: NamedAssign) => getNamedFlows(namedPorts, ports)
           case (_, false, _, _: NoNameAssign) => getSeqFlows(namedPorts.values.toSeq, ports)
-          case (_, _, false, _: NamedAssign) => ports.map(p => UnknownFlow)
+          case (_, _, false, _: NamedAssign) => ports.map(_ => UnknownFlow)
           case (_, _, false, _: NoNameAssign) => getSeqFlows(noNamePorts, ports)
-          case _ => ports.map(p => UnknownFlow)
+          case _ => ports.map(_ => UnknownFlow)
         }
       }
     }
@@ -189,7 +188,7 @@ class FlowReferences(
     
     def register(m: DefModule): Unit = {
       store.get(m.name) match {
-        case Some(mp) => throwInternalError(s"Unexpected duplicated declaration for module ${m.name}")
+        case Some(m@_) => throwInternalError(s"Unexpected duplicated declaration for module ${m.name}")
         case None =>
           val mp = new ModulePorts(m.name)
           mp.declare(m.ports)
@@ -210,7 +209,7 @@ class FlowReferences(
     def getExpectedFlows(name: String, ports: Seq[Assign]): Seq[Flow] = { // Assign or flow ?
       store.get(name) match {
         case Some(mp) => mp.getExpectedFlows(ports)
-        case None => ports.map(p => UnknownFlow)
+        case None => ports.map(_ => UnknownFlow)
       }
     }
   }
@@ -244,7 +243,7 @@ class FlowReferences(
         case s: SubField => getRef(s.expr) // assuming all subfield with same dir
         case s: SubIndex => getRef(s.expr)
         case s: SubRange => getRef(s.expr)
-        case c: Concat => None
+        case _: Concat => None
         // most of it
         case _ => None
       }
@@ -258,7 +257,7 @@ class FlowReferences(
           val ref = r.serialize
           
           extAssigned.get(ref) match {
-            case Some(b) => // nothing to do
+            case Some(r@_) => // nothing to do
             // registering as inAssigned => not as strong as extAssigned
             case None => inAssigned += ref
           }
@@ -453,7 +452,7 @@ class FlowReferences(
     
     def processAssign(a: Assign, expected: Option[Flow]): Assign = {
       a match {
-        case aa: AutoAssign => a
+        case _: AutoAssign => a
         case na: NamedAssign => 
           val expr = processExpression(na.expr, expected)
           na.copy(expr = expr, flow = expr.flow)

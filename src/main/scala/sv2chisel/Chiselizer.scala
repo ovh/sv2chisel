@@ -11,7 +11,6 @@ import logger.EasyLogging
 
 // implicits
 import sv2chisel.ir.evalExpression._
-import sv2chisel.ir.widthExpressionType._
 
 import collection.mutable.{ArrayBuffer}
 // define all implict chiselize function for all nodes of the IR
@@ -273,7 +272,7 @@ class ChiselModule(val m: Module) extends Chiselized {
     // filter out clock & reset ports provided by MultiIOModule if inference succeeded earlier
     val (mod, kind) = (m.clock, m.reset) match {
       case (_, Some(r)) => 
-        unsupportedChisel(ctx, m, "Reset inference unsupported for now")
+        unsupportedChisel(ctx, m, s"Reset inference ($r) unsupported for now")
         (m, "MultiIOModule")
       case (Some(c), None) => (m.mapPort(p => if(p.name == c) EmptyStmt else p), "MultiIOModule")
       case (None, None) => (m, "RawModule")
@@ -340,15 +339,15 @@ class ChiselDefParam(val p: DefParam) extends Chiselized {
   val eq = ChiselTxtS(" = ")
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = ??? // should never happen
   def chiselize(ctx: ChiselEmissionContext, forceType: Boolean): Seq[ChiselTxt] = {
-    val (tokens, value, tpe) = (p.value, p.tpe) match {
-      case (None, t: UnknownType) => (UndefinedInterval, Seq(), Seq(ChiselTxt(ctx, s"Int")))
-      case (None, t: Type) => (UndefinedInterval, Seq(), t.chiselize(ctx, scalaTypeOnly = true))
-      case (Some(e), t: UnknownType) => // TO DO : remove should be done before
+    val (value, tpe) = (p.value, p.tpe) match {
+      case (None, _: UnknownType) => (Seq(), Seq(ChiselTxt(ctx, s"Int")))
+      case (None, t: Type) => (Seq(), t.chiselize(ctx, scalaTypeOnly = true))
+      case (Some(e), _: UnknownType) => // TO DO : remove should be done before
         val tpe = e match {
-          case s: StringLit => "String"
+          case _: StringLit => "String"
           case _ => "Int"
         }
-        (e.tokens, eq ++ e.chiselize(ctx), Seq(ChiselTxt(ctx, tpe)))
+        (eq ++ e.chiselize(ctx), Seq(ChiselTxt(ctx, tpe)))
       case (Some(e), t: Type) => 
         // priority of HwExpressionKind value over ctx hw/sw
         val eCtx = e.kind match {
@@ -356,16 +355,16 @@ class ChiselDefParam(val p: DefParam) extends Chiselized {
           case SwExpressionKind => ctx.sw()
           case _ => ctx 
         }
-        (e.tokens, eq ++ e.chiselize(eCtx), t.chiselize(eCtx, scalaTypeOnly = true))
+        (eq ++ e.chiselize(eCtx), t.chiselize(eCtx, scalaTypeOnly = true))
     }
 
     (forceType, value, p.tpe) match {
       case (true, _, _) => Seq(ChiselLine(p, ctx, s"val ${p.name}: ")) ++ tpe ++ value
       case (false, Seq(), _) => Seq(ChiselLine(p, ctx, s"val ${p.name}: ")) ++ tpe
-      case (false, s, t: IntType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ value
-      case (false, s, t: StringType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ value
-      case (false, s, t: UnknownType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ value
-      case (false, s, _) => Seq(ChiselLine(p, ctx, s"val ${p.name}: ")) ++ tpe ++ value
+      case (false, s, _: IntType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ s
+      case (false, s, _: StringType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ s
+      case (false, s, _: UnknownType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ s
+      case (false, s, _) => Seq(ChiselLine(p, ctx, s"val ${p.name}: ")) ++ tpe ++ s
     }
   }
 }
@@ -457,13 +456,13 @@ class ChiselType(val t: Type) extends Chiselized {
         (i.width, ctx.isHardware) match {
           case (_, false) => ChiselTxtS(i.tokens, "UInt")
           case (UnknownWidth(), _) => ChiselTxtS(i.tokens, "UInt")
-          case (w, _) if(scalaTypeOnly) => ChiselTxtS(i.tokens, "UInt")
+          case (_, _) if(scalaTypeOnly) => ChiselTxtS(i.tokens, "UInt")
           case (w, _) => ChiselTxtS(i.tokens, "UInt(") ++ w.chiselize(ctx) ++ ChiselTxtS(")")
         }
       case i: SIntType => 
         i.width match {
           case UnknownWidth() => ChiselTxtS(i.tokens, "SInt")
-          case w if(scalaTypeOnly) => ChiselTxtS(i.tokens, "SInt")
+          case _ if(scalaTypeOnly) => ChiselTxtS(i.tokens, "SInt")
           case w => ChiselTxtS(i.tokens, "SInt(") ++ w.chiselize(ctx) ++ ChiselTxtS(")")
         }
         
@@ -477,8 +476,8 @@ class ChiselType(val t: Type) extends Chiselized {
       case b: BoolType => ChiselTxtS(b.tokens, "Boolean")
       case u: UserRefType => 
         u.tpe match {
-          case b: BundleType if(scalaTypeOnly) => ChiselTxtS(u.tokens, u.serialize)
-          case b: BundleType => ChiselTxtS(u.tokens, "new " + u.serialize)
+          case _: BundleType if(scalaTypeOnly) => ChiselTxtS(u.tokens, u.serialize)
+          case _: BundleType => ChiselTxtS(u.tokens, "new " + u.serialize)
           case _ => ChiselTxtS(u.tokens, u.serialize)
         }
         
@@ -544,9 +543,9 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
     val hCtxt = ctx.hw()
     
     val kind = (s.resolution, s.init) match {
-      case (LogicRegister, u:UndefinedExpression)=> "Reg" 
+      case (LogicRegister, _:UndefinedExpression)=> "Reg" 
       case (LogicRegister, _) => "RegInit" // optimizations required here 
-      case (LogicWire, u:UndefinedExpression)=> "Wire" 
+      case (LogicWire, _:UndefinedExpression)=> "Wire" 
       case (LogicWire, _) => "WireDefault" 
       case _ => unsupportedChisel(ctx,s,s"Unexpected unresolved logic in chiselize step ${s.serialize}"); "Wire"
     }
@@ -566,7 +565,7 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
     val rpar = Seq(ChiselTxt(ctx, ") "))
     
     decl ++ (s.init match {
-      case u: UndefinedExpression => rpar
+      case _: UndefinedExpression => rpar
       case e => comma ++ e.chiselize(hCtxt) ++ rpar
     })
   }
@@ -621,7 +620,7 @@ class ChiselExpression(val e: Expression) extends Chiselized {
       case x: SubIndex => x.chiselize(ctx)
       case x: SubRange => x.chiselize(ctx)
       case x: Number => x.chiselize(ctx)
-      case x: MaskedNumber => unsupportedChisel(ctx,e,"MaskedNumber shall be emitted in very precise context") 
+      case x: MaskedNumber => unsupportedChisel(ctx,e,s"MaskedNumber ($x) shall be emitted in very precise context") 
       case x: Assign => x.chiselize(ctx)
       case x: MappedValues => x.chiselize(ctx)
       case x: SeqValues => x.chiselize(ctx)
@@ -634,9 +633,9 @@ class ChiselExpression(val e: Expression) extends Chiselized {
       case x: TypeInst => x.chiselize(ctx)
       case x: DontCare => ChiselTxtS(x.tokens, "DontCare")
       
-      case x: FixedLiteral => unsupportedChisel(ctx,e,"TODO: FixedLiteral") 
-      case x: DefaultAssignPattern => unsupportedChisel(ctx,e,"DefaultAssignPattern") 
-      case x: UndefinedExpression => unsupportedChisel(ctx,e,"UndefinedExpression")
+      case _: FixedLiteral => unsupportedChisel(ctx,e,"TODO: FixedLiteral") 
+      case _: DefaultAssignPattern => unsupportedChisel(ctx,e,"DefaultAssignPattern") 
+      case _: UndefinedExpression => unsupportedChisel(ctx,e,"UndefinedExpression")
     }
   }
 }
@@ -654,7 +653,7 @@ class ChiselRawScalaExpression(e: RawScalaExpression){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     (e.str.count(_ == '\n'), e.str.split("\n")) match {
       case (0, _) => Seq(ChiselTxt(e, ctx, e.str))
-      case (1, Array(s)) => Seq(ChiselTxt(e, ctx, e.str))
+      case (1, Array(s)) => Seq(ChiselTxt(e, ctx, s))
       case (_, s) => s.toSeq.map(l => Seq(ChiselLine(e, ctx, l))).flatten
     }
   }
@@ -777,7 +776,7 @@ class ChiselSubRange(e: SubRange){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     def addVecImpl = ctx.src.addDep(PackageRef(UndefinedInterval, "sv2chisel.helpers.vecconvert", "_"))
     (e.expr.tpe, e.flow) match {
-      case (v: VecType, _) => addVecImpl
+      case (_: VecType, _) => addVecImpl
       case (_:UIntType | _: SIntType, SourceFlow) => // implemented in Bits (superclass of UInt & SInt)
       case (_:UIntType | _: SIntType, SinkFlow) => addVecImpl
       case _ => rwarn(ctx, e, s"Probably unsupported subrange of expression ${e.expr.serialize} of type ${e.expr.tpe.serialize} (${e.flow})")
@@ -845,7 +844,7 @@ class ChiselSeqValues(e: SeqValues){
       case (true, HwExpressionKind) => 
         val values = e.tpe match {
           case v: VecType if(v.downto) => e.values.reverse
-          case v: VecType => e.values
+          case _: VecType => e.values
           case _ => rcritical(ctx, e, s"unexpected type for SeqValues ${e.serialize}") ; e.values
         }
         
@@ -860,7 +859,7 @@ class ChiselSeqValues(e: SeqValues){
       case (false, SwExpressionKind) => 
         val values = e.tpe match {
           case v: VecType if(v.downto) => e.values.reverse
-          case v: VecType => e.values
+          case _: VecType => e.values
           case _ => rcritical(ctx, e, s"unexpected type for SeqValues ${e.serialize}") ; e.values
         }
         
@@ -916,7 +915,7 @@ class ChiselDoPrim(e: DoPrim){
       // Special cases:
       /// Parenthesis 
       case (p: Par, Seq(expr)) => ChiselTxtS(p, ctx, "(") ++ expr.chiselize(uctx) ++ ChiselTxtS(")")
-      case (p: Par, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 1 was expected.") 
+      case (_: Par, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 1 was expected.") 
       /// Power of 
       case (p: Pow, Seq(expr, exp)) => 
         expr.serialize match {
@@ -952,7 +951,7 @@ class ChiselDoPrim(e: DoPrim){
       case (e: Shr, Seq(e1, e2)) => 
         val shTxt = e1.chiselize(uctx) ++ ChiselTxtS(e, ctx, " >> ") ++ e2.chiselize(uctx)
         (e1.tpe, e2.kind) match {
-          case (s: SIntType, SwExpressionKind) => 
+          case (_: SIntType, SwExpressionKind) => 
             // glitch on static shift, see https://github.com/freechipsproject/chisel3/issues/1528
             // if shift value is hardware, this will behave properly
             e2.evalBigIntOption match {
@@ -1109,12 +1108,12 @@ class ChiselDoCast(e: DoCast){
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").asSInt") 
       
       // Bool Specials
-      case (_, _, BoolType(t, s), _) if(s) => unsupportedChisel(ctx, e, "Signed BoolType unexpected here")
+      case (_, _, BoolType(_, s), _) if(s) => unsupportedChisel(ctx, e, "Signed BoolType unexpected here")
       case (true, SwExpressionKind, BoolType(t, _), _) if(e.kind == SwExpressionKind) => 
         ChiselTxtS("(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, " != 0)")
       case (true, SwExpressionKind, BoolType(t, _), _) if(e.kind == HwExpressionKind) => 
         e.expr.tpe match {
-          case b: BoolType => e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".B")
+          case _: BoolType => e.expr.chiselize(uctx) ++ ChiselTxtS(t, ".B")
           case _ => ChiselTxtS("(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, " != 0).B")
         }
       
@@ -1123,7 +1122,7 @@ class ChiselDoCast(e: DoCast){
         ChiselTxtS("((") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ") != 0)")
       case (false, SwExpressionKind, BoolType(t, _), _) if(e.kind == HwExpressionKind) => 
         e.expr.tpe match {
-          case b: BoolType => ChiselTxtS("(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").B")
+          case _: BoolType => ChiselTxtS("(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ").B")
           case _ => ChiselTxtS("((") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(t, ") != 0).B")
         }
       

@@ -7,8 +7,6 @@ package transforms
 
 import sv2chisel.ir._
 
-import collection.mutable.{HashMap, ArrayBuffer}
-
 /** Resolve logic as wire or reg with appropriate clock (TODO: and reset)
   * Also legalize port reg 
   *   > input reg raise [fatal] (non-sense) (resolved as input wire port)

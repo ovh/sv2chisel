@@ -4,15 +4,14 @@
 
 package sv2chisel
 
-import org.antlr.v4.runtime.{ParserRuleContext,CommonTokenStream, Token}
-import org.antlr.v4.runtime.tree.{AbstractParseTreeVisitor, ParseTreeVisitor, TerminalNode}
+import org.antlr.v4.runtime.{ParserRuleContext,CommonTokenStream}
+import org.antlr.v4.runtime.tree.{TerminalNode}
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer}
 
 import sv2chisel.antlr._
-import sv2chisel.ir.{UndefinedInterval, Interval}
+import sv2chisel.ir.{Interval}
 import sv2017Parser._
-import Utils.throwInternalError
 
 // TODO : add selection ? error or warn ? 
 // or collection of all errors for counts:
@@ -157,7 +156,7 @@ class RaiseUnsupported(
     }
     ctx.DOT match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported module any port declaration (.*)")
+      case _ => raiseIt(ctx, s"Unsupported module any port declaration (.*)")
     }
     ctx.timeunits_declaration match {
       case null =>
@@ -210,15 +209,15 @@ class RaiseUnsupported(
   def checkCondExpression(ctx: Cond_predicateContext): Unit = {
     ctx.KW_MATCHES.asScala match {
       case Seq() =>
-      case s => raiseIt(ctx, s"Unsupported keyword match within context ${ctx.getText()}")
+      case _ => raiseIt(ctx, s"Unsupported keyword match within context ${ctx.getText()}")
     }
     ctx.TRIPLE_AND.asScala match {
       case Seq() =>
-      case s => raiseIt(ctx, s"Unsupported keyword within context ${ctx.getText()}")
+      case _ => raiseIt(ctx, s"Unsupported keyword within context ${ctx.getText()}")
     }
     ctx.pattern.asScala match {
       case Seq() =>
-      case s => raiseIt(ctx, s"Unsupported pattern within context ${ctx.getText()}")
+      case _ => raiseIt(ctx, s"Unsupported pattern within context ${ctx.getText()}")
     }
   }
   
@@ -254,8 +253,8 @@ class RaiseUnsupported(
     // weird grammar ...
     ctx.identifier.asScala match {
       case Seq() =>
-      case Seq(id) =>
-      case s => raiseIt(ctx, s"Unsupported identifier within context ${ctx.getText()}")
+      case Seq(id@_) =>
+      case _ => raiseIt(ctx, s"Unsupported identifier within context ${ctx.getText()}")
     }
     checkNetType(ctx.net_type)
   }
@@ -277,11 +276,11 @@ class RaiseUnsupported(
   def checkVarDeclAssign(ctx: Variable_decl_assignmentContext): Unit = {
     ctx.class_new match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported context ${ctx.getText()}")
+      case k => raiseIt(ctx, s"Unsupported context ${k.getText()}")
     }
     ctx.dynamic_array_new match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported context ${ctx.getText()}")
+      case k => raiseIt(ctx, s"Unsupported context ${k.getText()}")
     }
   }
   
@@ -290,8 +289,8 @@ class RaiseUnsupported(
       case null =>
       case k => 
         (k.KW_AUTOMATIC, k.KW_STATIC) match {
-          case (auto, null) => // ok 
-          case (null, stat) => raiseIt(ctx, s"Unsupported `static` keywork, all variable and function are treated as `automatic`") 
+          case (_, null) => // ok 
+          case (null, _) => raiseIt(ctx, s"Unsupported `static` keywork, all variable and function are treated as `automatic`") 
           case _ => 
         }
     }
@@ -300,11 +299,11 @@ class RaiseUnsupported(
   def checkDataDecl(ctx: Data_declarationContext): Unit = {
     ctx.KW_CONST match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported keyword ${ctx.getText()}")
+      case k => raiseIt(ctx, s"Unsupported keyword ${k.getText()}")
     }
     ctx.KW_VAR match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported keyword ${ctx.getText()}")
+      case k => raiseIt(ctx, s"Unsupported keyword ${k.getText()}")
     }
     checkLifetime(ctx.lifetime)
   }
@@ -313,14 +312,14 @@ class RaiseUnsupported(
     checkLifetime(ctx.lifetime)
     ctx.timeunits_declaration match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported context ${ctx.getText()}")
+      case k => raiseIt(ctx, s"Unsupported context ${k.getText()}")
     }
   }
   
   def checkCoreItemParam(ctx: CoreItemParamContext): Unit = {
     ctx.default_clocking_or_dissable_construct match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported context ${ctx.getText()}")
+      case k => raiseIt(ctx, s"Unsupported context ${k.getText()}")
     }
   }
   
@@ -328,7 +327,7 @@ class RaiseUnsupported(
     checkLifetime(ctx.lifetime)
     ctx.package_import_declaration.asScala match {
       case Seq() =>
-      case s => raiseIt(ctx, s"Unsupported package_import_declaration within context ${ctx.getText()}")
+      case _ => raiseIt(ctx, s"Unsupported package_import_declaration within context ${ctx.getText()}")
     }
   }
   
@@ -355,7 +354,7 @@ class RaiseUnsupported(
         case null => raiseIt(ctx, s"Unsupported data type in function call ${d.getText()}")
         case dtp => dtp.package_or_class_scoped_path match {
           case null => raiseIt(ctx, s"Unsupported data type in function call ${d.getText()}")
-          case p => 
+          case _ => 
         }
       }
     }

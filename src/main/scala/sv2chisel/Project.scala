@@ -157,7 +157,7 @@ class Project(name: String) extends EasyLogging {
   def isProjectModule(module: String): Boolean = {
     findDescription(module) match {
       case None => false 
-      case Some(d: DefModule) => true
+      case Some(_: DefModule) => true
       case _ => false
     }
   }

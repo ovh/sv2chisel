@@ -7,8 +7,6 @@ package transforms
 
 import sv2chisel.ir._
 
-import collection.mutable.{HashMap, ArrayBuffer}
-
 class CheckUseBeforeDecl(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
   implicit var srcFile = currentSourceFile
   implicit var stream = currentStream

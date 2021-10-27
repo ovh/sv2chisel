@@ -33,7 +33,7 @@ class RemoveConcats(
         case s: SubField => getRef(s.expr)
         case s: SubIndex => getRef(s.expr)
         case s: SubRange => getRef(s.expr)
-        case c: Concat => None
+        case _: Concat => None
         // most of it
         case _ => None
       }
@@ -56,7 +56,6 @@ class RemoveConcats(
     //  > intermediate val <instname_portname> = Wire(new Bundle { field ...}
     //  > rename direct calls to fields as <instname_portname>.<field>
     // assigned & used in a port map => port input => emit accordingly
-    val renameMap = new RenameMap()
     val usedGenNames = new HashMap[String, Int]()
     
     def getNewNameInBundle(hint: String, usedNamesInBundle: HashMap[String, Int]): String = {
@@ -127,7 +126,7 @@ class RemoveConcats(
         
         val (tpe, value) = actualTpe match {
           case u: UnknownType => critical(a, s"Unknown type for expression ${a.serialize} to be required for generated Bundle Field during emission..."); (u, a)
-          case (UIntType(t, Width(_, Number(_, "1",_,_,_)), _)) => 
+          case (UIntType(_, Width(_, Number(_, "1",_,_,_)), _)) => 
             a match {
               case Number(t, "0",_,_,k) => (BoolType(t), BoolLiteral(t, false, k))
               case Number(t, "1",_,_,k) => (BoolType(t), BoolLiteral(t, true, k))
@@ -144,7 +143,7 @@ class RemoveConcats(
           case t => (t, a)
         }
         a match {
-          case c@Concat(_,args, _, _, _) => 
+          case _:Concat => 
             // nested ... to do !?
             critical(a, "Unsupported nested concat operators")  
           case _ => 
@@ -169,9 +168,9 @@ class RemoveConcats(
               val loc = SubField(ui, Reference(ui, name, Seq()), f._1.name, HwExpressionKind, f._1.tpe)
               // cleaning ugly self typing used only to provide material for bundle field declaration
               val lhs = f._2 match {
-                case DoCast(t, from, HwExpressionKind, TypeOf(tt, to)) if(from == to) => 
+                case DoCast(_, from, HwExpressionKind, TypeOf(_, to)) if(from == to) => 
                   from
-                case DoCast(t, from, HwExpressionKind, TypeOf(tt, DoCast(_, to, _, _:UIntType))) if(from == to) => 
+                case DoCast(_, from, HwExpressionKind, TypeOf(_, DoCast(_, to, _, _:UIntType))) if(from == to) => 
                   from
                 case e => e 
               }
@@ -230,7 +229,7 @@ class RemoveConcats(
       }
     }
     
-    def getStatement(a: ArrayBuffer[Statement], s: Statement = EmptyStmt): Statement = {
+    def getStatement(a: ArrayBuffer[Statement], s: Statement): Statement = {
       (a.isEmpty, s) match {
         case (true, _) => s
         case _ => SimpleBlock(ui, a ++ Seq(s))
@@ -299,7 +298,7 @@ class RemoveConcats(
     def warnHiddenConcat(e: Expression): Unit = {
       e.foreachExpr(warnHiddenConcat)
       e match {
-        case c: Concat => critical(e, "Unmanaged hidden concatenation ... Consider upgrading RemoveConcat transform to add proper support for this one.")
+        case _: Concat => critical(e, "Unmanaged hidden concatenation ... Consider upgrading RemoveConcat transform to add proper support for this one.")
         case _ =>
       }
     }
@@ -328,7 +327,7 @@ class RemoveConcats(
       s match {
         case Seq() => false
         case se => se.head match {
-          case str: StringLit => true 
+          case _: StringLit => true 
           case _ => containsStringLit(se.tail)
         }
       }
@@ -345,7 +344,7 @@ class RemoveConcats(
             fmt += "%e"
             exprs += e
             
-          case d: DoPrim => critical(e, s"Unsuported conversion to string for operator ${e.serialize}: Ignored")
+          case _: DoPrim => critical(e, s"Unsuported conversion to string for operator ${e.serialize}: Ignored")
           case _ => critical(e, s"Unsuported conversion to string for expression ${e.serialize}: Ignored")
         }  
       }

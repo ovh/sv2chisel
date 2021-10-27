@@ -22,6 +22,9 @@ lazy val commonSettings = Seq (
   ),
   scalacOptions ++= Seq(
     "-deprecation",
+    "-unchecked", 
+    "-feature",
+    "-Ywarn-unused",
     "-language:implicitConversions"
   ),
   scalacOptions in Compile in doc ++= Seq(

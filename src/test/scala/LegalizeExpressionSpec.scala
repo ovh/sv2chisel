@@ -5,12 +5,7 @@
 package sv2chiselTests
 
 import sv2chiselTests.utils._
-import sv2chisel._
-
 import logger._
-
-import scala.util.Random
-import org.scalatest._
 
 class LegalizeExpressionSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)

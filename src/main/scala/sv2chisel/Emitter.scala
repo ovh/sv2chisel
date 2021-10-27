@@ -163,9 +163,9 @@ object Emitter extends EasyLogging {
             val newlineCount = spaces.count(_=='\n')
             str += ((spaces.split("\n"), newlineCount) match {
               case (Array(), n) => "\n"*n + tok.getText()
-              case (Array(s), 0) => " " + tok.getText()
-              case (Array(s), 1) => " " + tok.getText().split("\n").mkString("","\n","\n")
-              case (Array(a, b), 1) => 
+              case (Array(s@_), 0) => " " + tok.getText()
+              case (Array(s@_), 1) => " " + tok.getText().split("\n").mkString("","\n","\n")
+              case (Array(a@_, b), 1) => 
                 if (b.size > (ctx.indent * 6 * expIndent).size) {
                   // remove emitter glitch (many ws retrieved due to poor interval management)
                   " " + tok.getText()

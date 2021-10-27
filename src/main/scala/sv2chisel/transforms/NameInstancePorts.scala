@@ -6,9 +6,6 @@ package sv2chisel
 package transforms
 
 import sv2chisel.ir._
-// implicits
-
-import collection.mutable.{HashMap, HashSet, ArrayBuffer}
 
 /**
   * Ensure that instances use Only Named assigns 
@@ -31,7 +28,7 @@ class NameInstancePorts(
         case (l, ll) if (l != ll) => 
           critical(i, s"Unsupported portmap for instance ${i.name} of module ${i.module} with both named and unnamed port assignations")
           i
-        case (l, ll) => 
+        case (l, _) => 
           currentProject.get.findModule(mName) match {
             case None => 
               critical(i, s"Unable to find declaration for module ${mName} in current project. Sequential port-map of instance ${i.name} of this module ${mName} cannot be transformed to named port-map which will prevent successful chisel emission. To fix this issue please add the declaration of the module within project files or fix the port map manually")

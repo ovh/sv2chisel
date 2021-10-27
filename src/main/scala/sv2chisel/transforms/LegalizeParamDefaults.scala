@@ -45,7 +45,7 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
             true
           }
           
-        case Reference(_, name, s, _, _, _) => true // this is fine => remote ref
+        case _:Reference => true // this is fine => remote ref
         case _ => true
       })
     }
@@ -73,7 +73,7 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
               stmts += DefParam(UndefinedInterval,NoVerilogAttribute, p.name, p.tpe, Some(init), p.kind)
               
               val tpe = p.tpe match {
-                case s: StringType => RawScalaType("Option[String]") 
+                case _: StringType => RawScalaType("Option[String]") 
                 case _ => RawScalaType("Option[Int]") 
               }
               p.copy(name = autoName, value = Some(RawScalaExpression("None", SwExpressionKind)), tpe = tpe)

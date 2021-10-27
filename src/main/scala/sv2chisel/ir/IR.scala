@@ -9,10 +9,9 @@ package sv2chisel
 package ir
 
 import sv2chisel.ir.evalExpression._
-import Utils.{dec2string, indent, trim}
+import Utils.{indent}
 
-import scala.math.BigDecimal.RoundingMode._
-import collection.mutable.{LinkedHashMap, HashMap, HashSet, ArrayBuffer}
+import collection.mutable.{HashMap, HashSet, ArrayBuffer}
 
 case object UndefinedInterval extends Interval(-1,-1) {
   override def toString : String = "UndefinedInterval"
@@ -339,7 +338,6 @@ case class StringLit(tokens: Interval, string: String, kind : ExpressionKind, wi
   def foreachType(f: Type => Unit): Unit = Unit
   def foreachWidth(f: Width => Unit): Unit = Unit
   
-  import org.apache.commons.text.StringEscapeUtils
   /** Returns an escaped and quoted String */
   def escape: String = {
     "\"" + string + "\""
@@ -559,7 +557,7 @@ case class Number(tokens: Interval, value: String, width: Width, base: NumberBas
     (width.expr, kind) match {
       case (_:UndefinedExpression, SwExpressionKind) => IntType(tokens, base)
       case (_, SwExpressionKind) => Utils.throwInternalError(s"Unexpected specified width $width for SwExpressionKind Number ${this.serialize}")
-      case (we, HwExpressionKind) => UIntType(tokens, width, base)
+      case (_, HwExpressionKind) => UIntType(tokens, width, base)
       case _ => UnknownType()
     }
   }
@@ -735,7 +733,7 @@ case class UIntLiteral(tokens: Interval, value: BigInt, width: Width, base: Numb
   def serialize = {
     val base = s"$value.U"
     width.expr match {
-      case u: UndefinedExpression => base
+      case _: UndefinedExpression => base
       case w => base + s"(${w.serialize}.W)"
     }
   }
@@ -1470,7 +1468,7 @@ object UnknownWidth {
     Width(UndefinedInterval, UndefinedExpression())
   }
   def unapply(w: Width): Boolean = w.expr match {
-    case u: UndefinedExpression => true
+    case _: UndefinedExpression => true
     case _ => false 
   }
    
@@ -1507,8 +1505,6 @@ case class Field(tokens: Interval, attributes: VerilogAttributes, name: String, 
 case class EnumField(tokens: Interval, name: String, value: Expression) extends SVNode with HasName {
   type T = EnumField
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
-  def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
   def serialize: String = s"$name = ${value.serialize}"
 }
 
@@ -1729,7 +1725,7 @@ abstract class VecType extends AggregateType {
   def asUIntType(): UIntType = {
     tpe match {
       case Seq() => UIntType(tokens, Width(0), NumberDecimal)
-      case Seq(t: BoolType) => UIntType(tokens, Width(UndefinedInterval, getWidth()), NumberDecimal)
+      case Seq(_: BoolType) => UIntType(tokens, Width(UndefinedInterval, getWidth()), NumberDecimal)
       case _ => Utils.throwInternalError("Unable to convert to UInt")
     }
   }
@@ -1737,7 +1733,7 @@ abstract class VecType extends AggregateType {
   def asCharVecType(): VecType = {
     tpe match {
       case Seq() => NoneVecType(tokens)
-      case Seq(t: BoolType) => 
+      case Seq(_: BoolType) => 
       val ui = UndefinedInterval
       PackedVecType(
         tokens,
@@ -1752,7 +1748,7 @@ abstract class VecType extends AggregateType {
   def asSIntType(): SIntType = {
     tpe match {
       case Seq() => SIntType(tokens, Width(0))
-      case Seq(t: BoolType) => SIntType(tokens, Width(UndefinedInterval, getWidth()))
+      case Seq(_: BoolType) => SIntType(tokens, Width(UndefinedInterval, getWidth()))
       case _ => Utils.throwInternalError("Unable to convert to UInt")
     }
   }

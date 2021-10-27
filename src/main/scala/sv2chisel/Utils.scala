@@ -31,11 +31,11 @@ object Utils extends LazyLogging with InfoLogger {
   
   def isSimple(e: Expression): Boolean = {
     e match {
-      case r: StringLit => true
-      case r: Reference => true
-      case d: DoCast => true
-      case d: Concat => true
-      case r: Number => true
+      case _: StringLit => true
+      case _: Reference => true
+      case _: DoCast => true
+      case _: Concat => true
+      case _: Number => true
       case s: SubIndex => isSimple(s.expr)
       case s: SubRange => isSimple(s.expr)
       case DoPrim(_,PrimOps.InlineIf(_), _, HwExpressionKind, _) => true // Mux
@@ -129,11 +129,9 @@ object Utils extends LazyLogging with InfoLogger {
     * @param exception - possible exception triggering the error.
    */
   def throwInternalError(message: String = "", exception: Option[Exception] = None) = {
-    // We'll get the first exception in the chain, keeping it intact.
-    val first = true
     val throwable = getThrowable(exception, true)
     val string = if (message.nonEmpty) message + "\n" else message
-    error("Internal Error! %sPlease file an issue at ...".format(string), throwable)
+    error("Internal Error! %sPlease file an issue at https://github.com/ovh/sv2chisel/".format(string), throwable)
   }
 
   def time[R](block: => R): (Double, R) = {

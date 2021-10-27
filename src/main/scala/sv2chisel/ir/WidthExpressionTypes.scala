@@ -21,7 +21,7 @@ class WidthExpressionType(t: Type) extends EasyLogging {
       case v: VecType =>
         v.tpe match {
           case Seq(t) => DoPrim(ui, PrimOps.Mul(ui), Seq(v.getWidth(), t.getWidthExpression))
-          case s => 
+          case _ => 
             fatal("Unsupported MixedVec Type for width expression calculation")
             UndefinedExpression(ui)
         }

@@ -6,7 +6,6 @@ package sv2chiselTests.utils
 
 import org.scalatest._
 import matchers.should._
-import scala.util.matching.Regex
 
 trait ChiselMatchers extends Matchers {
   import matchers._

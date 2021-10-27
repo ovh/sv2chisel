@@ -5,16 +5,12 @@
 package sv2chiselTests
 
 import sv2chiselTests.utils._
-import sv2chisel._
-
 import logger._
 
-import scala.util.Random
-import org.scalatest._
 import java.io.{PrintStream, ByteArrayOutputStream}
 
 class WireOrRegSpec extends Sv2ChiselSpec {
-  Logger.setLevel(LogLevel.Info)
+  Logger.setLevel(LogLevel.Warn)
   
   "WireOrReg" should "raise critical in when a signal is either wire or reg " in {
     val out = new ByteArrayOutputStream()

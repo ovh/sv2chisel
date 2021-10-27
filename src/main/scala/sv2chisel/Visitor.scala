@@ -4,7 +4,7 @@
 
 package sv2chisel
 
-import org.antlr.v4.runtime.{ParserRuleContext,CommonTokenStream, Token}
+import org.antlr.v4.runtime.{ParserRuleContext,CommonTokenStream}
 import org.antlr.v4.runtime.tree.{AbstractParseTreeVisitor, ParseTreeVisitor, ParseTree, TerminalNode}
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer}
@@ -15,9 +15,6 @@ import sv2017Parser._
 import sv2chisel.ir._
 import sv2chisel.ir.PrimOps._
 import sv2chisel.ir.evalExpression._
-import Utils.throwInternalError
-
-import logger.EasyLogging
 
 class Visitor(
     val unsupportedMode: UnsupportedBehavior,
@@ -33,7 +30,6 @@ class Visitor(
   /////// END OF PUBLIC FACING API //////
   private val ut = UnknownType()
   private val uk = UnknownExpressionKind
-  private val uw = UnknownWidth()
   
   // debug Helper
   def printClasses(ctx: ParseTree, indent: Int = 0): Unit = {
@@ -71,7 +67,7 @@ class Visitor(
       case p: Program_declarationContext => unsupportedDesc(p, "Program_declarationContext")
       case c: Config_declarationContext => unsupportedDesc(c, "Config_declarationContext")
       case _ => 
-        val attr = visitAttributes(ctx.attribute_instance.asScala)
+        // val attr = visitAttributes(ctx.attribute_instance.asScala)
         (ctx.package_item_item, ctx.bind_directive) match {
           case (p, null) => unsupportedDesc(p, "Isolated Package Item")
           case (null, b) => unsupportedDesc(b, "Isolated Bind Directive")
@@ -84,7 +80,7 @@ class Visitor(
   private def visitData_type_or_void(ctx: Data_type_or_voidContext): (Type, LogicResolution) = {
     (ctx.KW_VOID, ctx.data_type) match {
       case (null, dtp) => getDataType(dtp, true)
-      case (v, null) => (VoidType(ctx.getSourceInterval), LogicUnresolved)
+      case (_, null) => (VoidType(ctx.getSourceInterval), LogicUnresolved)
       case _ => throwParserError(ctx)
     }
   }
@@ -353,11 +349,11 @@ class Visitor(
   
   private def getIntegerWidth(ctx: Integer_atom_typeContext) : Width = {
     (ctx.KW_BYTE,ctx.KW_SHORTINT,ctx.KW_INT,ctx.KW_LONGINT,ctx.KW_INTEGER,ctx.KW_TIME) match {
-      case (b,null,null,null,null,null) => Width(8)
-      case (null,s,null,null,null,null) => Width(16)
-      case (null,null,i,null,null,null) => Width(32)
-      case (null,null,null,l,null,null) => Width(64)
-      case (null,null,null,null,i,null) => Width(64)
+      case (_,null,null,null,null,null) => Width(8)
+      case (null,_,null,null,null,null) => Width(16)
+      case (null,null,_,null,null,null) => Width(32)
+      case (null,null,null,_,null,null) => Width(64)
+      case (null,null,null,null,_,null) => Width(64)
       case (null,null,null,null,null,t) => unsupported.raiseIt(ctx, s"Unsupported keyword $t") ; UnknownWidth()
       case _ => throwParserError(ctx)
     }
@@ -365,9 +361,9 @@ class Visitor(
   
   private def getResolution(ctx: Integer_vector_typeContext) : LogicResolution = {
     (ctx.KW_BIT,ctx.KW_LOGIC,ctx.KW_REG) match {
-      case (b, null, null) => LogicUnresolved
-      case (null, l, null) => LogicUnresolved
-      case (null, null, l) => LogicRegister
+      case (_, null, null) => LogicUnresolved
+      case (null, _, null) => LogicUnresolved
+      case (null, null, _) => LogicRegister
       case _ => throwParserError(ctx)
     }
   }
@@ -376,8 +372,8 @@ class Visitor(
     ctx match {
       case null => false
       case s => (s.KW_UNSIGNED, s.KW_SIGNED) match {
-        case (u, null) => false  
-        case (null, s) => true
+        case (_, null) => false  
+        case (null, _) => true
         case _ => throwParserError(ctx)
       }
     }
@@ -398,10 +394,10 @@ class Visitor(
     // ctx might be logic, bit or reg
     (isHw, ctx.KW_REG) match {
       case (_, null) => BoolType(itvl, signed)
-      case (false, reg) => 
+      case (false, _) => 
         unsupported.raiseIt(ctx, s"Unsupported reg keyword in software context ${getRawText(ctx)} (ignored)")
         BoolType(itvl, signed)
-      case (true, reg) => BoolType(itvl, signed)
+      case (true, _) => BoolType(itvl, signed)
     }
   }
   
@@ -462,7 +458,7 @@ class Visitor(
     }
     ctx.variable_dimension match {
       case null => (t, r)
-      case dim => (getFullType(Seq(getVariableDim(ctx.variable_dimension)).collect{case u: UnpackedVecType => u}, t), r)
+      case dim => (getFullType(Seq(getVariableDim(dim)).collect{case u: UnpackedVecType => u}, t), r)
     }
   }
   
@@ -537,7 +533,7 @@ class Visitor(
     }
   }
   
-  private def parseVerilogInt(str: String, i: Interval, wildComp: Option[Expression]=None): Expression = {
+  private def parseVerilogInt(str: String, i: Interval, wildComp: Option[Expression]): Expression = {
     // integral_number:
     //    BASED_NUMBER_WITH_SIZE
     //    | ( UNSIGNED_NUMBER )? ANY_BASED_NUMBER
@@ -591,7 +587,7 @@ class Visitor(
       val mask = maskB.mkString
       val res = resB.mkString
       (replacedMark, replacedXZ, wildComp) match {
-        case (m, r, Some(e)) if (m || r) => 
+        case (m, r, Some(e@_)) if (m || r) => 
           if(maskBase == "") unsupported.raiseIt(i, "Unsupported use of mask with decimal base")
           MaskedNumber(n.tokens, n.copy(value = res), n.copy(value = mask))
         case (true, _, None) => 
@@ -640,28 +636,28 @@ class Visitor(
     }
   }
   
-  private def getNumber(ctx: NumberContext, wildComp: Option[Expression]=None) : Expression = {
+  private def getNumber(ctx: NumberContext, wildComp: Option[Expression]) : Expression = {
     // IMPORTANT NOTE:
     // parser is made such as there is no signed lit 
     // it is always primary minus + unsigned lit
     
     (ctx.integral_number, ctx.real_number) match {
       case (i, null) => parseVerilogInt(i.getText(), i.getSourceInterval, wildComp)
-      case (null, r) => unsupportedExpr(ctx, "Fixed point literals")
+      case (null, _) => unsupportedExpr(ctx, "Fixed point literals")
       case _ => throwParserError(ctx)
     }
   }
   
-  private def getPrimaryLiteral(ctx: Primary_literalContext, wildComp: Option[Expression]=None): Expression = {
+  private def getPrimaryLiteral(ctx: Primary_literalContext, wildComp: Option[Expression]): Expression = {
     (ctx.time_lit,ctx.UNBASED_UNSIZED_LITERAL,ctx.STRING_LITERAL,ctx.number,ctx.KW_NULL,ctx.KW_THIS,ctx.DOLAR) match {
-      case (l, null, null, null, null, null, null) => unsupportedExpr(ctx, "TIME_LITERAL")
+      case (_, null, null, null, null, null, null) => unsupportedExpr(ctx, "TIME_LITERAL")
       case (null, l, null, null, null, null, null) => FillingBitPattern(l.getSourceInterval(), l.getText(), UnknownExpressionKind, UnknownType())
-      case (null, null, l, null, null, null, null) => 
+      case (null, null, _, null, null, null, null) => 
         StringLit(ctx.getSourceInterval, ctx.getText().tail.dropRight(1))
       case (null, null, null, l, null, null, null) => getNumber(l, wildComp)
-      case (null, null, null, null, l, null, null) => unsupportedExpr(ctx, "KW_NULL")
-      case (null, null, null, null, null, l, null) => unsupportedExpr(ctx, "KW_THIS")
-      case (null, null, null, null, null, null, l) => unsupportedExpr(ctx, "DOLAR")
+      case (null, null, null, null, _, null, null) => unsupportedExpr(ctx, "KW_NULL")
+      case (null, null, null, null, null, _, null) => unsupportedExpr(ctx, "KW_THIS")
+      case (null, null, null, null, null, null, _) => unsupportedExpr(ctx, "DOLAR")
       case _ => throwParserError(ctx)
     }
   }
@@ -711,7 +707,7 @@ class Visitor(
   
   private def getAssignPatternKey(ctx: Assignment_pattern_keyContext): Expression = {
     (ctx.KW_DEFAULT, ctx.integer_type, ctx.non_integer_type, ctx.package_or_class_scoped_path) match {
-      case (d, null, null, null) => DefaultAssignPattern(ctx.getSourceInterval())
+      case (_, null, null, null) => DefaultAssignPattern(ctx.getSourceInterval())
       case (null, i, null, null) => unsupportedExpr(i, "integer type within assign pattern key")
       case (null, null, n, null) => unsupportedExpr(n, "non integer type within assign pattern key")
       case (null, null, null, p) => getPath(p)
@@ -759,8 +755,8 @@ class Visitor(
       case (c,   Seq(), Seq(), Seq()) => getExpression(c.expression)
       case (null, e,    Seq(), Seq()) => 
         AssignPattern(ctx.getSourceInterval(), e.map(c => (UndefinedExpression(),getExpression(c))), UnknownExpressionKind, UnknownType())
-      case (null, e,    s,     Seq()) => getStructPatternKey(assig)
-      case (null, e,    Seq(), s    ) => getArrayPatternKey(assig)
+      case (null, _,    _,     Seq()) => getStructPatternKey(assig)
+      case (null, _,    Seq(), _    ) => getArrayPatternKey(assig)
       case _ => throwParserError(ctx)
     }
     
@@ -785,7 +781,7 @@ class Visitor(
     unsupported.check(ctx)
     val value = (ctx.list_of_arguments, ctx.data_type) match {
       case (null, null) => Seq()
-      case (l, null) => getCallArgs(ctx.list_of_arguments)
+      case (l, null) => getCallArgs(l)
       case (null, d) => 
         // weird reference to single param as arg hidden within data_type
         d.data_type_usual match {
@@ -958,7 +954,7 @@ class Visitor(
     e match {
       case si: SubIndex => si.copy(expr = updateLastIndexRef(si.expr, last))
       case sf: SubField => sf.copy(expr = last)
-      case e: Expression => last
+      case _: Expression => last
     }
   }
   
@@ -1002,10 +998,10 @@ class Visitor(
         }
       
         (op.PLUS, op.MINUS, l, r) match {
-        case (p, null, nl:Number, nr: Number) => (Number(ui, s"${nl.evalBigInt()+nr.evalBigInt()-1}"), l)
-        case (p, null, _, _) => (DoPrim(ui, Add(ui), Seq(l, r_minus_one)), l)
-        case (null, m, nl:Number, nr: Number) => (l, Number(ui, s"${nl.evalBigInt()-nr.evalBigInt()+1}"))
-        case (null, m, _, _) => (l, DoPrim(ui, Sub(ui), Seq(l, r_plus_one)))
+        case (_, null, nl:Number, nr: Number) => (Number(ui, s"${nl.evalBigInt()+nr.evalBigInt()-1}"), l)
+        case (_, null, _, _) => (DoPrim(ui, Add(ui), Seq(l, r_minus_one)), l)
+        case (null, _, nl:Number, nr: Number) => (l, Number(ui, s"${nl.evalBigInt()-nr.evalBigInt()+1}"))
+        case (null, _, _, _) => (l, DoPrim(ui, Sub(ui), Seq(l, r_plus_one)))
         case _ => throwParserError(ctx)
       }
     }
@@ -1217,9 +1213,9 @@ class Visitor(
       case e: ExpressionBinOpBitXorContext => 
         val opX = e.operator_xor
         val op = (opX.XOR,opX.NXOR,opX.XORN) match {
-          case (x, null, null) => BitXor(opX.getSourceInterval())
-          case (null, x, null) => BitXnor(opX.getSourceInterval())
-          case (null, null, x) => 
+          case (_, null, null) => BitXor(opX.getSourceInterval())
+          case (null, _, null) => BitXnor(opX.getSourceInterval())
+          case (null, null, _) => 
             unsupported.raiseIt(opX, s"Unsupported XORN operator: ${opX.getText()}")
             BitXor(opX.getSourceInterval())
           case _ => throwParserError(ctx)
@@ -1248,8 +1244,8 @@ class Visitor(
       case null => SomeVecType(intv, Seq(UnknownType()), UndefinedExpression(intv), false)
       case r => r.expression.asScala match {
         case Seq(h, l) => val (high, downto) = (h.getText(),l.getText()) match {
-            case (e,"0") => (h, true)
-            case ("0",e) => (l, false)
+            case (_,"0") => (h, true)
+            case ("0",_) => (l, false)
             case _ => unsupported.raiseIt(ctx, s"Packed Range Declaration must have one bound set to 0, got : ${getRawText(ctx)}"); (h, true) // this will cause trouble
           }
           val bound = getExpression(high)
@@ -1270,13 +1266,13 @@ class Visitor(
     val intv = ctx.getSourceInterval()
     ctx.operator_plus_minus match {
       case null => 
-      case o => unsupported.raiseIt(ctx, "Complex array range declaration are not supported.")
+      case _ => unsupported.raiseIt(ctx, "Complex array range declaration are not supported.")
     }
     
     ctx.expression.asScala match {
       case Seq(l, h) => val (high, downto) = (l.getText(),h.getText()) match {
-          case ("0",e) => (h, false)
-          case (e,"0") => (l, true)
+          case ("0",_) => (h, false)
+          case (_,"0") => (l, true)
           case _ => unsupported.raiseIt(ctx, s"Unpacked Range Declaration must have one bound set to 0, got : ${getRawText(ctx)}"); (h, false) // this will cause trouble
         }
         val bound = getExpression(high)
@@ -1307,7 +1303,7 @@ class Visitor(
             case v: VecType => 
               val last = s(s.size-2).copy(tpe = Seq(v.asSIntType()))
               s.dropRight(2) ++ Seq(last)
-            case t => err(); s
+            case _ => err(); s
           }
         } else {s}
         ss.reduceRight((a,b) => a.copy(tpe=Seq(b)))
@@ -1540,8 +1536,8 @@ class Visitor(
         (v.bound.evalBigIntOption, value) match {
           case (Some(bg), _) if (bg == 0) => (BoolType(v.bound.tokens), SwExpressionKind)
           case (Some(bg), _) => (UIntType(v.bound.tokens, Width(bg+1), NumberDecimal), HwExpressionKind)
-          case (_, Some(u:Number)) => (v.asUIntType(), HwExpressionKind)
-          case (_, Some(u:UIntLiteral)) => (v.asUIntType(), HwExpressionKind)
+          case (_, Some(_:Number)) => (v.asUIntType(), HwExpressionKind)
+          case (_, Some(_:UIntLiteral)) => (v.asUIntType(), HwExpressionKind)
           // this HwExpressionKind might be a bit restrictive in usage ...
           // should depends on inner kind and rely on InferUInt & LegalizeExpression Transforms for further interpretation
           case _ => (t, HwExpressionKind)
@@ -1563,7 +1559,7 @@ class Visitor(
   
   private def visitParamDeclPrim(ctx: Parameter_declaration_primitiveContext, attr: VerilogAttributes): Seq[DefParam] = {
     (ctx.KW_TYPE, ctx.list_of_param_assignments) match {
-      case (t, null) => unsupported.raiseIt(ctx, "Unsupported type declaration"); Seq()
+      case (_, null) => unsupported.raiseIt(ctx, "Unsupported type declaration"); Seq()
       case (null, l) =>
         val tpe = ctx.data_type_or_implicit match {
           case null => UnknownType() 
@@ -1592,7 +1588,7 @@ class Visitor(
     //     | data_type list_of_param_assignments
     // ;
     ctx match {
-      case p: ParamPortTypeContext => unsupported.raiseIt(ctx, "Unsupported type declaration"); Seq()
+      case _: ParamPortTypeContext => unsupported.raiseIt(ctx, "Unsupported type declaration"); Seq()
       case p: ParamSimpleContext => visitParameter_declaration(p.parameter_declaration, NoVerilogAttribute)
       case p: ParamLocalContext => visitLocal_parameter_declaration(p.local_parameter_declaration, NoVerilogAttribute)
       case p: ParamAssignContext => 
@@ -1688,14 +1684,14 @@ class Visitor(
     ctx.data_type match {
       case null => // barely used old-C-style of typedef in 2 statements (this would be the second, actual typedef) 
         ctx.getChild(2) match {
-          case i: IdentifierContext => unsupportedStmt(ctx, "TO DO simple type alias")
-          case o: Identifier_with_bit_selectContext => unsupportedStmt(ctx, "TO DO type alias")
+          case _: IdentifierContext => unsupportedStmt(ctx, "TO DO simple type alias")
+          case _: Identifier_with_bit_selectContext => unsupportedStmt(ctx, "TO DO type alias")
           case _ =>
             (ctx.KW_ENUM, ctx.KW_STRUCT, ctx.KW_UNION, ctx.KW_CLASS) match {
-              case (e, null, null, null) => unsupportedStmt(ctx, "TO DO enum typedef")
-              case (null, s, null, null) => unsupportedStmt(ctx, "TO DO struct typedef")
-              case (null, null, u, null) => unsupportedStmt(ctx, "typedef union")
-              case (null, null, null, c) => unsupportedStmt(ctx, "typedef class")
+              case (_, null, null, null) => unsupportedStmt(ctx, "TO DO enum typedef")
+              case (null, _, null, null) => unsupportedStmt(ctx, "TO DO struct typedef")
+              case (null, null, _, null) => unsupportedStmt(ctx, "typedef union")
+              case (null, null, null, _) => unsupportedStmt(ctx, "typedef class")
               case _ => throwParserError(ctx)
             }
         }
@@ -1734,7 +1730,7 @@ class Visitor(
   private def getStmtOrSimpleBlock(ctx: ParserRuleContext, s: Seq[Statement]): Statement = {
     s match {
       case Seq() => EmptyStmt
-      case Seq(e) => e.mapInterval((i: Interval) => ctx.getSourceInterval())
+      case Seq(e) => e.mapInterval((_: Interval) => ctx.getSourceInterval())
       case s => SimpleBlock(ctx.getSourceInterval, s)
     }
   }
@@ -1754,7 +1750,7 @@ class Visitor(
   
   
   private def unsupportedEvent(ctx: ParserRuleContext, str: String): EventControl = {
-    unsupported.raiseIt(ctx, s"Unsupported event within context ${getRawText(ctx)}")
+    unsupported.raiseIt(ctx, s"Unsupported event ($str) within context ${getRawText(ctx)}")
     UndefinedEventControl(ctx.getSourceInterval())
   }
   
@@ -1768,13 +1764,13 @@ class Visitor(
           case null => AlwaysComb(i, false, expr)
           case e => 
             (e.KW_POSEDGE, e.KW_NEGEDGE, e.KW_EDGE) match {
-              case (d, null, null) => AlwaysFF(i, true, expr)
-              case (null, d, null) => AlwaysFF(i, false, expr)
-              case (null, null, d) => unsupportedEvent(ctx,"keyword edge")
+              case (_, null, null) => AlwaysFF(i, true, expr)
+              case (null, _, null) => AlwaysFF(i, false, expr)
+              case (null, null, _) => unsupportedEvent(ctx,"keyword edge")
               case _ => throwParserError(ctx) 
             }
         }
-      case (null, s) => unsupportedEvent(ctx, "multiple expression with IFF keyword")
+      case (null, _) => unsupportedEvent(ctx, "multiple expression with IFF keyword")
       case _ => throwParserError(ctx) 
     }
   }
@@ -1794,7 +1790,7 @@ class Visitor(
     (pack, expr, star) match {
       case (p, null, null) => getVariablePath(p) ; unsupportedEvent(p, "path context")
       case (null, e, null) => getEventExpression(e)
-      case (null, null, s) => AlwaysComb(ctx.getSourceInterval())
+      case (null, null, _) => AlwaysComb(ctx.getSourceInterval())
       case _ => throwParserError(ctx)
     }
   }
@@ -1817,9 +1813,13 @@ class Visitor(
   }
   
   private def visitAlwaysProc(ctx: Procedural_timing_control_statementContext, attr: VerilogAttributes): Statement = {
+    attr match {
+      case NoVerilogAttribute =>
+      case _ => unsupported.raiseIt(ctx, s"Discarded Verilog attributes: ${attr.serialize}") 
+    }
+    
     val event = getProcTimingControl(ctx.procedural_timing_control)
     val s = visitStatement_or_null(ctx.statement_or_null)
-
     val i = ctx.getSourceInterval()
     
     (event, s) match {
@@ -1846,9 +1846,13 @@ class Visitor(
   }
 
   private def visitSeq_block(ctx: Seq_blockContext, attr: VerilogAttributes): Statement = {
-    val name = ctx.identifier.asScala match {
-      case Seq() => ""
-      case _ => unsupported.raiseIt(ctx, ">>> TODO add name management to blocks") ; ""
+    attr match {
+      case NoVerilogAttribute =>
+      case _ => unsupported.raiseIt(ctx, s"Discarded Verilog attributes: ${attr.serialize}") 
+    }
+    ctx.identifier.asScala match {
+      case Seq() =>
+      case _ => unsupported.raiseIt(ctx, ">>> TODO add name management to blocks")
     }
     
     val items = ctx.block_item_declaration.asScala.map(visitBlock_item_declaration)
@@ -1862,7 +1866,7 @@ class Visitor(
   private def visitOperator_assignment(ctx: Operator_assignmentContext, attr: VerilogAttributes): Statement = {
     ctx.assignment_operator.ASSIGN match {
       case null => unsupportedStmt(ctx, "complex assign")
-      case a => // only simple assign supported for now
+      case _ => // only simple assign supported for now
     }
     val loc = getVariableLvalue(ctx.variable_lvalue)
     val expr = getExpression(ctx.expression)
@@ -1879,12 +1883,12 @@ class Visitor(
           case null =>
           case d    => unsupportedStmt(d, "delay_or_event_control") 
         }
-        val loc = getVariableLvalue(ctx.variable_lvalue)
+        val loc = getVariableLvalue(v)
         val expr = getExpression(ctx.expression)
         Connect(ctx.getSourceInterval, attr, loc, expr, false, true)
         
-      case (null, pack, null) => unsupportedStmt(ctx, "class new")
-      case (null, null, op)   => visitOperator_assignment(op, attr)
+      case (null,  _, null) => unsupportedStmt(ctx, "class new")
+      case (null, null, op) => visitOperator_assignment(op, attr)
       case _ => throwParserError(ctx)
     }
   }
@@ -1903,7 +1907,7 @@ class Visitor(
   private def getPrimaryTfCallStmt(ctx: PrimaryTfCallContext, attr: VerilogAttributes): Statement = {
     unsupported.check(ctx)
     val args = (ctx.list_of_arguments, ctx.data_type) match {
-      case (l, null) => getCallArgs(ctx.list_of_arguments)
+      case (l, null) => getCallArgs(l)
       case (null, d) => 
         // weird reference to single param as arg hidden within data_type
         d.data_type_usual match {
@@ -2051,7 +2055,7 @@ class Visitor(
         (ctx.list_of_variable_assignments, ctx.for_variable_declaration.asScala) match {
           case (null, Seq()) => unsupportedExpr(ctx, "Unexpected null for loop initialization")
           case (null, Seq(v)) => unsupportedExpr(v, "TODO? for variable declaration")
-          case (null, s) => unsupportedExpr(ctx, "Unexpected multiple for variable declaration in for loop initialization.")
+          case (null, _) => unsupportedExpr(ctx, "Unexpected multiple for variable declaration in for loop initialization.")
           case (l, _) => 
             l.variable_assignment.asScala.map(v => {
               val loc = getVariableLvalue(v.variable_lvalue) match {
@@ -2080,7 +2084,7 @@ class Visitor(
             case o: Operator_assignmentContext => 
               o.assignment_operator.ASSIGN match {
                 case null => unsupportedExpr(o, "complex assign resolved as simple assign")
-                case a => // only simple assign supported for now
+                case _ => // only simple assign supported for now
               }
               val loc = getVariableLvalue(o.variable_lvalue) match {
                 case Reference(_, n, Seq(),_,_,_) => n
@@ -2151,17 +2155,22 @@ class Visitor(
   }
   
   private def visitAlways_construct(ctx: Always_constructContext, attr: VerilogAttributes): Statement = {
+    attr match {
+      case NoVerilogAttribute =>
+      case _ => unsupported.raiseIt(ctx, s"Discarded Verilog attributes: ${attr.serialize}") 
+    }
+    
     val kw = ctx.always_keyword
     val st = visitStatement(ctx.statement)
     (st, kw.KW_ALWAYS, kw.KW_ALWAYS_COMB, kw.KW_ALWAYS_LATCH, kw.KW_ALWAYS_FF) match {
-      case (s: ClockRegion, null, null, null, a) => s // always ff must be clocked
-      case (_, null, null, a, null) => // always latch must not be clocked
+      case (s: ClockRegion, null, null, null, _) => s // always ff must be clocked
+      case (_, null, null, _, null) => // always latch must not be clocked
         if(st.isInstanceOf[ClockRegion]) unsupported.raiseIt(ctx, "Inconsistent use of always_latch keyword")
         st
-      case (_, null, a, null, null) => // always comb must not be clocked
+      case (_, null, _, null, null) => // always comb must not be clocked
         if(st.isInstanceOf[ClockRegion]) unsupported.raiseIt(ctx, "Inconsistent use of always_latch keyword")
         st
-      case (_, a, null, null, null) => st // Always can be anything
+      case (_, _, null, null, null) => st // Always can be anything
       case _ => unsupportedStmt(ctx, "always keyword does not match with following event control") ; st
     }
   }
@@ -2211,8 +2220,8 @@ class Visitor(
     
     def getPrimop(op: Inc_or_dec_operatorContext, prefix: Boolean): PrimOp =
       (op.INCR, op.DECR) match {
-      case (i, null) => Incr(op.getSourceInterval, prefix)
-      case (null, d) => Decr(op.getSourceInterval, prefix)
+      case (_, null) => Incr(op.getSourceInterval, prefix)
+      case (null, _) => Decr(op.getSourceInterval, prefix)
       case _ => throwParserError(ctx)
     }
     
@@ -2223,7 +2232,7 @@ class Visitor(
             val e = getExpression(g.genvar_expression.constant_expression.expression)
             NamedAssign(i, getRefText(g.identifier), e, UnknownFlow)
             
-          case op => 
+          case _ => 
             DoPrim(i, getPrimop(g.inc_or_dec_operator, false), Seq(getRef(g.identifier)))
         }
       case g: GenIterPrefixContext  => 
@@ -2275,9 +2284,9 @@ class Visitor(
       val id = getRefText(c.identifier)
       val tokens = c.getSourceInterval()
       (c.MUL, c.identifier, c.expression) match {
-        case (m, null, null) => AutoAssign(tokens)
-        case (null, i, null) => NamedAssign(tokens, id, UndefinedExpression(), UnknownFlow)
-        case (null, i, e) => NamedAssign(tokens, id, getExpression(e), UnknownFlow)
+        case (_, null, null) => AutoAssign(tokens)
+        case (null, _, null) => NamedAssign(tokens, id, UndefinedExpression(), UnknownFlow)
+        case (null, _, e) => NamedAssign(tokens, id, getExpression(e), UnknownFlow)
         case _ => throwParserError(c)
       }
     }

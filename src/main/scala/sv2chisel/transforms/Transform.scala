@@ -43,7 +43,7 @@ abstract class Transform extends LazyLogging {
   }
   
   // private stuff
-  private[transforms] def renameReferences(module: DefModule, renameMap: RenameMap, ports: Boolean = false): DefModule = {
+  private[transforms] def renameReferences(module: DefModule, renameMap: RenameMap): DefModule = {
     
     def processExpression(e: Expression): Expression = {
       val expr = e match {

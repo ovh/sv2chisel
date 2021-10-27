@@ -11,8 +11,6 @@ import sv2chisel.ir.refreshTypes._
 import sv2chisel.ir.evalExpression._
 import sv2chisel.ir.expressionWidth._
 
-import collection.mutable.{HashMap, ArrayBuffer}
-
 class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
   implicit var srcFile = currentSourceFile
   implicit var stream = currentStream
@@ -29,11 +27,6 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
     
     // returns None <> do not cast
     def doCastIfCompat(e: Expression, toKind: ExpressionKind, toTpe: Type): Expression = {
-      toTpe match {
-        case v: VecType => trace(e, s"doCastIfCompat ${e.serialize} : ${e.tpe.serialize}/${e.kind} as ${toTpe.serialize} $toKind")
-        case _ => 
-      }
-      
       trace(e, s"doCastIfCompat ${e.serialize} : ${e.tpe.serialize}/${e.kind} as ${toTpe.serialize} $toKind")
       ((e.kind, toKind) match {
         case (UnknownExpressionKind, _) => 
@@ -49,7 +42,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
         case (HwExpressionKind, HwExpressionKind) => 
           (e.tpe, toTpe) match {
             case (t1, t2) if (t1.getClass == t2.getClass) => false
-            case (u: UIntType, b: BoolType) => true
+            case (_: UIntType, _: BoolType) => true
             case (_: SIntType, _: UIntType) => true
             case (_: UIntType, _: SIntType) => true
             case (_, _) if(toTpe.getClass.getSuperclass.isInstance(e.tpe)) => 
@@ -90,11 +83,11 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
             case u: UndefinedExpression => u
             case n: Number => 
               tpe match {
-                case b: BoolType => n.getInt match {
+                case _: BoolType => n.getInt match {
                   case 0 => BoolLiteral(n.tokens, false, kind)
                   case _ => BoolLiteral(n.tokens, true, kind)
                 }
-                case v: VecType => doCastIfCompat(n.copy(kind = kind), kind, tpe)
+                case _: VecType => doCastIfCompat(n.copy(kind = kind), kind, tpe)
                   
                 case _ => n.copy(kind = kind)
               }
@@ -155,12 +148,12 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           case (_, _, true) => 
             trace(e, s"legalizing type for expression ${e.serialize} : ${e.tpe.serialize}")
             e.tpe match {
-              case u: UnknownType => doCast(e, e.kind, TypeOf(e.tokens, e))
+              case _: UnknownType => doCast(e, e.kind, TypeOf(e.tokens, e))
               case _ => e
             }
             
             
-          case (_, u: UnknownType, _) => e
+          case (_, _: UnknownType, _) => e
           case (_:BoolType, _:BoolType, _) => e
           case (_:UIntType, UIntType(_, UnknownWidth(), _), _) => e
           case (_:BoolType, _:UIntType, _) => e
@@ -210,7 +203,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
       }
     }
     
-    def castTypeAll(s: Seq[Expression], baseHwType: Type, required: Option[ExpressionKind] = None): (ExpressionKind, Type, Seq[Expression]) = {
+    def castTypeAll(s: Seq[Expression], baseHwType: Type, required: Option[ExpressionKind]): (ExpressionKind, Type, Seq[Expression]) = {
       (commonKind(s), commonType(s), required) match {
         // Rules based on kinds
         // > required HW
@@ -235,19 +228,6 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
       }
     }
     
-    def extractVecType(tpe: Type): Option[Type] = {
-      tpe match {
-        case v: VecType => 
-          v.tpe match {
-            case Seq(t) => Some(t)
-            case _ => None
-          }
-        case u: UIntType => Some(BoolType(u.tokens))
-        case s: SIntType => Some(BoolType(s.tokens))
-        case _ => None
-      }
-    }
-    
     def processExpressionRec(e: Expression, expected: ExpressionKind, baseTpe: Type, requireWidth: Boolean = false): Expression = {
       val baseUInt = UIntType(UndefinedInterval, UnknownWidth(), NumberDecimal)
       e match {
@@ -262,25 +242,20 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           val expr = processExpressionRec(s.expr, expected, s.tpe)
           val index = processExpressionRec(s.index, UnknownExpressionKind, UnknownType())
           val ind = (index.kind, index.tpe) match {
-            case (HwExpressionKind, u: UIntType) => index 
-            case (HwExpressionKind, s: SIntType) => index
+            case (HwExpressionKind, _: UIntType) => index 
+            case (HwExpressionKind, _: SIntType) => index
             case (HwExpressionKind, _) => doCast(index, HwExpressionKind, baseUInt)
             case _ => index 
           }
           
           trace(s, s"SubIndex: ${s.serialize} - index kind : ${ind.kind}")
-          // val tpe = extractVecType(expr.tpe) match {
-          //   case Some(t) => t
-          //   case _ => critical(s, s"Unexpected type for index/subrange ${expr.tpe}"); s.tpe
-          // }
-          // trace(s, s"SubIndex ${s.serialize}: ${tpe}")
           s.copy(expr = expr, index = ind, kind = expr.kind).refreshedType
           
         case s: SubRange =>
           val expr = processExpressionRec(s.expr, expected, s.tpe)
           val left = processExpressionRec(s.left, UnknownExpressionKind, UnknownType())
           val right = processExpressionRec(s.right, UnknownExpressionKind, UnknownType())
-          val (kind, cast) = castThemAll(Seq(left, right), baseUInt)
+          val (_, cast) = castThemAll(Seq(left, right), baseUInt)
           val sb = s.copy(expr = expr, left = cast(0), right = cast(1), kind = expr.kind).refreshedType
           trace(s, s"SubRange ... => ${sb.serialize}: ${sb.tpe.serialize}")
           sb
@@ -298,17 +273,17 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           }
           
           (p.op, p.args.head.tpe) match {
-            case (o: PrimOps.CeilLog2, _) => 
+            case (_: PrimOps.CeilLog2, _) => 
               val expr = processExpressionRec(p.args(0), UnknownExpressionKind, UnknownType()) 
               val e = expr.kind match {
-                case UnknownExpressionKind => expr.mapKind(k => SwExpressionKind)
+                case UnknownExpressionKind => expr.mapKind(_ => SwExpressionKind)
                 case _ => expr
               }
               p.copy(args = Seq(e))
               
-            case (o: PrimOps.GetWidth, _) => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType())) // nothing else to ensure here ?
+            case (_: PrimOps.GetWidth, _) => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType())) // nothing else to ensure here ?
               
-            case (o: PrimOps.InlineIf, _) => 
+            case (_: PrimOps.InlineIf, _) => 
               // NOTE: not using Rec here, instantiating a new thread with final cast
               trace(p, s"InlineIf: ${p.serialize}")
               val pred = processExpression(p.args(0), expected, BoolType(UndefinedInterval))
@@ -448,7 +423,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               }
               p.copy(args = Seq(e,shft), kind = e.kind, tpe = e.tpe)
             
-            case (o: PrimOps.Par, _) =>
+            case (_: PrimOps.Par, _) =>
               // process through
               val exprs = p.args.map(processExpressionRec(_, expected, baseTpe))
               p.copy(args = exprs, kind = exprs(0).kind, tpe = exprs(0).tpe)
@@ -476,14 +451,14 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               }
               p.copy(args = Seq(a), kind = a.kind, tpe = a.tpe)
               
-            case (o: PrimOps.BitOp, _) => //bitwise operator (except BitNeg)
+            case (_: PrimOps.BitOp, _) => //bitwise operator (except BitNeg)
               val exprs = p.args.map(processExpressionRec(_, expected, baseTpe))
               val (kind, tpe, args) = castTypeAll(exprs, baseUInt, None)
               p.copy(args = args, kind = kind, tpe = tpe)
               
-            case (o: PrimOps.RedOp, _) => //reduction operator (unary)
+            case (_: PrimOps.RedOp, _) => //reduction operator (unary)
               val exprs = p.args.map(processExpressionRec(_, expected, baseUInt))
-              val (kind, args) = castThemAll(exprs, baseUInt, Some(HwExpressionKind))
+              val (_, args) = castThemAll(exprs, baseUInt, Some(HwExpressionKind))
               p.copy(args = args, kind = HwExpressionKind, tpe = BoolType(UndefinedInterval))
             
             case _ => Utils.throwInternalError("Impossible")
@@ -590,7 +565,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           }
         case a: AssignPattern => 
 
-          val assigns = a.assign.zipWithIndex.map { case (t, i) => {
+          val assigns = a.assign.map(t => {
             val localBaseType = baseTpe match {
               case v: VecType => v.tpe match {
                 case Seq(t) => t
@@ -607,7 +582,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
             }
             (processExpression(t._1, UnknownExpressionKind, UnknownType()),
               processExpressionRec(t._2, expected, localBaseType))
-          }}
+          })
           val (kind, tpe, values) = castTypeAll(assigns.map(_._2), baseUInt, None)
 
           val resultingType = (baseTpe, tpe) match {

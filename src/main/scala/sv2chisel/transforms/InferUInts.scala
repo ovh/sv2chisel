@@ -7,7 +7,7 @@ package transforms
 
 import sv2chisel.ir._
 
-import collection.mutable.{HashMap, ArrayBuffer}
+import collection.mutable.{HashMap}
 
 class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
   
@@ -107,7 +107,7 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Des
       tpe match {
         case v: VecType => 
           v.tpe match {
-            case Seq(t: BoolType) => 
+            case Seq(_: BoolType) => 
               // end of recursion let's return an UInt depending on
               if(stringAssignedCount.contains(path)){
                 info(tpe, s"Converting $path to Vec of Char(UInt(8.W)) based on its usage in the module")
@@ -131,6 +131,7 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Des
     }
     
     def getType(ref: String): Type = {
+      closed = true
       uintLeafType(ref, currentType(ref))
     }
     
@@ -222,8 +223,8 @@ class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends Des
           // could be both way 
           c.args.foreach(visitExpression(_, assign, whole))
           None
-        case n: NamedAssign => None // TODO ??? 
-        case n: NoNameAssign => None // TODO ???
+        case _: NamedAssign => None // TODO ??? 
+        case _: NoNameAssign => None // TODO ???
         
         // Litteral & others
         case _ => None

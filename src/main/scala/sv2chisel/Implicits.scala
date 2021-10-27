@@ -5,7 +5,6 @@
 package sv2chisel
 
 import sv2chisel.ir._
-import Utils.trim
 
 object Implicits {
   implicit def int2WInt(i: Int): WrappedInt = WrappedInt(UndefinedInterval,BigInt(i))

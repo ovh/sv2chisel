@@ -8,8 +8,6 @@ package transforms
 import sv2chisel.ir._
 import sv2chisel.ir.refreshTypes._
 
-import collection.mutable.{HashMap, ArrayBuffer}
-
 class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
   implicit var srcFile = currentSourceFile
   implicit var stream = currentStream

@@ -56,7 +56,7 @@ object Parser extends EasyLogging {
     }
     val ast = visit match {
       case c: SourceFile => c
-      case x => throw new ClassCastException("Error! AST not rooted with SourceFile node!")
+      case _ => throw new ClassCastException("Error! AST not rooted with SourceFile node!")
     }
     struct(s"######### Elapsed time for $path #########")
     struct(s"# Lexing+Parsing Time : $parseTimeMillis ms")

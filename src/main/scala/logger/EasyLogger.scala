@@ -11,7 +11,7 @@ trait EasyLogger {
   
   // note: octal literals such as \033 are deprecated in scala
   private val red = "\u001b[31m"
-  private val green = "\u001b[32m"
+  // private val green = "\u001b[32m"
   private val orange = "\u001b[33m"
   private val blue = "\u001b[34m"
   private val pink = "\u001b[35m"

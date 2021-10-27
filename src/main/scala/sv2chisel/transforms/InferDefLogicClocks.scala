@@ -187,6 +187,7 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
       val clock = reg2clocks.getOrElse(p.name, None)
       
       def createPortRegConnect(c: String) = {
+        trace(p, s"Clock: $c for port ${p.serialize}")
         val regName = p.name + "__out_reg"
         val tmpName = p.name + "_tmp_name"
         val refp = Reference(ui, tmpName, Seq())
@@ -199,16 +200,16 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
       
       (p.resolution, p.direction, clock) match {
         case (LogicUnresolved, _, None) => p.copy(resolution = LogicWire)
-        case (LogicUnresolved, d: Output, Some(c)) => 
+        case (LogicUnresolved, _: Output, Some(c)) => 
           info(p, s"Creating proper register declaration and connect for implicit output reg ${p.name}")
           createPortRegConnect(c)
           p.copy(clock = Reference(ui, c, Seq()), resolution = LogicWire)
           
-        case (LogicUnresolved, d: Direction, Some(c)) => 
+        case (LogicUnresolved, d: Direction, Some(m@_)) => 
           critical(p, s"H'ld a sec... ${d.serialize} reg? Are you trying to assign an input? (Resolved as wire)")
           p.copy(resolution = LogicWire)
           
-        case (LogicRegister, d: Output, None) =>
+        case (LogicRegister, _: Output, None) =>
           if(!reg2critical.contains(p.name)){
             warn(p, s"Inconsistent declaration as register of ${p.name} while never assigned in a clocked region (always @<pos|neg>edge <clock>). (resolved as wire declaration)")
           } else {
@@ -217,7 +218,7 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
             
           p.copy(resolution = LogicWire)
         
-        case (LogicWire, d: Output, Some(c)) =>
+        case (LogicWire, _: Output, Some(c)) =>
           if(!reg2critical.contains(p.name)){
             warn(p, s"Inconsistent declaration as wire of ${p.name} while assigned in a clocked region (always @<pos|neg>edge $c). (Resolved creating proper register declaration and connect for this implicit output reg)")
           } else {
@@ -230,7 +231,7 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
           critical(p, s"Found clocked assignment for declared ${d.serialize} wire ${p.name}: cannot create register for input ports it does not make sense !")
           p.copy(clock = Reference(UndefinedInterval, c, Seq()), resolution = LogicRegister)
         
-        case (LogicRegister, d: Output, Some(c)) => 
+        case (LogicRegister, _: Output, Some(c)) => 
           info(p, s"Creating proper register declaration and connect for output reg ${p.name}")
           createPortRegConnect(c)
           p.copy(clock = Reference(ui, c, Seq()), resolution = LogicWire)

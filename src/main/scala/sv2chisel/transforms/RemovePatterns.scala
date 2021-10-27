@@ -16,7 +16,6 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
   private val ui = UndefinedInterval
   private val ut = UnknownType()
   private val uw = UnknownWidth()
-  private val nv = NoVerilogAttribute
   
   def genOnes(expr: Expression): Expression = {
     val shift = DoPrim(ui, PrimOps.Shl(ui), Seq(UIntLiteral(ui, 1, uw, NumberDecimal), expr), HwExpressionKind)
@@ -30,10 +29,10 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
     def getFilling(e: Expression, tpe: Type, bit: String): Expression = {
       trace(e, s"get filling for $e $tpe $bit")
       (tpe, bit) match {
-        case (b: BoolType, "'0") => BoolLiteral(e.tokens, false, HwExpressionKind)
-        case (b: BoolType, "'1") => BoolLiteral(e.tokens, true, HwExpressionKind)
+        case (_: BoolType, "'0") => BoolLiteral(e.tokens, false, HwExpressionKind)
+        case (_: BoolType, "'1") => BoolLiteral(e.tokens, true, HwExpressionKind)
 
-        case (u: UIntType, "'0") => 
+        case (_: UIntType, "'0") => 
           UIntLiteral(e.tokens, 0, uw, NumberDecimal)
           
         case (_, "'0") => 
@@ -42,8 +41,8 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
         case (_, "'1") => 
           val castTpe = tpe match {
             // avoid useless detailed cast for UInt / SInt
-            case UIntType(t,w,b) => UIntType(t, UnknownWidth(), b)
-            case SIntType(t,w) => SIntType(t, UnknownWidth())
+            case UIntType(t,_,b) => UIntType(t, UnknownWidth(), b)
+            case SIntType(t,_) => SIntType(t, UnknownWidth())
             case _ => tpe
           }
           
@@ -97,15 +96,15 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
       
       a.assign.foreach(t => {
         t match {
-          case (u: UndefinedExpression, e) => seqValues += processExpression(e, underlyingTpe)
-          case (d: DefaultAssignPattern, e) => default = Some(processExpression(e, underlyingTpe))
+          case (_: UndefinedExpression, e) => seqValues += processExpression(e, underlyingTpe)
+          case (_: DefaultAssignPattern, e) => default = Some(processExpression(e, underlyingTpe))
           case (i, e) => mapValues += ((i, processExpression(e, underlyingTpe)))
         }
       })
       (seqValues.toSeq, mapValues.isEmpty) match {
         case (s, true) => SeqValues(a.tokens, s, a.kind, tpe)
         case (Seq(), false) => MappedValues(a.tokens, mapValues, default, a.kind, tpe)
-        case (s, false) => critical(a, s"unexpected assign pattern leading to both mapped and sequential assignment in ${a.serialize}"); UndefinedExpression(a.tokens)
+        case (_, false) => critical(a, s"unexpected assign pattern leading to both mapped and sequential assignment in ${a.serialize}"); UndefinedExpression(a.tokens)
       }
     }
     
@@ -124,17 +123,17 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
     
     def processExpression(e: Expression, expected: Type): Expression = {
       val tpe = (e.tpe, expected) match {
-        case (u: UnknownType, _) => expected
+        case (_: UnknownType, _) => expected
         case _ => e.tpe
       }
       trace(s"Process expression ${e.serialize} e.tpe = ${e.tpe.serialize} ; expected = ${expected.serialize}")
       
       val exp = e match {
-        case FillingBitPattern(_, bit, kind, _) => getFilling(e, tpe, bit) // kind to be used ?
+        case FillingBitPattern(_, bit, _, _) => getFilling(e, tpe, bit) // kind to be used ?
         case a: AssignPattern =>
           a.assign match {
             // usual fill them all
-            case Seq((DefaultAssignPattern(_), FillingBitPattern(_, bit, kind, _))) => 
+            case Seq((DefaultAssignPattern(_), FillingBitPattern(_, bit, _, _))) => 
               getFilling(e, tpe, bit)
             case _ => getSeqValues(a, tpe)
           }

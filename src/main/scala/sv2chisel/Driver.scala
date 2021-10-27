@@ -4,7 +4,6 @@
 
 package sv2chisel
 
-import sv2chisel.ir._
 import sv2chisel.Utils.{time}
 import sv2chisel.transforms._
 
@@ -22,7 +21,7 @@ object Driver extends EasyLogging {
       new LegalizeParamDefaults // To adapt just to warn about usage ??? "time to switch to chisel "
     )
     struct(s"######### Executing ${transforms.size} transforms #########")
-    val (timeTransforms, result) = time { project.run(transforms) }
+    val (timeTransforms, _) = time { project.run(transforms) }
     struct(s"# Total Elapsed time running transforms : $timeTransforms ms")
   }
   

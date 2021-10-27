@@ -4,13 +4,12 @@
 
 package sv2chisel
 
-import org.antlr.v4.runtime.{ParserRuleContext,CommonTokenStream, Token}
+import org.antlr.v4.runtime.{ParserRuleContext,CommonTokenStream}
 import org.antlr.v4.runtime.tree.{TerminalNode}
 import scala.collection.JavaConverters._
 
 import logger.EasyLogging
 
-import sv2chisel.antlr._
 import sv2chisel.ir.{UndefinedInterval, Interval}
 
 trait ParserLogging extends EasyLogging {

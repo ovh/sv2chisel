@@ -7,14 +7,14 @@ package transforms
 
 import sv2chisel.ir._
 
-import collection.mutable.{HashMap, HashSet, ArrayBuffer}
+import collection.mutable.{HashMap}
 
 class InferParamTypes(val llOption: Option[logger.LogLevel.Value] = None) extends DefModuleBasedTransform {
   
   class UsageStore() {
     private val intUsageCount = new HashMap[String, Int]()
     private val booleanUsageCount = new HashMap[String, Int]()
-    private val convertedToBoolean = new HashSet[String]()
+    // private val convertedToBoolean = new HashSet[String]()
 
     
     def registerIntUsage(ref: String): Unit = {
@@ -53,15 +53,15 @@ class InferParamTypes(val llOption: Option[logger.LogLevel.Value] = None) extend
           // this will be caught afterwards in LegalizeParamDefaults 
           // critical(e, s"Default param value $name contains some reference ($r) this is likely to result into illegal scala...") 
           r.tpe match {
-            case u: UnknownType => IntType(UndefinedInterval, NumberDecimal)
+            case _: UnknownType => IntType(UndefinedInterval, NumberDecimal)
             case _ => debug(e, s"Known type for parameter $name = ${r.tpe} "); r.tpe
           }
         
-        case n: Number => IntType(UndefinedInterval, NumberDecimal)
-        case n: StringLit => StringType(UndefinedInterval, UnknownWidth())
+        case _: Number => IntType(UndefinedInterval, NumberDecimal)
+        case _: StringLit => StringType(UndefinedInterval, UnknownWidth())
         
-        case DoPrim(_, op: PrimOps.InlineIf, args, _, _) => args match {
-          case Seq(cond, conseq, alt) => 
+        case DoPrim(_, _: PrimOps.InlineIf, args, _, _) => args match {
+          case Seq(cond@_, conseq, alt) => 
             val a = getType(name, conseq)
             val b = getType(name, alt)
             if (a != b) Utils.throwInternalError(s"Unable to infer type for param $name")
@@ -84,7 +84,7 @@ class InferParamTypes(val llOption: Option[logger.LogLevel.Value] = None) extend
     def processParam(p: DefParam): DefParam = {
       (p.tpe, p.value) match {
         case (t: UnknownType, None ) => p.copy(tpe = IntType(t.tokens, NumberDecimal))
-        case (t: UnknownType, Some(v) ) =>  p.copy(tpe = getType(p.name, v))
+        case (_: UnknownType, Some(v) ) =>  p.copy(tpe = getType(p.name, v))
           
         case _ => p
       }

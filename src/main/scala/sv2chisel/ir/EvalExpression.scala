@@ -11,8 +11,6 @@ package object evalExpression {
   implicit def expressionToEvalExpression(e: Expression) = new EvalExpression(e)
 }
 
-import evalExpression._
-
 class EvalExpression(e: Expression) {
   val ui = UndefinedInterval
   
@@ -54,7 +52,7 @@ class EvalExpression(e: Expression) {
       
       case DoPrim(_, Mul(_), s, _, _) => evalBinOp(s, _*_)
       case DoPrim(_, Pow(_), s, _, _) => 
-        evalBinOp(s, (a, b) => BigInt(math.pow(a.toDouble,a.toDouble).toLong))
+        evalBinOp(s, (a, b) => BigInt(math.pow(a.toDouble,b.toDouble).toLong))
       case DoPrim(_, Div(_), s, _, _) => evalBinOp(s, _/_)
       case DoPrim(_, Rem(_), s, _, _) => evalBinOp(s, _%_)
       case DoPrim(_, Add(_), s, _, _) => evalBinOp(s, _+_)
