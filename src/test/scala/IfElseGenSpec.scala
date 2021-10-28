@@ -25,9 +25,9 @@ class IfElseGenSpec extends Sv2ChiselSpec {
       |endgenerate
       """.stripMargin
     )
-    result should contains ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends MultiIOModule {")
     
-    result should contains ( "if( !(a != 0) || (b != 0)) {",
+    result should contain ( "if( !(a != 0) || (b != 0)) {",
                                "res := 0.U",
                              "} else if((c != 0)) {",
                                "res := 1.U",
@@ -36,6 +36,8 @@ class IfElseGenSpec extends Sv2ChiselSpec {
                              "}")
     
   }
+  
+  
   
   it should "be properly emitted with begin end blocks" in {
     val result = emitInModule("""
@@ -53,8 +55,8 @@ class IfElseGenSpec extends Sv2ChiselSpec {
       |endgenerate
       """.stripMargin
     )
-    result should contains ("class Test() extends MultiIOModule {")
-    result should contains ( "if( !(a != 0) || (b != 0)) {",
+    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ( "if( !(a != 0) || (b != 0)) {",
                                "res := 0.U",
                              "} else if((c != 0)) {",
                                "res := 1.U",
@@ -82,8 +84,8 @@ class IfElseGenSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class Test() extends MultiIOModule {")
-    result should contains ( "if( !(a != 0) || (b != 0)) {",
+    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ( "if( !(a != 0) || (b != 0)) {",
                                "res := 0.U",
                              "} else {",
                                 "if((c != 0)) {",
@@ -115,9 +117,9 @@ class IfElseGenSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends MultiIOModule {")
     
-    result should contains ( "if( !(a != 0) || (b != 0)) {",
+    result should contain ( "if( !(a != 0) || (b != 0)) {",
                                "res := 0.U",
                              "} else {",
                                 "if((c != 0)) {",

@@ -33,8 +33,8 @@ class WireOrRegSpec extends Sv2ChiselSpec {
     val stdout = out.toString
     Logger.reset()
     debug(stdout)
-    result should contains ("class Test() extends MultiIOModule {")
-    stdout should contains ( "[critical] Signal c is driven both by clock clk and assigned combinationally. This probably means that c is either a wire or a reg depending on a generate parameter. Please review and fix generated code. at :12" )
+    result should contain ("class Test() extends MultiIOModule {")
+    stdout should contain ( "[critical] Signal c is driven both by clock clk and assigned combinationally. This probably means that c is either a wire or a reg depending on a generate parameter. Please review and fix generated code. at :12" )
   }
 
 }

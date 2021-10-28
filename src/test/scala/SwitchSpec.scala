@@ -60,13 +60,13 @@ class SwitchSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends MultiIOModule {")
     
-    result should contains ("val mem = Wire(Vec(32, Bool()))",
+    result should contain ("val mem = Wire(Vec(32, Bool()))",
                             "val prev = Wire(UInt(32.W))",
                             "val res = Reg(UInt(32.W))")
     
-    result should contains ("when(true.B === a) {",
+    result should contain ("when(true.B === a) {",
                               "res := prev",
                             "} .elsewhen (true.B === Cat(b, c).orR()) {",
                               "res := mem(31,12).asUInt<<12",

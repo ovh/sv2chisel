@@ -9,9 +9,9 @@ import sv2chisel.chiselize._
 import sv2chisel.ir.{UndefinedInterval, Interval, SourceFile, SVNode}
 import sv2chisel.antlr.{sv2017Lexer}
 
-import logger.EasyLogging
+import logger._
 
-import org.antlr.v4.runtime.{CommonTokenStream}
+import org.antlr.v4.runtime.{CommonTokenStream, Token}
 import scala.collection.JavaConverters._
 import collection.mutable.{ArrayBuffer}
 import java.io.{File, FileWriter}
@@ -148,61 +148,136 @@ object Emitter extends EasyLogging {
       }
     }
     
-    def retrieveHidden(low: Int, high: Int, expIndent: Int): (Int, String) = {
+    def retrieveHidden(low: Int, high: Int, expIndent: Int, newLine: Boolean): (Int, String) = {
       val str = ArrayBuffer[String]()
       val ws = ArrayBuffer[String]()
+      var startFromNewLineNext = low == 0 // first token always start from new line
+      var startFromNewLine = false // won't be used
+
+      def getSpace: String = if(startFromNewLine) ctx.indent * expIndent else " "
       
-      var emittedUntil = low
-      for (i <- (low until high)) {
-        val tok = stream.get(i)
+      def processToken(tok: Token, last: Boolean = false): Boolean = {
+        startFromNewLine = startFromNewLineNext
         tok.getChannel() match {
           case sv2017Lexer.COMMENTS => 
+            // in-line comment always integrate a EOL within the text
+            val eol = tok.getType() match {
+              case sv2017Lexer.ONE_LINE_COMMENT => startFromNewLineNext = true; "\n"
+              case sv2017Lexer.BLOCK_COMMENT => ""
+              case _ => Utils.throwInternalError("Lexing error")
+            }
             // remove trailling new line
             val txt = tok.getText().split("\n").mkString("","\n","")
             val spaces = ws.mkString
             val newlineCount = spaces.count(_=='\n')
             str += ((spaces.split("\n"), newlineCount) match {
-              case (Array(), n) => "\n"*n + tok.getText()
-              case (Array(s@_), 0) => " " + tok.getText()
-              case (Array(s@_), 1) => " " + tok.getText().split("\n").mkString("","\n","\n")
+              case (Array(), 0) => 
+                trace(s"case 0")
+                getSpace + tok.getText()
+              
+              case (Array(), n) => 
+                trace(s"case 1 n=$n");
+                val updatedTxt = tok.getText().split("\n").map(l => {
+                  ctx.indent * expIndent + l
+                }).mkString("\n")
+                val trailling = "\n"*(tok.getText().count(_=='\n') - updatedTxt.count(_=='\n'))
+                "\n"*n + updatedTxt + trailling
+                
+              case (Array(s@_), 0) => // most common case for single-line comments
+                trace(s"case 2")
+                getSpace + tok.getText()
+                
+              case (Array(s@_), 1) => 
+                trace(s"case 3")
+                " " + tok.getText().split("\n").mkString("","\n","\n")
+                
               case (Array(a@_, b), 1) => 
-                if (b.size > (ctx.indent * 6 * expIndent).size) {
-                  // remove emitter glitch (many ws retrieved due to poor interval management)
-                  " " + tok.getText()
-                } else {
-                  "\n" + b.replace("    ", "  ") + txt
-                }
-              case (a, n) => "\n"*n + a.last.replace("    ", "  ") + txt
+                trace(s"case 4")
+                val updatedTxt = txt.split("\n").map(l => {
+                  l.replaceAll("^[ ]{"+ b.size +"}", ctx.indent * expIndent)
+                }).mkString("\n")
+                "\n" + ctx.indent * expIndent + updatedTxt
+                
+              case (a, n) => 
+                trace(s"case 5")
+                "\n"*n + a.last.replace("    ", "  ") + txt + eol
             })
             ws.clear()
-            emittedUntil = i
+            true
             
           case sv2017Lexer.WHITESPACES => 
             ws += tok.getText()
-            emittedUntil = i
+            if(last && newLine){
+              val spaces = ws.mkString
+              // compensate the one which will get suppressed upon newLine
+              val newlineCount = spaces.count(_=='\n') + (if(newLine) 1 else 0)
+              trace(s"Reintegrating $newlineCount `\\n`")
+              str += "\n"*newlineCount
+              ws.clear()
+            }
             
-          case _ => // ignore
+            true
+            
+          case _ => false // ignore
         }
       }
-      (emittedUntil, str.mkString)
+      
+      var emittedUntil = low
+      if(high < low){ // process to end
+        stream.getHiddenTokensToRight(low) match {
+          case null =>
+          case s => s.asScala.foreach(t => processToken(t))
+        }
+      } else {
+        for (i <- (low until high)) {
+          emittedUntil = if(processToken(stream.get(i), high-1 == i)) i else emittedUntil
+        }
+      }
+      
+      // remove last newline if necessary
+      val result = newLine match {
+        case true => str.mkString.replaceAll("\\n[ ]*$", "")
+        case _ => str.mkString
+      }
+      
+      (emittedUntil, result)
     }
     
     
     val emitted = ArrayBuffer[String]()
-    var emittedUntil = 0
-    
+    var emittedUntil = -1
+    val maxToken = stream.size()
+    // Logger.setLevel(LogLevel.Trace)
     for (cToken <- chisel) {
+      trace(cToken.toString)
       
       cToken.tokens match {
         case UndefinedInterval => 
-        case i: Interval => 
+        // case i: Interval => 
+        case i: Interval if(i.b > emittedUntil && emittedUntil+1 < maxToken) => 
           // first collect hidden comments & \n && integrate it
-          val (h, txt) = retrieveHidden(emittedUntil, i.a, cToken.indentLevel)
-          emitted += txt
-          // second increase the emittedUntil
-          emittedUntil = h
+          val low = emittedUntil + 1
+          // TODO: address root cause & remove this check
+          // only one example of this behaviour on the current corpus
+          if(i.a > maxToken){
+            critical(s" Unexpected interval !! maxToken: $maxToken i.a: ${i.a}, low: ${low}")
+            critical(cToken.toString)
+          } else {            
+            val (h, txt) = retrieveHidden(low, i.a, cToken.indentLevel, cToken.newLine)
+            trace(s" |-> low = $low ==> h= $h")
+            trace(s" |-> hidden retrieved: `${txt}`")
+            emitted += txt
+            // second increase the emittedUntil
+            emittedUntil = h
+          }
+        case _ => 
       }
       emitted += emitRaw(cToken)
+    }
+    // last call to retrieve hidden til EOF (if not already reached)
+    if(emittedUntil+1 < maxToken){      
+      val (_, txt) = retrieveHidden(emittedUntil+1, -1, 0, false)
+      emitted += txt
     }
     emitted.mkString
   }

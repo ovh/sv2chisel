@@ -481,11 +481,24 @@ class Visitor(
     val enum = ctx.enum_name_declaration.asScala
     val struct = ctx.struct_union
     val pack = ctx.package_or_class_scoped_path
-      
+    
+    // data_type_usual:
+    //   ( data_type_primitive
+    //       | KW_ENUM ( enum_base_type )?
+    //          LBRACE enum_name_declaration  ( COMMA enum_name_declaration )* RBRACE
+    //       | struct_union ( KW_PACKED ( signing )? )?
+    //           LBRACE ( struct_union_member )+ RBRACE
+    //       | package_or_class_scoped_path
+    //     ) ( variable_dimension )* ;
+    
     val (tpe, res) = (dtp, enum, struct, pack) match {
       case (p, Seq(), null, null) => getDataPrimitiveType(p, isHw)
       case (null, s, null, null) => 
-        val (t, r) = getEnumBaseType(ctx.enum_base_type, isHw)
+        val (t, r) = ctx.enum_base_type match {
+          case null => (UnknownType(), LogicUnresolved)
+          case e => getEnumBaseType(e, isHw)
+        }
+        
         trace(ctx, s"enum base type = ${t.serialize}")
         (EnumType(ctx.getSourceInterval(), s.map(getEnumNameDecl), t, HwExpressionKind), r) // TODO: review HwExpression
         

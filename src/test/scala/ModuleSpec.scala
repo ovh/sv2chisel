@@ -19,10 +19,10 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class Test() extends MultiIOModule {")
-    result should contains ("val a = Wire(Bool())")
-    result should contains ("val b = Wire(Bool())")
-    result should contains ("a := b")
+    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("val a = Wire(Bool())")
+    result should contain ("val b = Wire(Bool())")
+    result should contain ("a := b")
     
   }
   it should "be properly emitted with named wrapper" in {
@@ -32,10 +32,10 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class MyTest() extends MultiIOModule {")
-    result should contains ("val a = Wire(Bool())")
-    result should contains ("val b = Wire(Bool())")
-    result should contains ("a := b")
+    result should contain ("class MyTest() extends MultiIOModule {")
+    result should contain ("val a = Wire(Bool())")
+    result should contain ("val b = Wire(Bool())")
+    result should contain ("a := b")
     
   }
   
@@ -51,10 +51,10 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class CustomModule() extends MultiIOModule {")
-    result should contains ("val a = IO(Input(Bool()))")
-    result should contains ("val b = IO(Output(Bool()))")
-    result should contains ("b := a")
+    result should contain ("class CustomModule() extends MultiIOModule {")
+    result should contain ("val a = IO(Input(Bool()))")
+    result should contain ("val b = IO(Output(Bool()))")
+    result should contain ("b := a")
   }
   
   it should "be properly emitted with inline style IOs" in {
@@ -68,10 +68,10 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class CustomModule() extends MultiIOModule {")
-    result should contains ("val a = IO(Input(Bool()))")
-    result should contains ("val b = IO(Output(Bool()))")
-    result should contains ("b := a")
+    result should contain ("class CustomModule() extends MultiIOModule {")
+    result should contain ("val a = IO(Input(Bool()))")
+    result should contain ("val b = IO(Output(Bool()))")
+    result should contain ("b := a")
   }
   
   // Test Params
@@ -88,12 +88,12 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class CustomModule(" )
-    result should contains ("val TEST: Int" )
-    result should contains (") extends MultiIOModule {")
-    result should contains ("val a = IO(Input(Bool()))")
-    result should contains ("val b = IO(Output(Bool()))")
-    result should contains ("b := Mux((TEST != 0).B, a, false.B)")
+    result should contain ("class CustomModule(" )
+    result should contain ("val TEST: Int" )
+    result should contain (") extends MultiIOModule {")
+    result should contain ("val a = IO(Input(Bool()))")
+    result should contain ("val b = IO(Output(Bool()))")
+    result should contain ("b := Mux((TEST != 0).B, a, false.B)")
   }
   
   // Instances
@@ -119,20 +119,20 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class mod(" )
-    result should contains ("val TEST: Int = 1" )
+    result should contain ("class mod(" )
+    result should contain ("val TEST: Int = 1" )
     
-    result should contains ("class Main(" )
-    result should contains ("val OPT: Int" )
-    result should contains (") extends MultiIOModule {")
-    result should contains ("val i = IO(Input(Bool()))")
-    result should contains ("val o = IO(Output(Bool()))")
+    result should contain ("class Main(" )
+    result should contain ("val OPT: Int" )
+    result should contain (") extends MultiIOModule {")
+    result should contain ("val i = IO(Input(Bool()))")
+    result should contain ("val o = IO(Output(Bool()))")
 
-    result should contains ("val instA = Module(new mod(")
-    result should contains ("TEST = OPT")
-    result should contains ("))")
-    result should contains ("instA.a := i")
-    result should contains ("o := instA.b")
+    result should contain ("val instA = Module(new mod(")
+    result should contain ("TEST = OPT")
+    result should contain ("))")
+    result should contain ("instA.a := i")
+    result should contain ("o := instA.b")
     
   }
   
@@ -158,12 +158,12 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class mod(" )
-    result should contains ("class Main(" )
+    result should contain ("class mod(" )
+    result should contain ("class Main(" )
 
-    result should contains ("val instB = Module(new mod)")
-    result should contains ("instB.a := i")
-    result should contains ("o := instB.b")
+    result should contain ("val instB = Module(new mod)")
+    result should contain ("instB.a := i")
+    result should contain ("o := instB.b")
   }
   
   it should "be properly emitted without named port map" in {
@@ -189,12 +189,12 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class mod(" )
-    result should contains ("class Main(" )
+    result should contain ("class mod(" )
+    result should contain ("class Main(" )
 
-    result should contains ("val instB = Module(new mod)")
-    result should contains ("instB.a := i")
-    result should contains ("o := instB.b.asUInt")
+    result should contain ("val instB = Module(new mod)")
+    result should contain ("instB.a := i")
+    result should contain ("o := instB.b.asUInt")
   }
 
 }

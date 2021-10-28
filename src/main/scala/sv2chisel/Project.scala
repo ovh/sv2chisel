@@ -181,7 +181,7 @@ object Project {
   def apply(name: String, rawVerilog: String) = {
     val p = new Project(name)
     val (src, stream) = Parser.parseString(rawVerilog)
-    p.addEntry(ProjectEntry("", src, stream))
+    p.addEntry(ProjectEntry("raw", src, stream))
     p
   }
 }

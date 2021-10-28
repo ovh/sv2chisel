@@ -29,8 +29,8 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class Test() extends MultiIOModule {")
-    result should contains ("val auto_concat = Wire(new Bundle {",
+    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("val auto_concat = Wire(new Bundle {",
                               "val bool = Bool()",
                               "val packsmall_i_WWW_1_1 = Vec(WWW-1, Bool())",
                               "val packsmall_i_0 = Bool()",
@@ -41,7 +41,7 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
                             "packsmall(i)(0) := auto_concat.packsmall_i_0")
     
     // seccond concat inline
-    result should contains ("pack(2*i+1) := Mux(bool, Cat(packsmall(i)(WWW-1,0).asUInt, \"b0\".U(1.W)), 0.U)")
+    result should contain ("pack(2*i+1) := Mux(bool, Cat(packsmall(i)(WWW-1,0).asUInt, \"b0\".U(1.W)), 0.U)")
     
   }
 

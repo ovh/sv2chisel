@@ -59,46 +59,46 @@ class ComplexParamSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("import chisel3._")
-    result should contains ("import sv2chisel.helpers.vecconvert._")
+    result should contain ("import chisel3._")
+    result should contain ("import sv2chisel.helpers.vecconvert._")
     
-    result should contains ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends MultiIOModule {")
 
-    result should contains ("val IT_DOWN: Seq[Int] = Seq(IT_RIGHT, IT_LEFT)")
-    result should contains ("val IT_UP: Seq[Int] = Seq(IT_LEFT, IT_RIGHT)")
+    result should contain ("val IT_DOWN: Seq[Int] = Seq(IT_RIGHT, IT_LEFT)")
+    result should contain ("val IT_UP: Seq[Int] = Seq(IT_LEFT, IT_RIGHT)")
     
-    result should contains ("val count = RegInit(Vec(DBLW, SInt(65.W)), (0.U).asTypeOf(Vec(DBLW, SInt(65.W))))")
+    result should contain ("val count = RegInit(Vec(DBLW, SInt(65.W)), (0.U).asTypeOf(Vec(DBLW, SInt(65.W))))")
     // IDEAL: 
-    // result should contains ("val count = RegInit(VecInit.tabulate(DBLW)(_ => 0.S(65.W))")
+    // result should contain ("val count = RegInit(VecInit.tabulate(DBLW)(_ => 0.S(65.W))")
     
-    result should contains ("val stats_count = RegInit(Vec(DBLW, UInt(64.W)), (0.U).asTypeOf(Vec(DBLW, UInt(64.W))))")
-    result should contains ("val count_live = Wire(Vec(DBLW, SInt(65.W)))")
-    result should contains ("val stats_total = WireDefault(Vec(DBLW, UInt(64.W)), (0.U).asTypeOf(Vec(DBLW, UInt(64.W))))")
+    result should contain ("val stats_count = RegInit(Vec(DBLW, UInt(64.W)), (0.U).asTypeOf(Vec(DBLW, UInt(64.W))))")
+    result should contain ("val count_live = Wire(Vec(DBLW, SInt(65.W)))")
+    result should contain ("val stats_total = WireDefault(Vec(DBLW, UInt(64.W)), (0.U).asTypeOf(Vec(DBLW, UInt(64.W))))")
     
-    result should contains ("val en = RegInit(Vec(DBLW, Bool()), (0.U).asTypeOf(Vec(DBLW, Bool())))")
-    result should contains ("val cnt = RegInit(Vec(DBLW, UInt(65.W)), (0.U).asTypeOf(Vec(DBLW, UInt(65.W))))")
+    result should contain ("val en = RegInit(Vec(DBLW, Bool()), (0.U).asTypeOf(Vec(DBLW, Bool())))")
+    result should contain ("val cnt = RegInit(Vec(DBLW, UInt(65.W)), (0.U).asTypeOf(Vec(DBLW, UInt(65.W))))")
     
     // TO DO:
-    // result should contains ("val en = RegInit(VecInit(Seq.fill(DBLW)(false.B)))")
+    // result should contain ("val en = RegInit(VecInit(Seq.fill(DBLW)(false.B)))")
     // OR (a few more characters but less functions and more extendable)
     // a bit more obscur however
-    // result should contains ("val en = RegInit(VecInit.tabulate(DBLW)(_ => false.B))")
+    // result should contain ("val en = RegInit(VecInit.tabulate(DBLW)(_ => false.B))")
     
-    result should contains ("val cnter = RegInit(Vec(DBLW, UInt(65.W)), ((1.U<<DBLW*65)-1.U).asTypeOf(Vec(DBLW, UInt(65.W))))")
+    result should contain ("val cnter = RegInit(Vec(DBLW, UInt(65.W)), ((1.U<<DBLW*65)-1.U).asTypeOf(Vec(DBLW, UInt(65.W))))")
     // to do 
-    // result should contains ("val cnter = RegInit(VecInit.tabulate(DBLW)(_ => ((1.U<<65)-1.U))")
+    // result should contain ("val cnter = RegInit(VecInit.tabulate(DBLW)(_ => ((1.U<<65)-1.U))")
     
     
-    result should contains ("for(i <- 0 until DBLW){")
-    result should contains ("when(count_live(i).asUInt > IT_DOWN(i).U) {")
+    result should contain ("for(i <- 0 until DBLW){")
+    result should contain ("when(count_live(i).asUInt > IT_DOWN(i).U) {")
     // warning : SInt should have priority over UInt - See gitlab issue #11
-    // result should contains ("when(count_live(i) > IT_DOWN(i).S) {")
-    result should contains ("count(i) := IT_DOWN(i).S(65.W)")
-    result should contains ("stats_count(i) := stats_count(i)+1.U")
-    result should contains ("stats_total(i) := count(i).asTypeOf(UInt(64.W))")
+    // result should contain ("when(count_live(i) > IT_DOWN(i).S) {")
+    result should contain ("count(i) := IT_DOWN(i).S(65.W)")
+    result should contain ("stats_count(i) := stats_count(i)+1.U")
+    result should contain ("stats_total(i) := count(i).asTypeOf(UInt(64.W))")
     
-    result should contains ("b_addr(DBLW-1,0) := a_addr")
-    result should contains ("b_weird(DBLW-1,0) := VecInit.tabulate(DBLW)(_ => a_addr(0)(WWW-1))")
+    result should contain ("b_addr(DBLW-1,0) := a_addr")
+    result should contain ("b_weird(DBLW-1,0) := VecInit.tabulate(DBLW)(_ => a_addr(0)(WWW-1))")
 
     
   }
@@ -119,15 +119,15 @@ class ComplexParamSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("import chisel3._")
+    result should contain ("import chisel3._")
     
-    result should contains ("val STR = \"string\"")
+    result should contain ("val STR = \"string\"")
     // NB: reverse is expected to preserve the indexes TABLE_STR[0] = "bidule"
-    result should contains ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
+    result should contain ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
     
-    result should contains ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
-    result should contains ("val en: Vec[Bool] = (0.U).asTypeOf(Vec(DBLW, Bool()))")
-    result should contains ("val cnt: Vec[UInt] = (0.U).asTypeOf(Vec(DBLW, UInt(65.W)))")
+    result should contain ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
+    result should contain ("val en: Vec[Bool] = (0.U).asTypeOf(Vec(DBLW, Bool()))")
+    result should contain ("val cnt: Vec[UInt] = (0.U).asTypeOf(Vec(DBLW, UInt(65.W)))")
   }
   
   it should "support complex tables in package" in {
@@ -143,15 +143,15 @@ class ComplexParamSpec extends Sv2ChiselSpec {
       """.stripMargin
     ))
     debug(result)
-    result should contains ("import chisel3._")
+    result should contain ("import chisel3._")
     
-    result should contains ("val STR = \"string\"")
+    result should contain ("val STR = \"string\"")
     // NB: reverse is expected to preserve the indexes TABLE_STR[0] = "bidule"
-    result should contains ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
+    result should contain ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
     
-    result should contains ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
-    result should contains ("val en: Vec[Bool] = (0.U).asTypeOf(Vec(DBLW, Bool()))")
+    result should contain ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
+    result should contain ("val en: Vec[Bool] = (0.U).asTypeOf(Vec(DBLW, Bool()))")
     // no InferUInt in package params
-    result should contains ("val cnt: Vec[Vec[Bool]] = (0.U).asTypeOf(Vec(DBLW, Vec(65, Bool())))")
+    result should contain ("val cnt: Vec[Vec[Bool]] = (0.U).asTypeOf(Vec(DBLW, Vec(65, Bool())))")
   }
 }

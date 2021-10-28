@@ -24,7 +24,7 @@ class FunctionSpec extends Sv2ChiselSpec {
         """.stripMargin
       ))
       
-    result should contains (  "def simple_function(in:Bool): Bool = {",
+    result should contain (  "def simple_function(in:Bool): Bool = {",
                                 "in",
                               "}")
 
@@ -39,7 +39,7 @@ class FunctionSpec extends Sv2ChiselSpec {
         """.stripMargin
       ))
 
-    result should contains (  "def simple_function(in:Bool): Bool = {",
+    result should contain (  "def simple_function(in:Bool): Bool = {",
                                 "in",
                               "}")
 
@@ -54,7 +54,7 @@ class FunctionSpec extends Sv2ChiselSpec {
         """.stripMargin
       ))
 
-    result should contains (  "def simple_function(in:Bool): Bool = {",
+    result should contain (  "def simple_function(in:Bool): Bool = {",
                                 "in",
                               "}")
 
@@ -72,7 +72,7 @@ class FunctionSpec extends Sv2ChiselSpec {
         """.stripMargin
       ))
       
-    result should contains (  "def sum(a:UInt, b:UInt): UInt = {",
+    result should contain (  "def sum(a:UInt, b:UInt): UInt = {",
                                 "a+b",
                               "}")
 

@@ -26,24 +26,25 @@ class ComplexRangeSpec extends Sv2ChiselSpec {
       |assign b_res = b_vect[ 0 +: 8]; // == b_vect[0 : 7]
       |assign b_res = b_vect[15 -: 8]; // == b_vect[8 :15]
       |
-      |assign d_res = dword[8*sel +: 8]; // variable part-select with fixed width
+      |// variable part-select with fixed width
+      |assign d_res = dword[8*sel +: 8]; 
       |
       """.stripMargin
     )
     debug(result)
-    result should contains ("class Test() extends MultiIOModule {")
-    result should contains ("val a_vect = Wire(Vec(32, Bool()))")
-    result should contains ("val b_vect = Wire(Vec(32, Bool()))")
-    result should contains ("val a_res = Wire(UInt(8.W))")
-    result should contains ("val b_res = Wire(UInt(8.W))")
-    result should contains ("val dword = Wire(Vec(64, Bool()))")
-    result should contains ("val d_res = Wire(UInt(8.W))")
-    result should contains ("val sel = Wire(UInt(64.W))")
-    result should contains ("a_res := a_vect(7,0).asUInt // == a_vect[ 7 : 0]")
-    result should contains ("a_res := a_vect(15,8).asTypeOf(UInt(8.W)) // == a_vect[15 : 8]")
-    result should contains ("b_res := b_vect(7,0).asUInt // == b_vect[0 : 7]")
-    result should contains ("b_res := b_vect(15,8).asTypeOf(UInt(8.W)) // == b_vect[8 :15]")
-    result should contains ("d_res := dword(8.U*sel+7.U,8.U*sel).asTypeOf(UInt(8.W))")
+    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("val a_vect = Wire(Vec(32, Bool()))")
+    result should contain ("val b_vect = Wire(Vec(32, Bool()))")
+    result should contain ("val a_res = Wire(UInt(8.W))")
+    result should contain ("val b_res = Wire(UInt(8.W))")
+    result should contain ("val dword = Wire(Vec(64, Bool()))")
+    result should contain ("val d_res = Wire(UInt(8.W))")
+    result should contain ("val sel = Wire(UInt(64.W))")
+    result should contain ("a_res := a_vect(7,0).asUInt // == a_vect[ 7 : 0]")
+    result should contain ("a_res := a_vect(15,8).asTypeOf(UInt(8.W)) // == a_vect[15 : 8]")
+    result should contain ("b_res := b_vect(7,0).asUInt // == b_vect[0 : 7]")
+    result should contain ("b_res := b_vect(15,8).asTypeOf(UInt(8.W)) // == b_vect[8 :15]")
+    result should contain ("d_res := dword(8.U*sel+7.U,8.U*sel).asTypeOf(UInt(8.W))")
     
   }
 

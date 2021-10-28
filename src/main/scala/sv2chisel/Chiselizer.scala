@@ -152,7 +152,7 @@ case class ChiselTxt(
   def decr(n: Int = 1): ChiselTxt = {
     this.copy(indentLevel = indentLevel - n)
   }
-  override def toString: String = {
+  def serialize: String = {
     "  "*indentLevel + txt.replace("\n",  "\n" + "  "*indentLevel)
   }
 }
@@ -166,8 +166,8 @@ object ChiselTxt {
   def apply(txt: String): ChiselTxt = {
     new ChiselTxt(UndefinedInterval, 0, false, txt)
   }
-  def apply(tokens: Interval, txt: String): ChiselTxt = {
-    new ChiselTxt(tokens, 0, false, txt)
+  def apply(tokens: Interval, ctx: ChiselEmissionContext, txt: String): ChiselTxt = {
+    new ChiselTxt(tokens, ctx.indentLevel, false, txt)
   }
 }
 object ChiselTxtS {
@@ -189,11 +189,20 @@ object ChiselLine {
   def apply(n: SVNode, ctx: ChiselEmissionContext, txt: String): ChiselTxt = {
     new ChiselTxt(n.tokens, ctx.indentLevel, true, txt)
   }
+  def apply(i: Interval, ctx: ChiselEmissionContext, txt: String): ChiselTxt = {
+    new ChiselTxt(i, ctx.indentLevel, true, txt)
+  }
   def apply(ctx: ChiselEmissionContext, txt: String): ChiselTxt = {
     new ChiselTxt(UndefinedInterval, ctx.indentLevel, true, txt)
   }
   def apply(txt: String): ChiselTxt = {
     new ChiselTxt(UndefinedInterval, 0, true, txt)
+  }
+}
+
+object ChiselClosingLine {
+  def apply(n: SVNode, ctx: ChiselEmissionContext, txt: String): ChiselTxt = {
+    new ChiselTxt(new Interval(n.tokens.b, n.tokens.b), ctx.indentLevel, true, txt)
   }
 }
 
@@ -251,7 +260,7 @@ class ChiselDefPackage(val p: DefPackage) extends Chiselized {
     val s = ArrayBuffer[ChiselTxt]()
     s += ChiselLine(p, ctx, s"package object ${p.name} {")
     s ++= p.body.chiselize(ctx.incr())
-    s += ChiselLine(ctx, "}")
+    s += ChiselClosingLine(p, ctx, "}")
   }
 }
 
@@ -289,7 +298,7 @@ class ChiselModule(val m: Module) extends Chiselized {
       s += ChiselTxt(mCtxt, s") extends $kind {")
     }
     s ++= mod.body.chiselize(mCtxt)
-    s += ChiselLine(ctx, "}")
+    s += ChiselClosingLine(m, ctx, "}")
   }
 }
 
@@ -331,7 +340,7 @@ class ChiselDefFunction(val f: DefFunction) extends Chiselized {
     }
     s += ChiselTxt(mCtxt, s" {")
     s ++= removeImplicitReturn(f.mapPort(_ => EmptyStmt).body).chiselize(mCtxt)
-    s += ChiselLine(ctx, "}")
+    s += ChiselClosingLine(f, ctx, "}")
   }
 }
 
@@ -446,7 +455,7 @@ class ChiselType(val t: Type) extends Chiselized {
       case b: BundleType =>
         Seq(ChiselTxt(t, ctx, s"new Bundle { ")) ++
           b.fields.map(_.chiselize(iCtxt)).flatten ++
-          Seq(ChiselLine(ctx, "}"))
+          Seq(ChiselClosingLine(b, ctx, "}"))
 
       case u: UnknownType => 
         unsupportedChisel(ctx,u, "non-usable UnknownType")
@@ -478,6 +487,10 @@ class ChiselType(val t: Type) extends Chiselized {
         u.tpe match {
           case _: BundleType if(scalaTypeOnly) => ChiselTxtS(u.tokens, u.serialize)
           case _: BundleType => ChiselTxtS(u.tokens, "new " + u.serialize)
+          case _: EnumType if(scalaTypeOnly) => 
+            rwarn(ctx,t, s"cannot use Enum `${u.serialize}` as scala type (simple object convienience on top of underlying UInt implementation)")
+            ChiselTxtS(u.tokens, "UInt")
+          case _: EnumType => ChiselTxtS(u.tokens, u.serialize + "()") // apply object
           case _ => ChiselTxtS(u.tokens, u.serialize)
         }
         
@@ -579,25 +592,25 @@ class ChiselDefType(val t: DefType) extends Chiselized {
       case b: BundleType => 
         Seq(ChiselLine(t, ctx, s"class ${t.name} extends Bundle {")) ++
           b.fields.flatMap(_.chiselize(ctx.hw().incr())) ++
-          Seq(ChiselLine(ctx, "} "))
+          Seq(ChiselClosingLine(t, ctx, "} "))
           
       case e: EnumType if(e.isGeneric) => 
         addHwEnumDep()
         Seq(ChiselLine(t, ctx, s"object ${t.name} extends GenericHwEnum {")) ++
           e.fields.flatMap(_.chiselize(ctx.hw().incr())) ++
-          Seq(ChiselLine(ctx, "} "))
+          Seq(ChiselClosingLine(t, ctx, "} "))
           
       case e: EnumType => 
         addHwEnumDep()
         Seq(ChiselLine(t, ctx, s"object ${t.name} extends CustomHwEnum {")) ++
           e.fields.flatMap(_.chiselize(ctx.hw().incr(), forceValues = true)) ++
-          Seq(ChiselLine(ctx, "} "))
+          Seq(ChiselClosingLine(t, ctx, "} "))
       
       case tpe => // assuming alias case
         Seq(ChiselLine(t, ctx, s"object ${t.name} {"),
           ChiselLine(ctx.incr(), s"def apply() = ")) ++
           tpe.chiselize(ctx.hw()) ++
-          Seq(ChiselLine(ctx, "} "))
+          Seq(ChiselClosingLine(t, ctx, "} "))
     }
   }
 }
@@ -843,7 +856,7 @@ class ChiselSeqValues(e: SeqValues){
     (ctx.isHardware, e.kind) match {
       case (true, HwExpressionKind) => 
         val values = e.tpe match {
-          case v: VecType if(v.downto) => e.values.reverse
+          case v: VecType if(v.downto) => e.values.reverse.map(va => Utils.cleanTok(va)) 
           case _: VecType => e.values
           case _ => rcritical(ctx, e, s"unexpected type for SeqValues ${e.serialize}") ; e.values
         }
@@ -853,12 +866,12 @@ class ChiselSeqValues(e: SeqValues){
         } else {
           ChiselTxtS(e, ctx, "VecInit(") ++
             values.map(_.chiselize(ctx) ++ ChiselTxtS(", ")).flatten.dropRight(1) ++
-            ChiselTxtS(")")
+            ChiselTxtS(new Interval(e.tokens.b, e.tokens.b), ")")
         }
       
       case (false, SwExpressionKind) => 
         val values = e.tpe match {
-          case v: VecType if(v.downto) => e.values.reverse
+          case v: VecType if(v.downto) => e.values.reverse.map(va => Utils.cleanTok(va)) 
           case _: VecType => e.values
           case _ => rcritical(ctx, e, s"unexpected type for SeqValues ${e.serialize}") ; e.values
         }
@@ -868,7 +881,7 @@ class ChiselSeqValues(e: SeqValues){
         } else {
           ChiselTxtS(e, ctx, "Seq(") ++
             values.map(_.chiselize(ctx) ++ ChiselTxtS(", ")).flatten.dropRight(1) ++
-            ChiselTxtS(")")
+            ChiselTxtS(new Interval(e.tokens.b, e.tokens.b), ")")
         }
         
       case (b, _) => unsupportedChisel(ctx, e, s"Unexpected SeqValues of kind ${e.kind} in ${if(b) "hardware" else "software"} context")
@@ -1259,12 +1272,12 @@ class ChiselIfGen(val i: IfGen) extends Chiselized {
         case inner: IfGen => // flatten "else { if () {} [else {}]}"
           Seq(ChiselLine(inner, ctx, "} else if(")) ++
             inner.pred.chiselize(ctx) ++
-            Seq(ChiselTxt(inner, ctx, ") {")) ++
+            Seq(ChiselTxt(new Interval(inner.pred.tokens.b, inner.pred.tokens.b), ctx, ") {")) ++
             inner.conseq.chiselize(iCtxt) ++
             getAlt(inner.alt)
           
         case s: Statement =>
-          Seq(ChiselLine(ctx, "} else {")) ++
+          Seq(ChiselLine(new Interval(s.tokens.a -2 , s.tokens.a -2), ctx, "} else {")) ++
             s.chiselize(iCtxt)
       }
     }
@@ -1272,10 +1285,11 @@ class ChiselIfGen(val i: IfGen) extends Chiselized {
     val r = ArrayBuffer[ChiselTxt]()
     r += ChiselLine(i, ctx, "if(")
     r ++= i.pred.chiselize(ctx)
-    r += ChiselTxt(ctx, ") {")
+    r += ChiselTxt(new Interval(i.pred.tokens.b, i.pred.tokens.b), ctx, ") {")
     r ++= i.conseq.chiselize(iCtxt)
     r ++= getAlt(i.alt)
-    r += ChiselLine(i, ctx, "}")
+    r += ChiselClosingLine(i, ctx, "}")
+    // r += ChiselLine(new Interval(i.tokens.b+2, i.tokens.b+2), ctx, "}")
     r
   }
 }
@@ -1292,12 +1306,12 @@ class ChiselConditionally(val i: Conditionally) extends Chiselized {
         case inner: Conditionally => // flatten "else { if () {} [else {}]}"
           Seq(ChiselLine(inner, ctx, "} .elsewhen (")) ++
             inner.pred.chiselize(hCtxt) ++
-            Seq(ChiselTxt(inner, ctx, ") {")) ++
+            Seq(ChiselTxt(new Interval(inner.pred.tokens.b, inner.pred.tokens.b), ctx, ") {")) ++
             inner.conseq.chiselize(iCtxt) ++
             getAlt(inner.alt)
           
         case s: Statement =>
-          Seq(ChiselLine(ctx, "} .otherwise {")) ++
+          Seq(ChiselLine(new Interval(s.tokens.a -2 , s.tokens.a -2), ctx, "} .otherwise {")) ++
             s.chiselize(iCtxt)
       }
     }
@@ -1305,10 +1319,10 @@ class ChiselConditionally(val i: Conditionally) extends Chiselized {
     val r = ArrayBuffer[ChiselTxt]()
     r += ChiselLine(i, ctx, "when(")
     r ++= i.pred.chiselize(hCtxt)
-    r += ChiselTxt(ctx, ") {")
+    r += ChiselTxt(new Interval(i.pred.tokens.b, i.pred.tokens.b), ctx, ") {")
     r ++= i.conseq.chiselize(iCtxt)
     r ++= getAlt(i.alt)
-    r += ChiselLine(i, ctx, "}")
+    r += ChiselClosingLine(i, ctx, "}")
     r
   }
 }
@@ -1390,7 +1404,7 @@ class ChiselForGen(val f: ForGen) extends Chiselized {
     }
     decl ++ Seq(ChiselTxt(ctx, "{")) ++
       f.stmt.chiselize(iCtxt) ++
-      Seq(ChiselLine(ctx, "}"))
+      Seq(ChiselClosingLine(f, ctx, "}"))
   }
 }
 
@@ -1506,10 +1520,11 @@ class ChiselSwitch(val s: Switch) extends Chiselized {
             Seq(ChiselLine(ctx, s"} .elsewhen(")) ++ getExpression(t._1) ++ ChiselTxtS("){") ++
               t._2.chiselize(iCtxt)
           })
+        val lastIV = main.last.tokens.b
         s.default match {
-          case EmptyStmt => main ++ Seq(ChiselLine(ctx, s"}"))
-          case d => main ++ Seq(ChiselLine(ctx, s"} .otherwise { ")) ++ 
-            d.chiselize(iCtxt) ++ Seq(ChiselLine(ctx, s"}"))
+          case EmptyStmt => main ++ Seq(ChiselClosingLine(s, ctx, s"}"))
+          case d => main ++ Seq(ChiselLine(new Interval(lastIV, lastIV), ctx, s"} .otherwise { ")) ++ 
+            d.chiselize(iCtxt) ++ Seq(ChiselClosingLine(s, ctx, s"}"))
         }
     }
   }

@@ -34,16 +34,16 @@ class DefLogicSpecs extends Sv2ChiselSpec {
       |end
       """.stripMargin
     )
-    result should contains ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends MultiIOModule {")
 
-    result should contains ("val WWW = 1")
-    result should contains ("val change = Wire(Bool())")
-    result should contains ("val counter = RegInit(UInt(WW.W), 0.U)")
-    result should contains ("val current = RegInit(UInt(WWW.W), ((1<<WWW)-1).U)")
+    result should contain ("val WWW = 1")
+    result should contain ("val change = Wire(Bool())")
+    result should contain ("val counter = RegInit(UInt(WW.W), 0.U)")
+    result should contain ("val current = RegInit(UInt(WWW.W), ((1<<WWW)-1).U)")
     
     // TO DO 
-    result should contains ("when(current < ((1<<WWW)-1).U) {")
-    result should contains ("current := current+1.U")
+    result should contain ("when(current < ((1<<WWW)-1).U) {")
+    result should contain ("current := current+1.U")
     
   }
 

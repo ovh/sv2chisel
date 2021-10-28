@@ -47,12 +47,12 @@ class InstanceFlowSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contains ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends MultiIOModule {")
     
-    result should contains ("inst.in := inst_in_u3")
-    result should contains ("inst.din := inst_din.asTypeOf(inst.din)") // issue here
-    result should contains ("inst_dout := inst.dout.asTypeOf(inst_dout)")
-    result should contains ("inst_out_u3 := inst.out")
+    result should contain ("inst.in := inst_in_u3")
+    result should contain ("inst.din := inst_din.asTypeOf(inst.din)") // issue here
+    result should contain ("inst_dout := inst.dout.asTypeOf(inst_dout)")
+    result should contain ("inst_out_u3 := inst.out")
 
     // more to add
     

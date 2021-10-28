@@ -23,13 +23,13 @@ class EnumSpec extends Sv2ChiselSpec {
       """.stripMargin
     ))
     debug(result)
-    result should contains ("import chisel3._")
-    result should contains ("import sv2chisel.helpers.enum._")
+    result should contain ("import chisel3._")
+    result should contain ("import sv2chisel.helpers.enum._")
     
-    result should contains ("object state_t extends GenericHwEnum {")
-    result should contains ("val STATE_A = Value")
-    result should contains ("val STATE_B = Value")
-    result should contains ("val STATE_C = Value")
+    result should contain ("object state_t extends GenericHwEnum {")
+    result should contain ("val STATE_A = Value")
+    result should contain ("val STATE_B = Value")
+    result should contain ("val STATE_C = Value")
     
     // compression option to discuss below a given number of characters 
     // object state_t extends GenericHwEnum {
@@ -49,13 +49,13 @@ class EnumSpec extends Sv2ChiselSpec {
       """.stripMargin
     ))
     debug(result)
-    result should contains ("import chisel3._")
-    result should contains ("import sv2chisel.helpers.enum._")
+    result should contain ("import chisel3._")
+    result should contain ("import sv2chisel.helpers.enum._")
     
-    result should contains ("object state_t extends CustomHwEnum {")
-    result should contains ("val STATE_A = Val(0.U(2.W))")
-    result should contains ("val STATE_B = Val(3.U(2.W))")
-    result should contains ("val STATE_C = Val(2.U(2.W))")
+    result should contain ("object state_t extends CustomHwEnum {")
+    result should contain ("val STATE_A = Val(0.U(2.W))")
+    result should contain ("val STATE_B = Val(3.U(2.W))")
+    result should contain ("val STATE_C = Val(2.U(2.W))")
     
   }
   

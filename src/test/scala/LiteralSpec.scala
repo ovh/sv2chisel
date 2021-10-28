@@ -27,19 +27,19 @@ class LiteralSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     
-    result should contains ("import chisel3._")
+    result should contain ("import chisel3._")
     
-    result should contains ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends MultiIOModule {")
 
-    result should contains ("val bool = Wire(Bool())")
-    result should contains ("val iint = RegInit(UInt(5.W), \"b101\".U(5.W))")
-    result should contains ("val dec = WireDefault(UInt(5.W), 101.U(7.W))")
-    result should contains ("val dec2 = WireDefault(UInt(5.W), 101.U)")
-    result should contains ("val hex = WireDefault(UInt(5.W), \"hfff\".U(16.W))")
+    result should contain ("val bool = Wire(Bool())")
+    result should contain ("val iint = RegInit(UInt(5.W), \"b101\".U(5.W))")
+    result should contain ("val dec = WireDefault(UInt(5.W), 101.U(7.W))")
+    result should contain ("val dec2 = WireDefault(UInt(5.W), 101.U)")
+    result should contain ("val hex = WireDefault(UInt(5.W), \"hfff\".U(16.W))")
     
-    result should contains ("bool := true.B")
-    result should contains ("bool := false.B")
-    result should contains ("iint := iint+1.U")
+    result should contain ("bool := true.B")
+    result should contain ("bool := false.B")
+    result should contain ("iint := iint+1.U")
     
   }
 
