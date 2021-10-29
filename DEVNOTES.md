@@ -5,6 +5,11 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
+- add test-case for output reg normalization & fix underlying issue (additional statement gone??) 
+- integrate enum & function support in LegalizeExpression
+
+- add test-case for remote references usage 
+- integrate import package as statement within package/module
 
 - fix disabled cast from SInt to UInt (or double cast ??) => required by elaboration
 - fix systematic .U cast => cause issue with not and minus primops => need case for:

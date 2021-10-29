@@ -23,16 +23,24 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
   // Common functions
   def visitStatement(s: Statement)(implicit refStore: RefStore): Unit = {
     s match {
-      case l: DefLogic => refStore += ((l.name, FullType(l.tpe, HwExpressionKind)))
-      case p: Port => refStore += ((p.name, FullType(p.tpe, HwExpressionKind)))
-      case f: DefFunction => refStore += ((f.name, FullType(f.tpe, HwExpressionKind)))
+      case l: DefLogic => refStore += ((WRef(l.name), FullType(l.tpe, HwExpressionKind)))
+      case p: Port => refStore += ((WRef(p.name), FullType(p.tpe, HwExpressionKind)))
+      case f: DefFunction => refStore += ((WRef(f.name), FullType(f.tpe, HwExpressionKind)))
       case p: DefParam => 
         trace(p, s"${p.name}: ${p.kind} ${p.tpe.serialize}")
-        refStore += ((p.name, FullType(p.tpe, p.kind)))
-      case t: DefType => refStore += ((t.name, FullType(t.tpe, UnknownExpressionKind, true)))
+        refStore += ((WRef(p.name), FullType(p.tpe, p.kind)))
+      case t: DefType => 
+        refStore += ((WRef(t.name), FullType(t.tpe, UnknownExpressionKind, true)))
+        t.tpe match {
+          case e: EnumType => e.fields.foreach(f => {
+            refStore += ((WRef(f.name), FullType(e.tpe, e.kind))) // weird but seems standard to flatten
+            refStore += ((WRef(f.name, Seq(t.name)), FullType(e.tpe, e.kind))) // not sure if used in this way ?
+          })
+          case _ =>  
+        }
       case f: ForGen =>
         f.init match {
-          case na: NamedAssign => refStore += ((na.name, FullType(IntType(na.tokens, NumberDecimal), SwExpressionKind)))
+          case na: NamedAssign => refStore += ((WRef(na.name), FullType(IntType(na.tokens, NumberDecimal), SwExpressionKind)))
           case _ => 
         }
       case _ => 
@@ -46,14 +54,14 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     trace(e, s"Continuing processExpression for ${e.getClass.getName}: ${e.serialize} - ${e.tpe.serialize}")
     proc.mapType(processType) match {
       case r: Reference => 
-        if(refStore.contains(r.name)){
-          val tpe = refStore(r.name).tpe.mapInterval(_ => r.tokens)
-          refStore(r.name).tpeRef match {
+        if(refStore.contains(r)){
+          val tpe = refStore(r).tpe.mapInterval(_ => r.tokens)
+          refStore(r).tpeRef match {
             case true => TypeInst(r.tokens, tpe, Some(r.name), HwExpressionKind, UnknownFlow)
-            case false => r.copy(tpe = processType(tpe), kind = refStore(r.name).kind)
+            case false => r.copy(tpe = processType(tpe), kind = refStore(r).kind)
           }          
         } else {
-          warn(r, s"Undeclared reference ${r.name}")
+          warn(r, s"Undeclared reference ${r.serialize}")
           r
         }
       case s: SubField =>
@@ -86,11 +94,11 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     trace(t, s"Entering processType for ${t.getClass.getName}: ${t.serialize}")
     t.mapType(processType).mapWidth(_.mapExpr(processExpression)) match {
       case u: UserRefType =>  
-        if(!refStore.contains(u.name)){
-          critical(u, s"Undeclared type ${u.name}")
+        if(!refStore.contains(u)){
+          critical(u, s"Undeclared type ${u.serialize}")
           u
         } else {
-          val tpe = refStore(u.name).tpe.mapInterval(_ => u.tokens)
+          val tpe = refStore(u).tpe.mapInterval(_ => u.tokens)
           u.copy(tpe = processType(tpe)) // could be optimized with some cache system ?
         }
       case tpe => tpe
@@ -163,15 +171,15 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     //FIRST PASS => fill ref2Type    
     m.foreachStmt(visitStatement)
     m.clock match {
-      case Some(c) => ref2Type += ((c, FullType(BoolType(UndefinedInterval), HwExpressionKind)))
+      case Some(c) => ref2Type += ((WRef(c), FullType(BoolType(UndefinedInterval), HwExpressionKind)))
       case _ => 
     }
     m.reset match {
-      case Some(r) => ref2Type += ((r, FullType(BoolType(UndefinedInterval), HwExpressionKind)))
+      case Some(r) => ref2Type += ((WRef(r), FullType(BoolType(UndefinedInterval), HwExpressionKind)))
       case _ => 
     }
     
-    m.foreachParam(p => ref2Type += ((p.name, FullType(p.tpe, p.kind))))
+    m.foreachParam(p => ref2Type += ((WRef(p.name), FullType(p.tpe, p.kind))))
     
     // SECOND PASS => use ref2Type to fill reference type
     m.copy(body = processStatement(m.body))

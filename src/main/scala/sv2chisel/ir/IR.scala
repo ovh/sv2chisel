@@ -1981,13 +1981,20 @@ case class DefParam(
 }
 
 case class FullType(tpe: Type, kind: ExpressionKind, tpeRef: Boolean = false)
+case class WRef(
+  name: String, 
+  path: Seq[String] = Seq()
+){
+  def in(prepend: String): WRef = this.copy(path = prepend +: path)
+  def serialize: String = (path :+ name).mkString(".")
+}
 
 case class DefPackage(
   tokens: Interval,
   attributes : VerilogAttributes,
   name : String,
   body : Statement,
-  refs: Option[HashMap[String, FullType]] = None
+  refs: Option[HashMap[WRef, FullType]] = None
 ) extends Description with IsDeclaration {
   type T = DefPackage
   def serialize: String = s"package $name:" + indent("\n" + body.serialize)

@@ -60,7 +60,7 @@ class PropagateClocks(val llOption: Option[logger.LogLevel.Value] = None) extend
           
         case None => 
           // not sure that the warning is necessary
-          warn(i, s"Module ${i.module} referenced by instance ${i.name} cannot be found in current design. Clock & Reset management might be inaccurate.")
+          warn(i, s"Module ${i.module.serialize} referenced by instance ${i.name} cannot be found in current design. Clock & Reset management might be inaccurate.")
           i 
       }
     }

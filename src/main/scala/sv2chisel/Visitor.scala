@@ -1337,11 +1337,9 @@ class Visitor(
   private def visitTypeRes(ctx: Net_or_var_data_typeContext, isHw: Boolean) : (Type, LogicResolution) = {
     ctx match {
       case null => (BoolType(UndefinedInterval), LogicUnresolved)
-      case c => unsupported.check(ctx)
+      case c => unsupported.check(ctx) // allow only wire (underlying check net_type)
         c.data_type_or_implicit match {
-          case null => 
-            unsupported.raiseIt(ctx, s"To investigate? weird Net_or_var_data_typeContext: `${getRawText(ctx)}`")
-            (BoolType(UndefinedInterval), LogicUnresolved)
+          case null => (BoolType(UndefinedInterval), LogicWire)
           case cdi => visitData_type_or_implicit(cdi, isHw)
         }
     }

@@ -21,67 +21,66 @@ class CheckScopes(val llOption: Option[logger.LogLevel.Value] = None) extends De
   
   // Common functions
   
-  def processExpression(e: Expression)(implicit refStore: RefStore): Expression = {
-    e.mapExpr(processExpression).mapType(processType) match {
-      case r: Reference => 
-        if(!refStore.contains(r.name)){
-          critical(r, s"Undeclared reference ${r.name} in current scope, scala will not compile")
-        }
-        r
-      case exp: Expression => exp
+  def visitExpression(e: Expression)(implicit refStore: RefStore): Unit = {
+    e.foreachExpr(visitExpression)
+    e.foreachType(visitType)
+    e match {
+      case r: Reference if(!refStore.contains(r)) => 
+          critical(r, s"Undeclared reference ${r.serialize} at current point, scala will not compile")
+      case _ =>
     }
   }
   
-  def processType(t: Type)(implicit refStore: RefStore): Type = {
-    t.mapType(processType).mapWidth(_.mapExpr(processExpression)) match {
-      case u: UserRefType =>  
-        if(!refStore.contains(u.name)){
-          critical(u, s"Undeclared type ${u.name} in current scope, scala will not compile")
-        }
-        u
-      case tpe => tpe
+  def visitType(t: Type)(implicit refStore: RefStore): Unit = {
+    t.foreachType(visitType)
+    t.foreachWidth(_.foreachExpr(visitExpression))
+    t match {
+      case u: UserRefType if(!refStore.contains(u)) =>  
+          critical(u, s"Undeclared type ${u.serialize} in current scope, scala will not compile")
+      case _ => 
     }
   }
   
-  def processStatement(s: Statement, refStore: RefStore): Statement = {
+  def visitStatement(s: Statement, refStore: RefStore): Unit = {
     // record
     implicit val current = refStore
     s match {
-      case l: DefLogic => 
-        refStore += ((l.name, FullType(l.tpe, HwExpressionKind)))
-        l.mapExpr(processExpression).mapType(processType)
-        
-      case p: DefParam => 
-        refStore += ((p.name, FullType(p.tpe, p.kind)))
-        p.mapExpr(processExpression).mapType(processType)
-        
-      case t: DefType => 
-        refStore += ((t.name, FullType(t.tpe, HwExpressionKind)))
-        t.mapExpr(processExpression).mapType(processType)
-        
-      case f: DefFunction => 
-        refStore += ((f.name, FullType(f.tpe, HwExpressionKind)))
-        f.mapExpr(processExpression).mapType(processType)
-        
-      case p: Port => 
-        refStore += ((p.name, FullType(p.tpe, HwExpressionKind)))
-        p.mapExpr(processExpression).mapType(processType)
-        
+      // special case For Gen : first named assign declared the variable to be used later on 
       case f: ForGen =>
         f.init match {
-          case na: NamedAssign => refStore += ((na.name, FullType(IntType(na.tokens, NumberDecimal), SwExpressionKind)))
+          case na: NamedAssign => refStore += ((WRef(na.name), FullType(IntType(na.tokens, NumberDecimal), SwExpressionKind)))
           case _ => 
         }
         val localStore = new RefStore()
         localStore ++= refStore
-        f.mapExpr(processExpression).mapType(processType).mapStmt(processStatement(_, localStore))
+        f.foreachExpr(visitExpression)
+        f.foreachType(visitType)
+        f.foreachStmt(visitStatement(_, localStore))
         
-      case i: IfGen =>
-        val localStore = new RefStore()
-        localStore ++= refStore
-        i.mapExpr(processExpression).mapType(processType).mapStmt(processStatement(_, localStore))
-        
-      case stmt => stmt.mapExpr(processExpression).mapType(processType).mapStmt(processStatement(_, refStore))
+      case _ => 
+        // nb: no recursivity is allowed in verilog so it makes sense to do the check before
+        s.foreachExpr(visitExpression)
+        s.foreachType(visitType)
+        s match {
+          case l: DefLogic => refStore += ((WRef(l.name), FullType(l.tpe, HwExpressionKind)))  
+          case p: DefParam => refStore += ((WRef(p.name), FullType(p.tpe, p.kind)))  
+          case t: DefType => 
+            refStore += ((WRef(t.name), FullType(t.tpe, HwExpressionKind))) 
+            t.tpe match {
+              case e: EnumType => e.fields.foreach(f => {
+                refStore += ((WRef(f.name), FullType(e.tpe, e.kind))) // weird but seems standard to flatten
+                refStore += ((WRef(f.name, Seq(t.name)), FullType(e.tpe, e.kind))) // not sure if used in this way ?
+              })
+              case _ =>  
+            } 
+          case f: DefFunction => refStore += ((WRef(f.name), FullType(f.tpe, HwExpressionKind)))  
+          case p: Port => refStore += ((WRef(p.name), FullType(p.tpe, HwExpressionKind)))
+          case i: IfGen =>
+            val localStore = new RefStore()
+            localStore ++= refStore
+            i.foreachStmt(visitStatement(_, localStore))
+          case _ => s.foreachStmt(visitStatement(_, refStore))
+        }
     }
   }
   
@@ -92,7 +91,8 @@ class CheckScopes(val llOption: Option[logger.LogLevel.Value] = None) extends De
     val refs = new RefStore() 
     refs ++= remoteRefs
     // propagate to local refs & record them
-    p.copy(refs = Some(refs), body = processStatement(p.body, refs))
+    visitStatement(p.body, refs)
+    p // update of refs is done by check before use
   }
   
   /**
@@ -102,8 +102,9 @@ class CheckScopes(val llOption: Option[logger.LogLevel.Value] = None) extends De
     val ref2Type = new RefStore() 
     ref2Type ++= remoteRefs
     
-    m.foreachParam(p => ref2Type += ((p.name, FullType(p.tpe, SwExpressionKind))))
-    m.copy(body = processStatement(m.body, ref2Type))
+    m.foreachParam(p => ref2Type += ((WRef(p.name), FullType(p.tpe, SwExpressionKind))))
+    visitStatement(m.body, ref2Type)
+    m
     
   }
 }
