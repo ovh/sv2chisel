@@ -18,16 +18,22 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
   
   val seenModules = new HashMap[String, DefModule]()
   
-  def processModule(m: DefModule): DefModule = {
-    if (seenModules.contains(m.name)) {
-      debug(m, s"Ignoring multiple processing for module ${m.name}")
-      seenModules(m.name)
-    } else {
-      processModuleCore(m)
+  def processModule(mod: DefModule): DefModule = {
+    mod match {
+      case m: Module =>       
+        if (seenModules.contains(m.name)) {
+          debug(m, s"Ignoring multiple processing for module ${m.name}")
+          seenModules(m.name)
+        } else {
+          processModuleCore(m)
+        }
+      case _ =>
+        debug(mod, s"Ignoring non-module ${mod.name} for logic inference")
+        mod
     }
   }
   
-  private def processModuleCore(m: DefModule): DefModule = {
+  private def processModuleCore(m: Module): DefModule = {
     val reg2clocks = new HashMap[String, Option[String]]()
     val reg2critical = new HashSet[String]()
     val clocksUsageCounts = new HashMap[String, Int]()
@@ -96,11 +102,11 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
     
     def visitClockRegion(c: ClockRegion): Block = {
       if(!c.posedge) 
-        Utils.throwInternalError("Only posedge supported for emission")
+        critical(c,"Only posedge supported for emission (ignored, the resulting chisel won't work)")
         
       activeClock = c.clock match {
         case r: Reference => Some(r.name)
-        case c => Utils.throwInternalError(s"Weird clock dude! ${c.serialize}") 
+        case c => critical(c,s"Weird clock dude! ${c.serialize} (ignored, the resulting chisel won't work)") ; None
       }
       // Mapping Statements
       val reg = c.mapStmt(visitStatement)
@@ -156,15 +162,20 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
     }
 
     // module used for second pass
-    val moduleNext = m.mapStmt(visitStatement).asInstanceOf[Module]
+    val moduleNext = m.mapStmt(visitStatement) match {
+      case m: Module => m
+      case x =>
+        critical(m, "Unexpected non-module, attempting runtime cast (will probably crash)")
+        x.asInstanceOf[Module]
+    }
     
     // SECOND PASS => use reg2clocks to fix registers definitions
     val rectifiedOutputRegStmt = ArrayBuffer[Statement]()
     val renameMap = new RenameMap()
     
-    val (clock, module) = clocksUsageCounts.keys.toSeq match {
+    val module = clocksUsageCounts.keys.toSeq match {
       // to do add parameter to allow clock rename or not (no rename => rawmodule + withClock)
-      case Seq() => (Some("clock"), moduleNext)
+      case Seq() => moduleNext.copy(clock = Some("clock"))
       case Seq(e) => 
         renameMap.add(Rename(e, "clock", true)) // very important for submodules (and consistency)
         val m = moduleNext.mapPort(p => {
@@ -174,10 +185,10 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
             p
           }
         })
-        (Some("clock"), m)
+        m.copy(clock = Some("clock"))
       case _ => 
         critical(moduleNext, "Multi-clock currently unsupported")
-        (None, moduleNext) // not supported at emission for now
+        moduleNext.copy(clock = None) // not supported at emission for now
     }
     
     
@@ -282,18 +293,21 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
       }
     }
     
-    // Note statement must be placed right after IOs because in scala 
-    val comment = Seq(Comment(UndefinedInterval,s"NOTE: The following statements are auto generated based on existing output reg of the original verilog source"))
+    // Note statement must be placed right after IOs because in scala vals cannot be used before declaration
+    lazy val comment = Seq(Comment(UndefinedInterval,s"NOTE: The following statements are auto generated based on existing output reg of the original verilog source"))
     
-    val body = (module.body, rectifiedOutputRegStmt.size) match {
-      case (b, 0) => b.mapStmt(processStatement)
-      case (b: Block, _) =>  
-        b.mapStmt(processStatement).prependStmts(comment ++ rectifiedOutputRegStmt)
-      case (s: Statement, _) => SimpleBlock(s.tokens, comment ++ rectifiedOutputRegStmt ++ Seq(processStatement(s)))
+    // NB: must be done before the match on rectifiedOutputRegStmt (mutable, modified by processStatement)
+    val processed = module.mapStmt(processStatement) 
+    
+    val updatedModule = (processed, rectifiedOutputRegStmt.size) match {
+      case (b, 0) => b
+      case (m: Module, _) => m.insertAfterPorts(SimpleBlock(UndefinedInterval, comment ++ rectifiedOutputRegStmt))
+      case _ => 
+        critical(processed, "Unexpected non-module: ignoring output register normalization")
+        processed
     }
-    
     currentProject.get.clearDescriptionCache() // clock & reset have been modified
-    val res = renameReferences(module.copy(body = body, clock = clock), renameMap)
+    val res = renameReferences(updatedModule, renameMap)
     seenModules += ((m.name, res))
     res
   }

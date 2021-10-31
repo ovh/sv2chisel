@@ -2031,6 +2031,17 @@ trait FetchPort {
       case st => st.mapStmt(s => mapPortStatement(s, f))
     }
   }
+  
+  protected def insertAfterPortsInner(toInsert: Statement): Statement = mapPortStatement(body, p => {
+    if(p.name == ports.last.name){
+      toInsert match {
+        case b: Block => b.prependStmts(Seq(p))
+        case s => SimpleBlock(p.tokens, Seq(p, s))
+      }
+    } else {
+      p
+    }
+  })
 }
 
 /** Base class for modules */
@@ -2072,6 +2083,7 @@ case class Module(
   def serialize: String = serializeHeader("module") + indent("\n" + body.serialize)
 
   def mapPort(f: Port => Statement): T = this.copy(body = mapPortStatement(body, f))
+  def insertAfterPorts(toInsert: Statement): T = this.copy(body = insertAfterPortsInner(toInsert))
   
   def mapParam(f: DefParam => DefParam): T = this.copy(params = params map f)
   def mapStmt(f: Statement => Statement): T = this.copy(body = f(body))

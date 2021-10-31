@@ -293,7 +293,7 @@ class ChiselModule(val m: Module) extends Chiselized {
     s += ChiselLine(m, ctx, s"class ${m.name}(")
     if(mod.params.size > 0) {
       s ++= mod.params.map(_.chiselize(pCtxt, forceType=true) ++ comma).flatten.dropRight(1)
-      s += ChiselLine(mCtxt, s") extends $kind {")
+      s += ChiselClosingLine(mod.params.last, mCtxt, s") extends $kind {")
     } else {
       s += ChiselTxt(mCtxt, s") extends $kind {")
     }

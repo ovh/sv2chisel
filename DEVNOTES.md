@@ -5,7 +5,6 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- add test-case for output reg normalization & fix underlying issue (additional statement gone??) 
 - integrate enum & function support in LegalizeExpression
 
 - add test-case for remote references usage 
