@@ -169,6 +169,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
   type RefStore = HashMap[WRef, FullType]
   
   var currentProject : Option[Project] = None
+  var currentDescription : Option[Description] = None
   var currentSourceFile : Option[SourceFile] = None
   var currentStream : Option[CommonTokenStream] = None
   val importedPackages = new ArrayBuffer[PackageRef]()
@@ -176,19 +177,47 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
   private var refOutdated = true
   private val remoteRefsStore : RefStore = new HashMap[WRef, FullType]()
   
-  def forceRefsRefresh(): Unit = {
+  protected def forceRefsRefresh(): Unit = {
     trace("forceRefresh")
     refOutdated = true
     currentProject.get.clearDescriptionCache()
     remoteRefsStore.clear()
   }
   
-  def remoteRefs: RefStore = {
+  protected def processImportStatement[T <: Statement](s: T, localRefStore: RefStore): T = {
+    s match {
+      case ImportPackages(_,sp) => sp.foreach(p => {
+        trace(s, s"locally imported package: ${p.path}")
+        currentProject.get.findDescription(p.path) match {
+          case Some(d: DefPackage) =>
+            d.refs match {
+              case Some(h) => 
+                // all items
+                if(p.allItems) { 
+                  localRefStore ++= h
+                } else {
+                  if(h.contains(WRef(p.item))){
+                    localRefStore += ((WRef(p.item), h(WRef(p.item))))
+                  } else {
+                    critical(s, s"No reference found for ${p.item} within package ${p.path}")
+                  }
+                }
+              case _ => critical(s, s"No references found for package ${p.path}, did you properly set-ups the package refs before using processImportStatement inside a transform?")
+            }
+          case _ => critical(s, s"Unable to retrieve package declaration for package ref ${p.path}")
+        }
+      })
+      case _ => 
+    }
+    s // return s for easy chaining
+  }
+  
+  protected def remoteRefs: RefStore = {
     if (refOutdated) {
       refOutdated = false
       // in all cases all references with explicit paths should be available
       scopedPackages.foreach(name => {
-        debug(s"scoped package: $name")
+        debug(currentDescription.get, s"scoped package: $name")
         currentProject.get.findDescription(name) match {
           case Some(d: DefPackage) =>
             d.refs match {
@@ -196,9 +225,9 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
                 for ((k, v) <- h) {
                   remoteRefsStore += ((k.in(name), v)) // prepending current package name to get access
                 }
-              case _ => critical(s"No references found for package ${name}, did you properly set-ups the package refs before using remoteRefs inside a transform?")
+              case _ => critical(currentDescription.get, s"No references found for package ${name}, did you properly set-ups the package refs before using remoteRefs inside a transform?")
             }
-          case _ => critical(s"Unable to retrieve package declaration for package ref ${name}")
+          case _ => critical(currentDescription.get, s"Unable to retrieve package declaration for package ref ${name}")
         }
       })
       
@@ -215,12 +244,12 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
                   if(h.contains(WRef(p.item))){
                     remoteRefsStore += ((WRef(p.item), h(WRef(p.item))))
                   } else {
-                    critical(s"No reference found for ${p.item} within package ${p.path}")
+                    critical(currentDescription.get, s"No reference found for ${p.item} within package ${p.path}")
                   }
                 }
-              case _ => critical(s"No references found for package ${p.path}, did you properly set-ups the package refs before using remoteRefs inside a transform?")
+              case _ => critical(currentDescription.get, s"No references found for package ${p.path}, did you properly set-ups the package refs before using remoteRefs inside a transform?")
             }
-          case _ => critical(s"Unable to retrieve package declaration for package ref ${p.path}")
+          case _ => critical(currentDescription.get, s"Unable to retrieve package declaration for package ref ${p.path}")
         }
         
       }
@@ -228,7 +257,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
     remoteRefsStore
   }
   
-  def updateContext(desc: String): Unit = {
+  protected def updateContext(desc: String): Unit = {
     currentProject.get.getEntries.map(e => e.src.descriptions.collect {
       case n: HasName => (n, e)
     }).flatten.foreach {( t => {
@@ -241,6 +270,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
   }
   
   private def processDescriptionWrapper(d: Description): Description = {
+    currentDescription = Some(d)
     d match {
       case IsolatedStatement(_, i: ImportPackages) => importedPackages ++= i.packages; refOutdated = true
       case _ =>

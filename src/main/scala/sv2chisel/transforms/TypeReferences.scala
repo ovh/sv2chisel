@@ -8,11 +8,17 @@ package transforms
 import sv2chisel.ir._
 import sv2chisel.ir.refreshTypes._
 
+import org.antlr.v4.runtime.CommonTokenStream
+
 class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
-  implicit var srcFile = currentSourceFile
-  implicit var stream = currentStream
+  // for refreshedType -- initial declaration to be in scope of process expression 
+  implicit var srcFile : Option[SourceFile] = None
+  implicit var stream : Option[CommonTokenStream] = None
   
   def processDescription(d: Description): Description = {
+    // for refreshedType -- getting actual pointers
+    srcFile = currentSourceFile
+    stream = currentStream
     d match {
       case m: Module => processModule(m)
       case p: DefPackage => processPackage(p)
@@ -22,7 +28,7 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
   
   // Common functions
   def visitStatement(s: Statement)(implicit refStore: RefStore): Unit = {
-    s match {
+    processImportStatement(s, refStore) match {
       case l: DefLogic => refStore += ((WRef(l.name), FullType(l.tpe, HwExpressionKind)))
       case p: Port => refStore += ((WRef(p.name), FullType(p.tpe, HwExpressionKind)))
       case f: DefFunction => refStore += ((WRef(f.name), FullType(f.tpe, HwExpressionKind)))
@@ -30,14 +36,16 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
         trace(p, s"${p.name}: ${p.kind} ${p.tpe.serialize}")
         refStore += ((WRef(p.name), FullType(p.tpe, p.kind)))
       case t: DefType => 
-        refStore += ((WRef(t.name), FullType(t.tpe, UnknownExpressionKind, true)))
-        t.tpe match {
+        val kind = t.tpe match {
           case e: EnumType => e.fields.foreach(f => {
-            refStore += ((WRef(f.name), FullType(e.tpe, e.kind))) // weird but seems standard to flatten
-            refStore += ((WRef(f.name, Seq(t.name)), FullType(e.tpe, e.kind))) // not sure if used in this way ?
-          })
-          case _ =>  
+              refStore += ((WRef(f.name), FullType(e.tpe, e.kind))) // weird but seems standard to flatten
+              refStore += ((WRef(f.name, Seq(t.name)), FullType(e.tpe, e.kind))) // not sure if used in this way ?
+            })
+            HwExpressionKind
+          case _:BundleType => HwExpressionKind  
+          case _ => UnknownExpressionKind
         }
+        refStore += ((WRef(t.name), FullType(t.tpe, kind, true)))
       case f: ForGen =>
         f.init match {
           case na: NamedAssign => refStore += ((WRef(na.name), FullType(IntType(na.tokens, NumberDecimal), SwExpressionKind)))
@@ -55,9 +63,9 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     proc.mapType(processType) match {
       case r: Reference => 
         if(refStore.contains(r)){
-          val tpe = refStore(r).tpe.mapInterval(_ => r.tokens)
+          val tpe = refStore(r).tpe.mapInterval(_ => r.tokens) // do not refer to remote tokens
           refStore(r).tpeRef match {
-            case true => TypeInst(r.tokens, tpe, Some(r.name), HwExpressionKind, UnknownFlow)
+            case true => TypeInst(r.tokens, tpe, Some(r.name), r.path, HwExpressionKind, UnknownFlow)
             case false => r.copy(tpe = processType(tpe), kind = refStore(r).kind)
           }          
         } else {
@@ -86,6 +94,36 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
         debug(c, s"Concat: ${c.serialize}")
         c.args.foreach(a => debug(a, s"${a.serialize} ---- ${a.getClass.getName} ${a.tpe.serialize} => ${a.tpe}"))
         c
+      case c: DoCall => 
+        if(refStore.contains(c.fun)){
+          val cleanTpe = refStore(c.fun).tpe.mapInterval(_ => c.fun.tokens) // do not refer to remote tokens
+          val scopedTpe = cleanTpe match {
+            case u: UserRefType if(!refStore.contains(u)) => 
+              // simple attempt to apply current call scope to type
+              val attempt = u.copy(path = c.fun.path ++ u.path)
+              if(refStore.contains(attempt)){
+                attempt
+              } else {
+                warn(c, s"Unable to retrieve scope for user-defined type ${u.serialize}. This will likely cause further errors.")
+                u
+              }
+            case t => t 
+          }
+          
+          c.copy(tpe = processType(scopedTpe), kind = refStore(c.fun).kind)        
+        } else {
+          warn(c, s"Undeclared reference ${c.fun.serialize}")
+          c
+        }
+        
+      case c@DoCast(_, _, _, u: UserRefType) =>
+        if(!refStore.contains(u)){
+          critical(u, s"Undeclared type ${u.serialize}")
+          c
+        } else {
+          c.copy(kind = refStore(u).kind) // only retrieve kind associated to type declaration
+        }
+
       case exp: Expression => exp
     }
   }
@@ -154,10 +192,10 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     refs ++= remoteRefs
     // add local refs
     p.foreachStmt(visitStatement)
-    
+    val processed = processStatement(p.body)
     forceRefsRefresh() // be sure to refresh refs for upcoming package imports
     // propagate to local refs & record them
-    p.copy(refs = Some(refs), body = processStatement(p.body))
+    p.copy(refs = Some(refs), body = processed)
   }
   
   /**
@@ -182,6 +220,6 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     m.foreachParam(p => ref2Type += ((WRef(p.name), FullType(p.tpe, p.kind))))
     
     // SECOND PASS => use ref2Type to fill reference type
-    m.copy(body = processStatement(m.body))
+    m.copy(body = processStatement(m.body), params = m.params.map(_.mapExpr(processExpression)))
   }
 }

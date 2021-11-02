@@ -900,13 +900,15 @@ class Visitor(
     unsupported.check(ctx)
     val ref = getPrimary(ctx.primary) match {
       case r: Reference => r 
-      case _ => unsupportedExpr(ctx.primary, "function must be a reference") 
+      case _ => 
+        unsupported.raiseIt(ctx.primary, "function must be a reference")
+        Reference(ctx.primary.getSourceInterval(), "<undefined>", Seq())
     }
     val args = ctx.list_of_arguments match {
       case null => Seq()
       case l => getCallArgs(l) 
     }
-    DoCall(ctx.getSourceInterval, ref, args, UnknownExpressionKind)
+    DoCall(ctx.getSourceInterval, ref, args, UnknownType(), UnknownExpressionKind)
   }
   
   private def getSubField(ctx: PrimaryDotContext): Expression = {

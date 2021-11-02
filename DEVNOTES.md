@@ -5,10 +5,23 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- integrate enum & function support in LegalizeExpression
+- integrate function call support in LegalizeExpression (refactor the args in DoCall as Seq[Assign] (just like DefInstance's portMap, they are made of ports as well))
+
+- add implicit to width inference and find out why it doesn't work as expected here
+- add parenthesis to asUInt() before subIndex/subRange accesses or wrap the whole expression with parenthesis to avoid error
 
 - add test-case for remote references usage 
 - integrate import package as statement within package/module
+
+- add the ability to includes blackboxes (only parsing the ports and generate proper chisel blackboxes with corresponding resources)
+
+- add true regression tests based on actual sv files (internal repo and CI ?) down to 
+  - scala compilation
+  - chisel elaboration
+  - verilog generation
+  - verilog testing with prior test-benches
+  
+- warn about ignored ifdef (silently ignored for now) 
 
 - fix disabled cast from SInt to UInt (or double cast ??) => required by elaboration
 - fix systematic .U cast => cause issue with not and minus primops => need case for:
@@ -30,6 +43,8 @@
 - De-scope should be done directly here in this pass (only for port decl & val decl)
 
 ##### fix flow reference transform as stated in comment on top of its file
+
+##### Add a transform to to automatically fix wire/reg selection depending on IfGen (not that easy) 
 
 ##### Add package hierarchy in emitted file, based on folder hierarchy
 

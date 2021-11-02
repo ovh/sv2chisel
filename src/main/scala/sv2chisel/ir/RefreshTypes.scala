@@ -67,9 +67,13 @@ class SubRangeRefreshType(s: SubRange) extends LazyLogging with InfoLogger {
         debug(s, s"New type: ${tpe.serialize}")
         s.copy(tpe = tpe, kind = s.expr.kind)
       
+      case u: UserRefType => 
+        warn(s, s"Unsupported user-defined type '${u.serialize}' for subrange expression '${s.serialize}' (this should be adressed by LegalizeExpression transform)")
+        s.copy(tpe = UnknownType(), kind = s.expr.kind)
+        
       case t => 
-        warn(s, s"Unsupported Type '${t.serialize}' for expression '${s.serialize}'")
-        s.copy(tpe = t, kind = s.expr.kind)
+        critical(s, s"Unsupported Type '${t.serialize}' for subrange expression '${s.serialize}'")
+        s.copy(tpe = UnknownType(), kind = s.expr.kind)
     }
   }
   
@@ -96,9 +100,14 @@ class SubIndexRefreshType(s: SubIndex) extends LazyLogging with InfoLogger {
       case u: UIntType => 
         debug(s, s"Converting index to UInt: ${s.serialize}")
         s.copy(tpe = BoolType(u.tokens), kind = s.expr.kind) // index of UInt is bool
+        
+      case u: UserRefType => 
+        warn(s, s"Unsupported user-defined type '${u.serialize}' for subrange expression '${s.serialize}' (this should be adressed by LegalizeExpression transform)")
+        s.copy(tpe = UnknownType(), kind = s.expr.kind)
+        
       case t => 
-        warn(s, s"Unsupported Type '${t.serialize}' for expression '${s.serialize}'")
-        s.copy(tpe = t, kind = s.expr.kind)
+        critical(s, s"Unsupported Type '${t.serialize}' for subindex expression '${s.serialize}'")
+        s.copy(tpe = UnknownType(), kind = s.expr.kind)
     }
   }
   

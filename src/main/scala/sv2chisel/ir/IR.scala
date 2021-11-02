@@ -459,11 +459,12 @@ case class TypeInst(
     tokens: Interval,
     tpe: Type,
     name: Option[String],
+    path: Seq[String],
     kind: ExpressionKind,
     flow : Flow = UnknownFlow
   ) extends Expression {
   type T = TypeInst
-  def serialize: String = s"InstOf[${ftpe}]"  
+  def serialize: String = s"InstOf[${(path :+ name.getOrElse("<unamed>")).mkString(".")}]<$ftpe>"  
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapExpr(f: Expression => Expression) = this
   def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
@@ -832,7 +833,7 @@ case class DoCast(
   ) extends Expression {
   type T = DoCast
   def flow: Flow = SourceFlow
-  def serialize: String = s"(${expr.serialize}).asTypeOf(${ftpe})"
+  def serialize: String = s"(${expr.serialize}).asTypeOf(${ftpe}):${ftpe}"
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapExpr(f: Expression => Expression) = this.copy(expr = f(expr))
   def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
@@ -844,12 +845,12 @@ case class DoCast(
 }
 case class DoCall(
     tokens: Interval, 
-    fun: Expression, 
-    args: Seq[Expression], 
+    fun: Reference, 
+    args: Seq[Expression],
+    tpe: Type,
     kind: ExpressionKind
   ) extends Expression {
   type T = DoCall
-  def tpe = UnknownType(tokens)
   def flow: Flow = SourceFlow
   def serialize: String =  s"${fun.serialize}${args.map(_.serialize).mkString("(",", ",")")}"
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
@@ -1605,6 +1606,12 @@ case class IntType(tokens: Interval, base: NumberBase) extends GroundType {
   def mapWidth(f: Width => Width) = this
   def foreachWidth(f: Width => Unit): Unit = Unit
 }
+object IntType {
+  def apply(): IntType = {
+    IntType(UndefinedInterval, NumberDecimal)
+  }
+}
+
 // signed is meant for temporary purposes before aggregating an (un)packedVec of Bool into a SInt
 case class BoolType(tokens: Interval, signed: Boolean = false) extends GroundType {
   type T = BoolType

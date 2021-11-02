@@ -43,7 +43,7 @@ class CheckUseBeforeDecl(val llOption: Option[logger.LogLevel.Value] = None) ext
   
   def visitStatement(s: Statement)(implicit refStore: RefStore): Unit = {
     // record
-    s match {
+    processImportStatement(s, refStore) match {
       case l: DefLogic => refStore += ((WRef(l.name), FullType(l.tpe, HwExpressionKind)))
       case p: DefParam => refStore += ((WRef(p.name), FullType(p.tpe, p.kind)))
       case t: DefType => 
@@ -77,9 +77,10 @@ class CheckUseBeforeDecl(val llOption: Option[logger.LogLevel.Value] = None) ext
   def processPackage(p: DefPackage): DefPackage = {
     implicit val refs = new RefStore() 
     refs ++= remoteRefs
-    forceRefsRefresh() // no impact on current run as remoteRefs has be retrieved above
     // propagate to local refs & record them
     visitStatement(p.body)
+    forceRefsRefresh() // must be done after visitStatement due to the import statement side effect
+    debug(p, s"Updating refs for package ${p.name}")
     p.copy(refs = Some(refs))
   }
   

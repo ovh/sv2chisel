@@ -45,7 +45,7 @@ trait EasyLogger {
     * @param msg msg generator to be invoked if level is right
     */
   def struct(msg: => String): Unit = {
-    logger.info(s"[log] $msg")
+    logger.struct(s"[log] $msg")
   }
   /**
     * Log msg at Info level

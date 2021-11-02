@@ -26,11 +26,11 @@ class WidthExpressionType(t: Type) extends EasyLogging {
             UndefinedExpression(ui)
         }
       case b: BundleType =>
-        DoPrim(ui, PrimOps.GetWidth(ui), Seq(TypeInst(ui, b, None, HwExpressionKind, UnknownFlow)))
+        DoPrim(ui, PrimOps.GetWidth(ui), Seq(TypeInst(ui, b, None, Seq(), HwExpressionKind, UnknownFlow)), SwExpressionKind, IntType())
         
       case tpe: GroundType => tpe.width.expr
       case u: UserRefType => 
-        DoPrim(ui, PrimOps.GetWidth(ui), Seq(TypeInst(ui, u.tpe, Some(u.name), HwExpressionKind, SourceFlow)))
+        DoPrim(ui, PrimOps.GetWidth(ui), Seq(TypeInst(ui, u.tpe, Some(u.name), u.path, HwExpressionKind, SourceFlow)), SwExpressionKind, IntType())
 
       case _ => 
         fatal(s"Unsupported Type for width expression calculation: ${t}")

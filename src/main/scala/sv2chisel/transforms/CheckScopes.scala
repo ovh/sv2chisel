@@ -44,7 +44,7 @@ class CheckScopes(val llOption: Option[logger.LogLevel.Value] = None) extends De
   def visitStatement(s: Statement, refStore: RefStore): Unit = {
     // record
     implicit val current = refStore
-    s match {
+    processImportStatement(s, refStore) match {
       // special case For Gen : first named assign declared the variable to be used later on 
       case f: ForGen =>
         f.init match {

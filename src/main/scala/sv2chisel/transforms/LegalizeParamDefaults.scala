@@ -28,7 +28,7 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
   // TO DO : add proper error management within passes
     
   def processModule(m: DefModule): DefModule = {
-    val stmts = ArrayBuffer[Statement]()
+    val stmts = ArrayBuffer[Statement]() 
     val knownParams = new HashSet[String]()
     
     // SINGLE PASS
@@ -37,15 +37,16 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
       e.foreachExpr( expr => allLegalSubExprs &= isLegalExpression(expr))
       
       allLegalSubExprs && (e match {
+        case r:Reference if(remoteRefs.contains(r)) => true // remote ref in scope
         case Reference(_, name, Seq(), _, _, _) => 
           if (knownParams.contains(name)) {
             false
           } else {
-            critical(e, "Unknown reference (without path) used as default param, this will likely not pass scala compilation")
+            critical(e, "Unknown local reference used as default param, this will likely not pass scala compilation")
             true
           }
           
-        case _:Reference => true // this is fine => remote ref
+        case _:Reference => true // this is fine => undefined remote ref not to be legalized
         case _ => true
       })
     }

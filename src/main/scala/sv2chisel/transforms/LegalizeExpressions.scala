@@ -12,10 +12,11 @@ import sv2chisel.ir.evalExpression._
 import sv2chisel.ir.expressionWidth._
 
 class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
-  implicit var srcFile = currentSourceFile
-  implicit var stream = currentStream
   
   def processDescription(d: Description): Description = {
+    // for refreshedType
+    implicit val srcFile = currentSourceFile
+    implicit val stream = currentStream
     // Insert cast wherever needed 
     // update kind whenever needed to push cast as UInt as far as possible:
     // ref.U + 1.U should be (ref+1).U
@@ -68,7 +69,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           e match {
             case u: UndefinedExpression => u
             case _ =>
-              critical(e, s"docast Unknown expression kind for expression ${e.serialize}")
+              critical(e, s"docast Unknown expression kind for expression ${e.serialize} as ${tpe.serialize}@$kind")
               e
           }
         
@@ -239,7 +240,14 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           // note need to check index of what => might need further casting ???
           // actually nope => required only for DoPrim
           // Global solution: generated files will include implicits to handle all this  
-          val expr = processExpressionRec(s.expr, expected, s.tpe)
+          val processedExpr = processExpressionRec(s.expr, expected, s.tpe)
+          val expr = processedExpr.tpe match {
+            case UserRefType(_,_,_,_:EnumType) => doCast(processedExpr, expected, baseUInt)
+            case UserRefType(_,_,_,_:BundleType) => doCast(processedExpr, expected, baseUInt)
+            case _:EnumType => doCast(processedExpr, expected, baseUInt)
+            case _:BundleType => doCast(processedExpr, expected, baseUInt)
+            case _ => processedExpr
+          }
           val index = processExpressionRec(s.index, UnknownExpressionKind, UnknownType())
           val ind = (index.kind, index.tpe) match {
             case (HwExpressionKind, _: UIntType) => index 
@@ -252,7 +260,15 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           s.copy(expr = expr, index = ind, kind = expr.kind).refreshedType
           
         case s: SubRange =>
-          val expr = processExpressionRec(s.expr, expected, s.tpe)
+          val processedExpr = processExpressionRec(s.expr, expected, s.tpe)
+          val expr = processedExpr.tpe match {
+            case UserRefType(_,_,_,_:EnumType) => doCast(processedExpr, expected, baseUInt)
+            case UserRefType(_,_,_,_:BundleType) => doCast(processedExpr, expected, baseUInt)
+            case _:EnumType => doCast(processedExpr, expected, baseUInt)
+            case _:BundleType => doCast(processedExpr, expected, baseUInt)
+            case _ => processedExpr
+          }
+          
           val left = processExpressionRec(s.left, UnknownExpressionKind, UnknownType())
           val right = processExpressionRec(s.right, UnknownExpressionKind, UnknownType())
           val (_, cast) = castThemAll(Seq(left, right), baseUInt)
@@ -281,7 +297,9 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               }
               p.copy(args = Seq(e))
               
-            case (_: PrimOps.GetWidth, _) => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType())) // nothing else to ensure here ?
+            case (_: PrimOps.GetWidth, _) => 
+              val processed = p.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
+              processed.copy(tpe = IntType(), kind = SwExpressionKind)
               
             case (_: PrimOps.InlineIf, _) => 
               // NOTE: not using Rec here, instantiating a new thread with final cast
@@ -465,7 +483,9 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           }
           
         
-        case c: DoCall => c.mapExpr(processExpression(_, UnknownExpressionKind, UnknownType())) // nothing else to ensure here ?
+        case c: DoCall => 
+          critical(c, s"TODO: cast properly function arguments depending on function definition (${c.serialize})")
+          c.mapExpr(processExpression(_, UnknownExpressionKind, UnknownType())) // nothing else to ensure here ?
         
         case c: DoCast => // user cast ($signed / $unsigned)
           val cast = c.mapExpr(processExpression(_, UnknownExpressionKind, UnknownType())) 
@@ -499,6 +519,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               cast.tpe
 
             case (_: UIntType, _, _, _) => cast.tpe // don't care about width here => .asUInt 
+            case (_: UserRefType, _, _, _) => cast.tpe // don't care about width here => .asTypeOf(<user-type>)
             
             case _ =>
               critical(c, s"Unsupported user cast to type ${cast.tpe.serialize} (baseTpe: ${baseTpe.serialize})")
@@ -596,7 +617,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
         
         case na: NamedAssign => na.mapExpr(processExpressionRec(_, expected, baseTpe))
         
-        case t: TypeInst => t.mapType(processType)
+        case t: TypeInst => if(t.name.isDefined) t else t.mapType(processType) // no need to process references
         
         case _ => 
           warn(e, s"unsupported expression: ${e.serialize}")
