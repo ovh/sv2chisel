@@ -172,8 +172,11 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
   var currentDescription : Option[Description] = None
   var currentSourceFile : Option[SourceFile] = None
   var currentStream : Option[CommonTokenStream] = None
-  val importedPackages = new ArrayBuffer[PackageRef]()
-  val scopedPackages = new ArrayBuffer[String]()
+  
+  var localPackages = new HashMap[String, DefPackage]() // packages defined within the current project entry
+  val importedPackages = new ArrayBuffer[PackageRef]() // package explicitly imported (members accessibles directly)
+  val scopedPackages = new ArrayBuffer[String]() // packages in scope whose members can be refered explicitly
+  
   private var refOutdated = true
   private val remoteRefsStore : RefStore = new HashMap[WRef, FullType]()
   
@@ -184,11 +187,18 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
     remoteRefsStore.clear()
   }
   
+  private def findDescription(name: String): Option[Description] = {
+    localPackages.get(name) match {
+      case None => currentProject.get.findDescription(name)
+      case s => s // return Some(p: DefPackage)
+    }
+  }
+  
   protected def processImportStatement[T <: Statement](s: T, localRefStore: RefStore): T = {
     s match {
       case ImportPackages(_,sp) => sp.foreach(p => {
         trace(s, s"locally imported package: ${p.path}")
-        currentProject.get.findDescription(p.path) match {
+        findDescription(p.path) match {
           case Some(d: DefPackage) =>
             d.refs match {
               case Some(h) => 
@@ -218,7 +228,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
       // in all cases all references with explicit paths should be available
       scopedPackages.foreach(name => {
         debug(currentDescription.get, s"scoped package: $name")
-        currentProject.get.findDescription(name) match {
+        findDescription(name) match {
           case Some(d: DefPackage) =>
             d.refs match {
               case Some(h) => 
@@ -233,7 +243,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
       
       for (p <- importedPackages) {
         debug(s"importedPackage: ${p.path}")
-        currentProject.get.findDescription(p.path) match {
+        findDescription(p.path) match {
           case Some(d: DefPackage) =>
             d.refs match {
               case Some(h) => 
@@ -276,10 +286,12 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
       case _ =>
     }
     processDescription(d) match {
-      case p: DefPackage => scopedPackages += p.name ; p // shall not be considered as Scoped for himself !
+      case p: DefPackage => 
+        scopedPackages += p.name // shall not be considered as Scoped for himself !
+        localPackages += ((p.name, p)) // for local usage (within the same Project entry -- edge case)
+        p
       case des => des
     }
-    
   }
   
   protected def execute(project: Project): Unit = {
@@ -287,10 +299,11 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
     def processEntry(e: ProjectEntry, f: Description => Description): ProjectEntry = {
       importedPackages.clear()
       remoteRefsStore.clear()
+      localPackages.clear()
       refOutdated = true
       currentSourceFile = Some(e.src)
       currentStream = Some(e.stream)
-      e.copy(src = e.src.mapDescription(f))
+      e.copy(src = e.src.mapDescription(f)) //NOTE: project only updated once per entry (not on description basis)
     }
     
     // Note : project is mutable
@@ -298,7 +311,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
       case Some(f) => project.mapEntry(processEntry(_, f))
       case None =>
     }
-    project.mapEntry(processEntry(_, processDescriptionWrapper))
+    project.mapEntry(processEntry(_, processDescriptionWrapper)) // descriptions updated only updated once per entry
   }
   
 }

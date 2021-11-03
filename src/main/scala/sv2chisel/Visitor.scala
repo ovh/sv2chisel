@@ -781,9 +781,31 @@ class Visitor(
   //      | ( COMMA ( expression )? )+
   //     )
   //     ( COMMA list_of_arguments_named_item )*;
-  private def getCallArgs(ctx: List_of_argumentsContext): Seq[Expression] = {
-    unsupported.check(ctx)
-    ctx.expression.asScala.map(getExpression(_))
+  private def getCallArgs(ctx: List_of_argumentsContext, noNameOnly: Boolean = false, msg: String = ""): Seq[Assign] = {
+    
+    def getNoName(exp: ExpressionContext): NoNameAssign = {
+      NoNameAssign(exp.getSourceInterval(), getExpression(exp), SinkFlow)
+    }
+    
+    def getNamed(named:List_of_arguments_named_itemContext): NamedAssign = {
+      val e = named.expression match {
+        case null => unsupportedExpr(named, "Named argument call without value (TODO: could be supported when a default argument is specified at function definition, leveraging a proper transform)")
+        case _ => getExpression(named.expression)
+      }
+      if(noNameOnly){
+        unsupportedExpr(named, s"Named argument `${getRawText(named)}` in context: $msg")
+      }
+      NamedAssign(named.getSourceInterval(), named.identifier.getText(), e, SinkFlow)
+    }
+    
+    if(noNameOnly){
+      ctx.list_of_arguments_named_item.asScala.foreach(getNamed) // to get detailed errors
+      ctx.expression.asScala.map(getNoName)
+    } else {
+      // can get named then named or expression then named
+      // so named will always be after noname
+      ctx.expression.asScala.map(getNoName) ++ ctx.list_of_arguments_named_item.asScala.map(getNamed)
+    }
   }
   
   // | any_system_tf_identifier ( LPAREN data_type (COMMA list_of_arguments)?
@@ -793,14 +815,19 @@ class Visitor(
   private def getPrimaryTfCall(ctx: PrimaryTfCallContext): Expression = {
     unsupported.check(ctx)
     val value = (ctx.list_of_arguments, ctx.data_type) match {
-      case (null, null) => Seq()
-      case (l, null) => getCallArgs(l)
+      case (null, null) => UndefinedExpression()
+      case (l, null) => getCallArgs(l, noNameOnly= true, msg = s"primary function call ${getRawText(ctx)}") match {
+        case Seq(n: NoNameAssign) => n.expr 
+        case Seq(a) => unsupportedExpr(l, s"Impossible single named argument ${a.serialize}")
+        case _ => unsupportedExpr(l, s"Unexpected multiple arguments for primary function call ${getRawText(ctx)}")
+      }
+      
       case (null, d) => 
         // weird reference to single param as arg hidden within data_type
         d.data_type_usual match {
-          case null => Seq(unsupportedExpr(d, "Data type context"))
+          case null => unsupportedExpr(d, "Data type context")
           case dtp => dtp.package_or_class_scoped_path match {
-            case null =>  Seq(unsupportedExpr(d, "Data type context"))
+            case null =>  unsupportedExpr(d, "Unexpecting package or class path in primary function call")
             case p => 
               val loc = getPath(p)
               val res = dtp.variable_dimension.asScala.map(d => getVariableDimSubRange(d, loc)) match {
@@ -811,11 +838,11 @@ class Visitor(
                   case _ => unsupportedExpr(ctx, "Should not happen")
                 })
               }
-              Seq(res)    
+              res
           }
         }
         
-      case _ => Seq(unsupportedExpr(ctx, "Weird primary call"))
+      case _ => unsupportedExpr(ctx, s"Weird primary call ${getRawText(ctx)}")
     }
     
     ctx.any_system_tf_identifier.getText() match {
@@ -824,27 +851,21 @@ class Visitor(
         
       case "$clog2" => 
         val primop = CeilLog2(ctx.any_system_tf_identifier.getSourceInterval())
-        DoPrim(ctx.getSourceInterval, primop, value)
+        DoPrim(ctx.getSourceInterval, primop, Seq(value))
         
       case "$bits" =>
         val primop = GetWidth(ctx.any_system_tf_identifier.getSourceInterval())
-        DoPrim(ctx.getSourceInterval, primop, value)
+        DoPrim(ctx.getSourceInterval, primop, Seq(value))
         
       case "$signed" =>
         val tpe = SIntType(ctx.any_system_tf_identifier.getSourceInterval(), UnknownWidth())
-        value match {
-          case Seq(a) => DoCast(ctx.getSourceInterval, a, HwExpressionKind, tpe)
-          case _ => unsupportedExpr(ctx, "$signed requires exactly one argument")
-        }
+        DoCast(ctx.getSourceInterval, value, HwExpressionKind, tpe)
         
       case "$unsigned" =>
         val tpe = UIntType(ctx.any_system_tf_identifier.getSourceInterval(), UnknownWidth(), NumberDecimal)
-        value match {
-          case Seq(a) => DoCast(ctx.getSourceInterval, a, HwExpressionKind, tpe)
-          case _ => unsupportedExpr(ctx, "$unsigned requires exactly one argument")
-        }
+        DoCast(ctx.getSourceInterval, value, HwExpressionKind, tpe)
       
-      case _ => unsupportedExpr(ctx, "Unsupported PrimaryTfCall")
+      case name => unsupportedExpr(ctx, s"Unsupported PrimaryTfCall ($name)")
     }
   }
   
@@ -1920,7 +1941,10 @@ class Visitor(
   private def getPrimaryTfCallStmt(ctx: PrimaryTfCallContext, attr: VerilogAttributes): Statement = {
     unsupported.check(ctx)
     val args = (ctx.list_of_arguments, ctx.data_type) match {
-      case (l, null) => getCallArgs(l)
+      case (l, null) => 
+        getCallArgs(l, noNameOnly=true, msg=s"primary statement ${getRawText(ctx)}")
+          .collect { case n: NoNameAssign => n }
+          .map(_.expr)
       case (null, d) => 
         // weird reference to single param as arg hidden within data_type
         d.data_type_usual match {

@@ -402,17 +402,26 @@ case class Reference(
 }
 sealed abstract class Assign extends Expression {
   type T <: Assign
-  def kind: ExpressionKind = UnknownExpressionKind
   def mapKind(f: ExpressionKind => ExpressionKind) = this.asInstanceOf[T]
   def mapType(f: Type => Type) = this.asInstanceOf[T]
   def mapWidth(f: Width => Width) = this.asInstanceOf[T]
   def foreachType(f: Type => Unit): Unit = Unit
   def foreachWidth(f: Width => Unit): Unit = Unit
 }
+
+sealed trait RemoteLinked {
+  def remoteKind : Option[ExpressionKind]
+  def remoteType : Option[Type]
+  def remoteName : Option[String]
+  def getName: String = remoteName.getOrElse("<?>")
+  def assignExpr : Option[Expression]
+}
+
 case class AutoAssign(tokens: Interval) extends Assign {
   type T = AutoAssign
   def tpe : Type = UnknownType()
   def flow: Flow = UnknownFlow
+  def kind: ExpressionKind = UnknownExpressionKind
   def serialize: String = s"AutoAssign"
   def mapExpr(f: Expression => Expression) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
@@ -423,11 +432,14 @@ case class NamedAssign(
   name: String, 
   expr: Expression, 
   flow: Flow, 
+  remoteKind : Option[ExpressionKind] = None,
   remoteType : Option[Type] = None,
   assignExpr : Option[Expression] = None
-) extends Assign with HasName {
+) extends Assign with HasName with RemoteLinked {
   type T = NamedAssign
+  def remoteName = Some(name)
   def tpe : Type = expr.tpe
+  def kind: ExpressionKind = expr.kind
   def serialize: String = flow match {
     case SourceFlow => s"$name <- " + expr.serialize
     case SinkFlow => s"$name -> " + expr.serialize
@@ -443,16 +455,18 @@ case class NoNameAssign(
   expr: Expression, 
   flow: Flow,
   remoteName : Option[String] = None,
+  remoteKind : Option[ExpressionKind] = None,
   remoteType : Option[Type] = None,
   assignExpr : Option[Expression] = None
-) extends Assign {
+) extends Assign with RemoteLinked {
   type T = NoNameAssign
   def tpe : Type = expr.tpe
+  def kind: ExpressionKind = expr.kind
   def serialize: String = s"NoNameAssign(" + expr.serialize + ")"
   def mapExpr(f: Expression => Expression) = this.copy(expr = f(expr))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = f(expr)
-  def toNamed(name: String): NamedAssign = NamedAssign(tokens, name, expr, flow, remoteType, assignExpr)
+  def toNamed(name: String): NamedAssign = NamedAssign(tokens, name, expr, flow, remoteKind, remoteType, assignExpr)
 }
 
 case class TypeInst(
@@ -846,7 +860,7 @@ case class DoCast(
 case class DoCall(
     tokens: Interval, 
     fun: Reference, 
-    args: Seq[Expression],
+    args: Seq[Assign],
     tpe: Type,
     kind: ExpressionKind
   ) extends Expression {
@@ -854,7 +868,8 @@ case class DoCall(
   def flow: Flow = SourceFlow
   def serialize: String =  s"${fun.serialize}${args.map(_.serialize).mkString("(",", ",")")}"
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
-  def mapExpr(f: Expression => Expression) = this.copy(args = args.map(f))
+  // hacky: assign are transparent here
+  def mapExpr(f: Expression => Expression) = this.copy(args = args.map(_.mapExpr(f))) 
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
@@ -1652,7 +1667,16 @@ case class BundleType(tokens: Interval, fields: Seq[Field]) extends AggregateTyp
   def foreachType(f: Type => Unit): Unit = fields.foreach{ x => f(x.tpe) }
   def mapWidth(f: Width => Width) = this
   def foreachWidth(f: Width => Unit): Unit = Unit
-  def widthOption: Option[Width] = None // TODO ?
+  def widthOption: Option[Width] = {
+    val fieldWidths = fields.map(_.tpe.widthOption)
+    fieldWidths.collectFirst {case a@None => a} match {
+      case None => // OK continue
+        Some(Width(UndefinedInterval, fieldWidths.map(_.get.expr).reduce((a, b) => {
+          DoPrim(UndefinedInterval, PrimOps.Add(UndefinedInterval), Seq(a, b))
+        })))
+      case _ => None
+    }
+  }
 }
 
 case class EnumType(tokens: Interval, fields: Seq[EnumField], tpe: Type, kind: ExpressionKind) extends AggregateType {
@@ -1987,7 +2011,12 @@ case class DefParam(
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 
-case class FullType(tpe: Type, kind: ExpressionKind, tpeRef: Boolean = false)
+case class FullType(
+  tpe: Type, 
+  kind: ExpressionKind, 
+  tpeRef: Boolean = false,
+  portRefs: Seq[Port] = Seq() // use-case: for DefDunction args
+)
 case class WRef(
   name: String, 
   path: Seq[String] = Seq()

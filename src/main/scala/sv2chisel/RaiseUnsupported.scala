@@ -44,7 +44,6 @@ class RaiseUnsupported(
       case c: CoreItemParamContext => checkCoreItemParam(c)
       case c: PrimaryTfCallContext => checkPrimaryTfCall(c)
       case c: PrimaryCallContext => checkPrimaryCall(c)
-      case c: List_of_argumentsContext => checkTfCallArgs(c)
       case c: Net_declarationContext => checkNetDecl(c)
       case c: Module_header_commonContext => checkModuleHeader(c)
       case c: Net_or_var_data_typeContext => checkVarDataType(c)
@@ -357,13 +356,6 @@ class RaiseUnsupported(
           case _ => 
         }
       }
-    }
-  }
-  
-  def checkTfCallArgs(ctx: List_of_argumentsContext): Unit = {
-    ctx.list_of_arguments_named_item.asScala match {
-      case Seq() =>
-      case _ => raiseIt(ctx, s"Unsupported named arguments call ${ctx.getText()}")
     }
   }
   

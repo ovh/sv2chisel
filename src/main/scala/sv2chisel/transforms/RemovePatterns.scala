@@ -24,6 +24,8 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
   }
 
   def processDescription(m: Description): Description = {
+    implicit val srcFile = currentSourceFile
+    implicit val stream = currentStream
     // SINGLE PASS 
     
     def getFilling(e: Expression, tpe: Type, bit: String): Expression = {
@@ -46,7 +48,7 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
             case _ => tpe
           }
           
-          val expr = tpe.getWidthExpression()
+          val expr = tpe.getWidthExpression
           expr.evalBigIntOption match {
             case None => 
               (expr.kind, e.kind) match {

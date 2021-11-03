@@ -5,15 +5,19 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- integrate function call support in LegalizeExpression (refactor the args in DoCall as Seq[Assign] (just like DefInstance's portMap, they are made of ports as well))
-
-- add implicit to width inference and find out why it doesn't work as expected here
 - add parenthesis to asUInt() before subIndex/subRange accesses or wrap the whole expression with parenthesis to avoid error
 
-- add test-case for remote references usage 
-- integrate import package as statement within package/module
+- fix cast for strings within expressions + test-case
+- fix deflogic for functions (not reg allowed in verilog standard)
+- add support for recursive concat + test case (beautiful verilog!)
+- add support for filling bit pattern in concat (filling on left or right)
+
+- add support for truly generic enum (no values in verilog)
+- fix SInt cast weird behavior for params... (investigate behavior of InlineIf whose kind should depend on kind of the value being tested (test at elab or actual hw Mux)) (see tfpa:361 for ex)
 
 - add the ability to includes blackboxes (only parsing the ports and generate proper chisel blackboxes with corresponding resources)
+
+- fix unexpected intervals at emission (non-critical)
 
 - add true regression tests based on actual sv files (internal repo and CI ?) down to 
   - scala compilation

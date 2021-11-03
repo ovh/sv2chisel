@@ -484,10 +484,34 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           
         
         case c: DoCall => 
-          critical(c, s"TODO: cast properly function arguments depending on function definition (${c.serialize})")
-          c.mapExpr(processExpression(_, UnknownExpressionKind, UnknownType())) // nothing else to ensure here ?
+          val updatedArgs = c.args.map(a => {
+            a match {
+              case r: RemoteLinked => 
+                val kind = r.remoteKind match {
+                  case None => 
+                    critical(a, s"No remote kind found for argument ${a.serialize} in function call ${c.serialize}")
+                    UnknownExpressionKind
+                  case Some(k) => k 
+                }
+                val tpe = r.remoteType match {
+                  case None => 
+                    critical(a, s"No remote type found for argument ${a.serialize} in function call ${c.serialize}")
+                    UnknownType()
+                  case Some(t) => t 
+                }
+                r match {
+                  case na: NoNameAssign => na.copy(expr = processExpression(na.expr, kind, tpe))
+                  case na: NamedAssign => na.copy(expr = processExpression(na.expr, kind, tpe))
+                }
+                
+              case _ =>
+                critical(a, s"No remote kind and type for argument ${a.serialize} in function call ${c.serialize}")
+                a
+            }
+          })
+          c.copy(args = updatedArgs)
         
-        case c: DoCast => // user cast ($signed / $unsigned)
+        case c: DoCast => // user cast ($signed / $unsigned / custom)
           val cast = c.mapExpr(processExpression(_, UnknownExpressionKind, UnknownType())) 
           
           val castWOption = cast.tpe.widthOption match {
@@ -537,7 +561,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           // let's try to compute the actual width of this concat
           // 1st build the expression as a sum of each terms width
           // 2nd then try to evaluate this expression if it is only made of
-          val tpe = c.copy(args = args).getWidthOption() match {
+          val tpe = c.copy(args = args).getWidthOption match {
             case Some(e) =>
               val w = e.evalBigIntOption() match {
                 case Some(bg) => Width(bg)
@@ -655,14 +679,14 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
         case i: DefInstance =>  
           val ports = i.portMap.zipWithIndex.map(t => t._1 match {
             
-            case na@NamedAssign(_,_,_, SourceFlow, _, _) => 
+            case na@NamedAssign(_,_,_, SourceFlow, _, _, _) => 
               trace(na, s"Processing port ${na.name} (#${t._2}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(na.tpe).serialize}")
               na.mapExpr(processExpression(_, HwExpressionKind, na.remoteType.getOrElse(na.tpe)))
-            case na@NoNameAssign(_,_, SourceFlow, _, _, _) => 
+            case na@NoNameAssign(_,_, SourceFlow, _, _, _, _) => 
               trace(na, s"Processing port #${t._2} (${na.remoteName.getOrElse("<unknown>")}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(na.tpe).serialize}")
               na.mapExpr(processExpression(_, HwExpressionKind, na.remoteType.getOrElse(na.tpe)))
               
-            case na@NamedAssign(_,_,_, SinkFlow, _, _) => 
+            case na@NamedAssign(_,_,_, SinkFlow, _, _, _) => 
               trace(na, s"Processing port ${na.name} (#${t._2}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(UnknownType()).serialize}")
               val expr = processExpression(na.expr, HwExpressionKind, UnknownType())
               na.remoteType match {
@@ -678,7 +702,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
                 case None => na.copy(expr = expr)
               }
               
-            case na@NoNameAssign(_,_, SinkFlow, _, _, _) => 
+            case na@NoNameAssign(_,_, SinkFlow, _, _, _, _) => 
               val remoteName = na.remoteName.getOrElse("<???>")
               trace(na, s"Processing port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(UnknownType()).serialize}")
               val expr = processExpression(na.expr, HwExpressionKind, UnknownType())

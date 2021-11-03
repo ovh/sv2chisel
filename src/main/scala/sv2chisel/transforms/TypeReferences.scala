@@ -31,10 +31,8 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     processImportStatement(s, refStore) match {
       case l: DefLogic => refStore += ((WRef(l.name), FullType(l.tpe, HwExpressionKind)))
       case p: Port => refStore += ((WRef(p.name), FullType(p.tpe, HwExpressionKind)))
-      case f: DefFunction => refStore += ((WRef(f.name), FullType(f.tpe, HwExpressionKind)))
-      case p: DefParam => 
-        trace(p, s"${p.name}: ${p.kind} ${p.tpe.serialize}")
-        refStore += ((WRef(p.name), FullType(p.tpe, p.kind)))
+      case f: DefFunction => refStore += ((WRef(f.name), FullType(f.tpe, HwExpressionKind, portRefs = f.ports)))
+      case p: DefParam => refStore += ((WRef(p.name), FullType(p.tpe, p.kind)))
       case t: DefType => 
         val kind = t.tpe match {
           case e: EnumType => e.fields.foreach(f => {
@@ -96,7 +94,8 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
         c
       case c: DoCall => 
         if(refStore.contains(c.fun)){
-          val cleanTpe = refStore(c.fun).tpe.mapInterval(_ => c.fun.tokens) // do not refer to remote tokens
+          val fdef = refStore(c.fun)
+          val cleanTpe = fdef.tpe.mapInterval(_ => c.fun.tokens) // do not refer to remote tokens
           val scopedTpe = cleanTpe match {
             case u: UserRefType if(!refStore.contains(u)) => 
               // simple attempt to apply current call scope to type
@@ -110,7 +109,10 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
             case t => t 
           }
           
-          c.copy(tpe = processType(scopedTpe), kind = refStore(c.fun).kind)        
+          val remoteArgsTypes = fdef.portRefs.map(p => (p.name, FullType(p.tpe, HwExpressionKind)))
+          val updatedArgs = processAssignSeq(c.args, remoteArgsTypes, s"for call of function `${c.fun.serialize}`")
+          
+          c.copy(tpe = processType(scopedTpe), kind = fdef.kind, args = updatedArgs)        
         } else {
           warn(c, s"Undeclared reference ${c.fun.serialize}")
           c
@@ -143,26 +145,35 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     }
   }
   
-  def processAssignSeq(assign: Seq[Assign], ref: Seq[(String, Type)]): Seq[Assign] = {
+  def processAssignSeq(assign: Seq[Assign], ref: Seq[(String, FullType)], ctx: String): Seq[Assign] = {
     // process ports
     val nna = assign.collect({case nna:NoNameAssign => nna})
     val na = assign.collect({case na:NamedAssign => na})
     val aa = assign.collect({case aa:AutoAssign => aa})
     (aa, nna, na) match {
       case (Seq(), Seq(), Seq()) => assign
-      case (aa, Seq(), Seq()) => critical(aa.head, s"Unsupported auto-assign"); assign
+      case (aa, Seq(), Seq()) => critical(aa.head, s"Unsupported auto-assign $ctx"); assign
       case (Seq(), nna, Seq()) =>
         if(nna.length != ref.length){
-          critical(nna.head, s"Unnamed assignation list length (${nna.length}) mismatches declaration length (${ref.length})")
+          critical(nna.head, s"Unnamed assignation list length (${nna.length}) mismatches declaration length (${ref.length}) $ctx")
           assign
         } else {
-          nna.zip(ref).map({case (a, (n, t)) => a.copy(remoteName = Some(n), remoteType = Some(Utils.cleanTok(t)))})
+          nna.zip(ref).map({case (a, (n, ft)) => {
+            a.copy(remoteName = Some(n), remoteKind = Some(ft.kind), remoteType = Some(Utils.cleanTok(ft.tpe)))
+          }})
         }
       case (Seq(), Seq(), na) =>
-        val refM = ref.toMap.mapValues(v => Some(Utils.cleanTok(v)))
-        na.map(a => {a.copy(remoteType = refM.getOrElse(a.name, None))})
+        val refM = ref.toMap.mapValues(ft => ft.copy(tpe = Utils.cleanTok(ft.tpe)))
+        na.map(a => {
+          refM.get(a.name) match {
+            case None => 
+              critical(a, s"Unable to retrieve remote `${a.name}` parameter or port $ctx")
+              a
+            case Some(ft) => a.copy(remoteType = Some(ft.tpe), remoteKind = Some(ft.kind))
+          }
+        })
         
-      case _ => critical(assign.head, s"Unsupported mixed assign methods"); assign
+      case _ => critical(assign.head, s"Unsupported mixed assign methods $ctx"); assign
     }
   }
   
@@ -173,8 +184,9 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
         // let's fetch remote module if known
         currentProject.get.findModule(i.module.serialize) match {
           case Some(m) => 
-            val portMap = processAssignSeq(i.portMap, m.ports.map(p => (p.name, p.tpe)))
-            val paramMap = processAssignSeq(i.paramMap, m.params.map(p => (p.name, p.tpe)))
+            val ctx = s"for instance `${i.name}` of module `${i.module}`"
+            val portMap = processAssignSeq(i.portMap, m.ports.map(p => (p.name, FullType(p.tpe,HwExpressionKind))),ctx)
+            val paramMap = processAssignSeq(i.paramMap, m.params.map(p => (p.name, FullType(p.tpe, p.kind))), ctx)
             i.copy(portMap = portMap, paramMap = paramMap)
 
           case _ => i

@@ -340,7 +340,7 @@ class RemoveConcats(
         e match {
           case s: StringLit => fmt += "\"" + s.string + "\""
           case DoPrim(_, PrimOps.Add(_), Seq(StringLit(_, "0", _, _), e), _, _) =>
-            debug(c, s"Hack: Inserting expression ${e.serialize} within string $fmt (probably imcomplete)")
+            debug(c, s"Hack: Inserting expression ${e.serialize} within string $fmt (probably incomplete)")
             fmt += "%e"
             exprs += e
             
@@ -378,16 +378,34 @@ class RemoveConcats(
       
       val portMap = i.portMap.map(p => {
         val (exp, name) = p match {
-          case NamedAssign(_, n, e, _, _, _) => (Some(e), s"_$n")
-          case NoNameAssign(_, e, _, _, _, _) => (Some(e), "")
+          case NamedAssign(_, n, e, _, _, _, _) => (Some(e), s"_$n")
+          case NoNameAssign(_, e, _, _, _, _, _) => (Some(e), "")
           case _ => (None, "")
         }
         val expr = exp match {
           case None => p
-          case Some(c@Concat(_,_,_,_, SourceFlow)) => 
+          case Some(c@Concat(_,_,_,_, SourceFlow)) => // this concat is a source feeding the input port of the instance
             info(p, s"Remove Concat Towards instance ${p.serialize}")
-            warn(c, s"Proper concat removal of ${c.serialize} cannot be guaranteed as the expected type is Unknown (TODO when instances declarations are known...)")
-            val (expr, stmt) = processRHS(c, Reference(ui, s"${i.name}$name", Seq()), false)
+            val (kind, tpe) = p match {
+              case r: RemoteLinked => 
+                val kind = r.remoteKind match {
+                  case None => 
+                    warn(p, s"No remote kind found for port ${r.getName} in instance ${i.name} of module ${i.module.serialize}")
+                    UnknownExpressionKind
+                  case Some(k) => k 
+                }
+                r.remoteType match {
+                  case None => 
+                    warn(p, s"No remote type found for port ${r.getName} in instance ${i.name} of module ${i.module.serialize}")
+                    (kind, UnknownType())
+                  case Some(t) => (kind, t)
+                }
+                
+              case _ => 
+                warn(c, s"Proper concat removal of ${c.serialize} cannot be guaranteed as the expected type is Unknown")
+                (UnknownExpressionKind, UnknownType())
+            }
+            val (expr, stmt) = processRHS(c, Reference(ui, s"${i.name}$name", Seq(), tpe, kind, SinkFlow), false)
             appendOption(preStmts, stmt)
             expr
             

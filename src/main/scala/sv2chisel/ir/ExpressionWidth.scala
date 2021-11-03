@@ -5,7 +5,9 @@
 package sv2chisel
 package ir
 
-import logger.EasyLogging
+import logger.{LazyLogging}
+import sv2chisel.transforms.InfoLogger
+import org.antlr.v4.runtime.{CommonTokenStream}
 
 package object expressionWidth {
   implicit def expressionToExpressionWidth(e: Expression) = new ExpressionWidth(e)
@@ -13,10 +15,18 @@ package object expressionWidth {
 
 import expressionWidth._
 
-class ExpressionWidth(e: Expression) extends EasyLogging {
+class ExpressionWidth(e: Expression) extends LazyLogging with InfoLogger {
+  var currentSourceFile : Option[SourceFile] = None
+  var currentStream : Option[CommonTokenStream] = None
   val ui = UndefinedInterval
   
-  def getWidthOption(): Option[Expression] = {
+  def getWidthOption(
+    implicit currentSourceFile : Option[SourceFile], 
+    currentStream : Option[CommonTokenStream]
+  ): Option[Expression] = {
+    this.currentSourceFile = currentSourceFile
+    this.currentStream = currentStream
+    
     e.tpe.widthOption match {
       case Some(w) => Some(w.expr)
       case None => 
@@ -61,7 +71,7 @@ class ExpressionWidth(e: Expression) extends EasyLogging {
           // case x: UndefinedExpression => 
           
           case _ => 
-            warn(s"Unsupported Expression for width inference: ${e.serialize}")
+            warn(e, s"Unsupported width inference for: ${e.serialize}: <${e.tpe.serialize}>(${e.tpe.getClass.getName})")
             None
         }
     }

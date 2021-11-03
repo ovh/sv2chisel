@@ -5,7 +5,10 @@
 package sv2chisel
 package ir
 
-import logger.EasyLogging
+import logger.{LazyLogging}
+import sv2chisel.transforms.InfoLogger
+import org.antlr.v4.runtime.{CommonTokenStream}
+
 
 package object widthExpressionType {
   implicit def typeToWithExpressionType(t: Type) = new WidthExpressionType(t)
@@ -13,16 +16,21 @@ package object widthExpressionType {
 
 import widthExpressionType._
 
-class WidthExpressionType(t: Type) extends EasyLogging {
+class WidthExpressionType(t: Type) extends LazyLogging with InfoLogger {
+  var currentSourceFile : Option[SourceFile] = None
+  var currentStream : Option[CommonTokenStream] = None
+  
   val ui = UndefinedInterval
   
-  def getWidthExpression(): Expression = {
+  def getWidthExpression(implicit currentSourceFile : Option[SourceFile], currentStream : Option[CommonTokenStream]): Expression = {
+    this.currentSourceFile = currentSourceFile
+    this.currentStream = currentStream
     t match {
       case v: VecType =>
         v.tpe match {
           case Seq(t) => DoPrim(ui, PrimOps.Mul(ui), Seq(v.getWidth(), t.getWidthExpression))
           case _ => 
-            fatal("Unsupported MixedVec Type for width expression calculation")
+            fatal(v, "Unsupported MixedVec Type for width expression calculation")
             UndefinedExpression(ui)
         }
       case b: BundleType =>
@@ -33,7 +41,7 @@ class WidthExpressionType(t: Type) extends EasyLogging {
         DoPrim(ui, PrimOps.GetWidth(ui), Seq(TypeInst(ui, u.tpe, Some(u.name), u.path, HwExpressionKind, SourceFlow)), SwExpressionKind, IntType())
 
       case _ => 
-        fatal(s"Unsupported Type for width expression calculation: ${t}")
+        fatal(t, s"Unsupported Type for width expression calculation: ${t}")
         UndefinedExpression(ui)
     }
   }
