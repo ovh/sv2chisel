@@ -780,9 +780,22 @@ class ChiselSubField(e: SubField){
   }
 }
 
+object getSafeBeforeParenthesis {
+  // hacky fix, waiting for chisel to remove parenthesis for asUInt in its def to avoid this syntax conflict
+  // deprecation started in chisel 3.5, maybe removed in 3.6 ?
+  def apply(expr: Expression, ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
+    val underlying = expr.chiselize(ctx)
+    (Utils.isSimple(expr), underlying.last.txt) match {
+      case (true, ".asUInt") => ChiselTxtS(expr, ctx, "(") ++ underlying ++ ChiselTxtS(")")
+      case (false, _) => ChiselTxtS(expr, ctx, "(") ++ underlying ++ ChiselTxtS(")")
+      case _ => underlying
+    }
+  }
+}
+
 class ChiselSubIndex(e: SubIndex){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    e.expr.chiselize(ctx) ++ ChiselTxtS(e, ctx, "(") ++ 
+    getSafeBeforeParenthesis(e.expr, ctx) ++ ChiselTxtS(e, ctx, "(") ++ 
       e.index.chiselize(ctx) ++ ChiselTxtS(")")
   }
 }
@@ -797,7 +810,7 @@ class ChiselSubRange(e: SubRange){
       case _ => rwarn(ctx, e, s"Probably unsupported subrange of expression ${e.expr.serialize} of type ${e.expr.tpe.serialize} (${e.flow})")
     }
     
-    e.expr.chiselize(ctx) ++ ChiselTxtS(e, ctx, "(") ++ 
+    getSafeBeforeParenthesis(e.expr, ctx) ++ ChiselTxtS(e, ctx, "(") ++ 
       e.left.chiselize(ctx) ++ ChiselTxtS(",") ++
       e.right.chiselize(ctx) ++ ChiselTxtS(")")
   }

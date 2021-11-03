@@ -37,6 +37,7 @@ object Utils extends LazyLogging with InfoLogger {
       case _: Concat => true
       case _: Number => true
       case _: DoCall => true
+      case _: SubField => true
       case s: SubIndex => isSimple(s.expr)
       case s: SubRange => isSimple(s.expr)
       case DoPrim(_,PrimOps.InlineIf(_), _, HwExpressionKind, _) => true // Mux

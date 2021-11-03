@@ -5,7 +5,6 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- add parenthesis to asUInt() before subIndex/subRange accesses or wrap the whole expression with parenthesis to avoid error
 
 - fix cast for strings within expressions + test-case
 - fix deflogic for functions (not reg allowed in verilog standard)
