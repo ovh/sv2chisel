@@ -16,6 +16,9 @@ import collection.mutable.{HashMap, HashSet, ArrayBuffer}
 case object UndefinedInterval extends Interval(-1,-1) {
   override def toString : String = "UndefinedInterval"
 }
+case class TechnicalInterval(r: Int) extends Interval(-1,r) {
+  override def toString : String = s"TechnicalInterval($b)"
+}
 
 /** Intermediate Representation for SourceFile */
 sealed abstract class SVNode {
@@ -328,7 +331,16 @@ object DontCare {
 case class StringLit(tokens: Interval, string: String, kind : ExpressionKind, width: Width) extends Expression {
   type T = StringLit
   def flow : Flow = SourceFlow
-  def tpe: Type = StringType(UndefinedInterval, width)
+  def tpe: Type = {
+    kind match {
+      case HwExpressionKind => 
+        val uint8 = UIntType(UndefinedInterval, Width(8), NumberDecimal)
+        PackedVecType(UndefinedInterval, Seq(uint8), width.getBoundToZero, downto = true)
+        
+      case _ => StringType(UndefinedInterval, width)
+    }
+    
+  }
   def mapExpr(f: Expression => Expression) = this
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = this
@@ -930,6 +942,7 @@ case class DefFunction(
   tpe: Type
 ) extends Statement with IsDeclaration with FetchPort {
   val attributes: VerilogAttributes = NoVerilogAttribute
+  val kind : ExpressionKind = HwExpressionKind // TODO: deal with various function kinds
   type T = DefFunction
   def serialize: String = s"function $name : ${indent(body.serialize)}\n"  
   
@@ -1459,6 +1472,18 @@ case class Width(tokens: Interval, expr: Expression) extends SVNode {
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   def mapExpr(f: Expression => Expression): Width = this.copy(expr = f(expr))
   def foreachExpr(f: Expression => Unit): Unit = f(expr)
+  
+  def getBoundToZero(): Expression = {
+    // need to do -1 to get bound from width
+    // in some case there is a +1 in the expression, let's just strip it
+    expr match {
+      case DoPrim(_, _:PrimOps.Add, Seq(e, p), _, _) if(p.serialize == "1") => e 
+      case DoPrim(_, _:PrimOps.Add, Seq(p, e), _, _) if(p.serialize == "1") => e 
+      case n: Number => n.copy(value = s"${n.evalBigInt()-1}")
+      case _ => 
+        DoPrim(expr.tokens, PrimOps.Sub(UndefinedInterval), Seq(expr, Number(UndefinedInterval,"1", SwExpressionKind)), expr.kind, expr.tpe)
+    }
+  }
 }
 
 object Width {

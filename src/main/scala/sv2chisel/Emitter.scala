@@ -6,7 +6,7 @@ package sv2chisel
 
 import sv2chisel.Utils.time
 import sv2chisel.chiselize._
-import sv2chisel.ir.{UndefinedInterval, Interval, SourceFile, SVNode}
+import sv2chisel.ir.{UndefinedInterval, TechnicalInterval, Interval, SourceFile, SVNode}
 import sv2chisel.antlr.{sv2017Lexer}
 
 import logger._
@@ -140,15 +140,15 @@ object Emitter extends EasyLogging {
   
   private def emit(ctx: ChiselEmissionContext, chisel: Seq[ChiselTxt], stream: CommonTokenStream): String = {
     
-    def emitRaw(t: ChiselTxt): String = {
-      if(t.newLine) {
+    def emitRaw(t: ChiselTxt, lastWasSingleLineComment: Boolean): String = {
+      if(t.newLine || lastWasSingleLineComment) {
         "\n" + ctx.indent * t.indentLevel + t.txt 
       } else {
         t.txt
       }
     }
     
-    def retrieveHidden(low: Int, high: Int, expIndent: Int, newLine: Boolean): (Int, String) = {
+    def retrieveHidden(low: Int, high: Int, expIndent: Int, newLine: Boolean, stopAt1stMain: Boolean): (Int, String) = {
       val str = ArrayBuffer[String]()
       val ws = ArrayBuffer[String]()
       var startFromNewLineNext = low == 0 // first token always start from new line
@@ -156,7 +156,7 @@ object Emitter extends EasyLogging {
 
       def getSpace: String = if(startFromNewLine) ctx.indent * expIndent else " "
       
-      def processToken(tok: Token, last: Boolean = false): Boolean = {
+      def processToken(tok: Token, last: Boolean = false): (Boolean, Boolean) = {
         startFromNewLine = startFromNewLineNext
         tok.getChannel() match {
           case sv2017Lexer.COMMENTS => 
@@ -203,7 +203,7 @@ object Emitter extends EasyLogging {
                 "\n"*n + a.last.replace("    ", "  ") + txt + eol
             })
             ws.clear()
-            true
+            (true, false)
             
           case sv2017Lexer.WHITESPACES => 
             ws += tok.getText()
@@ -214,11 +214,20 @@ object Emitter extends EasyLogging {
               trace(s"Reintegrating $newlineCount `\\n`")
               str += "\n"*newlineCount
               ws.clear()
+              (true, false)
+            } else {
+              (false, false) // not emitted
             }
             
-            true
+          case _ => 
+            ws.clear() // prevent carrying unwanted whitespaces between tokens
+            val stop = tok.getType match {
+              case sv2017Lexer.SEMI => false // ignore
+              case _ => stopAt1stMain 
+            }
             
-          case _ => false // ignore
+            if(stop) debug(s"Stoping at `${tok.getText}`")
+            (false, stop)
         }
       }
       
@@ -229,8 +238,13 @@ object Emitter extends EasyLogging {
           case s => s.asScala.foreach(t => processToken(t))
         }
       } else {
-        for (i <- (low until high)) {
-          emittedUntil = if(processToken(stream.get(i), high-1 == i)) i else emittedUntil
+        var i = low
+        var stop = false
+        while (i < high && !stop) {
+          val (emitted, stp) = processToken(stream.get(i), high-1 == i)
+          emittedUntil = if(emitted) i else emittedUntil
+          stop = stp
+          i += 1
         }
       }
       
@@ -248,35 +262,45 @@ object Emitter extends EasyLogging {
     var emittedUntil = -1
     val maxToken = stream.size()
     // Logger.setLevel(LogLevel.Trace)
+    
     for (cToken <- chisel) {
       trace(cToken.toString)
       
-      cToken.tokens match {
-        case UndefinedInterval => 
+      val lastWasSingleLineComment = cToken.tokens match {
+        case UndefinedInterval => false
         // case i: Interval => 
         case i: Interval if(i.b > emittedUntil && emittedUntil+1 < maxToken) => 
           // first collect hidden comments & \n && integrate it
-          val low = emittedUntil + 1
+          val (low, high, stopAt1stMain) = i match {
+            case TechnicalInterval(max) => (emittedUntil + 1, max, true)
+            case _ => (emittedUntil + 1, i.a, false)
+          }
+          
           // TODO: address root cause & remove this check
           // only one example of this behaviour on the current corpus
           if(i.a > maxToken){
             critical(s" Unexpected interval !! maxToken: $maxToken i.a: ${i.a}, low: ${low}")
             critical(cToken.toString)
+            false
           } else {            
-            val (h, txt) = retrieveHidden(low, i.a, cToken.indentLevel, cToken.newLine)
-            trace(s" |-> low = $low ==> h= $h")
+            val (h, txt) = retrieveHidden(low, high, cToken.indentLevel, cToken.newLine, stopAt1stMain)
+            trace(s" |-> low = $low ; high = $high ==> h= $h (${stream.get(h).getType}: `${stream.get(h).getText}`)")
             trace(s" |-> hidden retrieved: `${txt}`")
             emitted += txt
             // second increase the emittedUntil
-            emittedUntil = h
+            emittedUntil = Seq(h, i.a).max
+            stream.get(h).getType match {
+              case sv2017Lexer.ONE_LINE_COMMENT => true
+              case _ => false
+            }
           }
-        case _ => 
+        case _ => false
       }
-      emitted += emitRaw(cToken)
+      emitted += emitRaw(cToken, lastWasSingleLineComment)
     }
     // last call to retrieve hidden til EOF (if not already reached)
     if(emittedUntil+1 < maxToken){      
-      val (_, txt) = retrieveHidden(emittedUntil+1, -1, 0, false)
+      val (_, txt) = retrieveHidden(emittedUntil+1, -1, 0, false, false)
       emitted += txt
     }
     emitted.mkString

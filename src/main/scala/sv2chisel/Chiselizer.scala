@@ -319,7 +319,10 @@ class ChiselDefFunction(val f: DefFunction) extends Chiselized {
   }
   
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    val mCtxt = ctx.incr()
+    val mCtxt = f.kind match {
+      case HwExpressionKind => ctx.incr().hw() // should be considered much more carefully
+      case _ => ctx.incr()
+    }
     val pCtxt = mCtxt.incr()
     
     val comma = Seq(ChiselTxt(mCtxt, ", "))
@@ -1292,7 +1295,7 @@ class ChiselIfGen(val i: IfGen) extends Chiselized {
             getAlt(inner.alt)
           
         case s: Statement =>
-          Seq(ChiselLine(new Interval(s.tokens.a -2 , s.tokens.a -2), ctx, "} else {")) ++
+          Seq(ChiselLine(TechnicalInterval(s.tokens.a), ctx, "} else {")) ++
             s.chiselize(iCtxt)
       }
     }
@@ -1304,7 +1307,6 @@ class ChiselIfGen(val i: IfGen) extends Chiselized {
     r ++= i.conseq.chiselize(iCtxt)
     r ++= getAlt(i.alt)
     r += ChiselClosingLine(i, ctx, "}")
-    // r += ChiselLine(new Interval(i.tokens.b+2, i.tokens.b+2), ctx, "}")
     r
   }
 }

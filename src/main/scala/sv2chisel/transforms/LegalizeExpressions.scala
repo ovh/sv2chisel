@@ -592,13 +592,19 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               baseTpe match {
                 case v: VecType =>
                   v.tpe match {
-                    case Seq(t: UIntType) => t.width.expr.evalBigIntOption match {
-                      // nothing pad properly directly here
-                      case Some(i) if i == 8 => sl.copy(width = Width(UndefinedInterval,v.getWidth))
-                    }
+                    case Seq(t: UIntType) => 
+                      t.width.expr.evalBigIntOption match {
+                        // nothing pad properly directly here
+                        case Some(i) if i == 8 => sl.copy(width = Width(UndefinedInterval,v.getWidth))
+                        case _ => sl
+                      }
                     case _ => sl
                   }
-                case _ => DoCast(UndefinedInterval, sl, HwExpressionKind, baseTpe)
+                case _: UnknownType => sl // nothing to do
+                case _: UIntType => sl // nothing to do
+                case _ => 
+                  warn(s, s"Probably inconsistent stringLit baseType: $baseTpe")
+                  DoCast(UndefinedInterval, sl, HwExpressionKind, baseTpe)
               }
             case _ => s 
           }
