@@ -78,6 +78,48 @@ class FunctionSpec extends Sv2ChiselSpec {
 
   }
   
+  it should "just work with more complex functions " in {
+
+    val result = emit(wrapInPackage("""
+        |function [7:0] sum;
+        |    input [7:0] a;
+        |    input [7:0] b;
+        |    sum = a + b;
+        |endfunction
+        |
+        |function logic[7:0] my_fun;
+        |    input logic [7:0] in;
+        |    automatic logic[7:0] dbl;
+        |    dbl = sum(in, in);
+        |    if (dbl == in) begin
+        |        my_fun = '0;
+        |    end else begin
+        |        my_fun = dbl;
+        |    end
+        |endfunction
+
+        """.stripMargin
+      ))
+      
+    result should contain (  "def sum(a:UInt, b:UInt): UInt = {",
+                                "a+b",
+                              "}")
+                               
+    result should containLineSet( "  def my_fun(in:UInt): UInt = {",
+                                  "    val my_fun = Wire(UInt(8.W)) ", // not sure why there is a trailing space here?
+                                  "    val dbl = Wire(UInt(8.W)) ",
+                                  "    dbl := sum(in, in)",
+                                  "    when(dbl === in) {",
+                                  "      my_fun := 0.U",
+                                  "    } .otherwise {",
+                                  "      my_fun := dbl",
+                                  "    }",
+                                  "    my_fun",
+                                  "  }"
+                                )
+
+  }
+  
   it should "just work with simple function in usage " in {
 
     val pkt = wrapInPackage("""

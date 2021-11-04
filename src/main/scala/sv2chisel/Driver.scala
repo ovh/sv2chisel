@@ -39,6 +39,7 @@ object Driver extends EasyLogging {
       new LegalizeExpressions, // TO DO - requires TypedReferences; no more concats
       
       // Emission Oriented Transforms
+      new FixFunctionImplicitReturns,
       new NameInstancePorts,
       new RemovePatterns,
       new RemoveConcats,

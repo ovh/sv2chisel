@@ -304,19 +304,6 @@ class ChiselModule(val m: Module) extends Chiselized {
 
 class ChiselDefFunction(val f: DefFunction) extends Chiselized {
   
-  private def removeImplicitReturn(s: Statement): Statement = {
-    def applyToLastStatement(s: Statement, f: Statement => Statement): Statement = {
-      s match {
-        case b:SimpleBlock => b.copy(stmts = b.stmts.dropRight(1) :+ applyToLastStatement(b.stmts.last, f))
-        case st => f(st)
-      }
-    }
-    applyToLastStatement(s, s => s match {
-        case Connect(_,_,Reference(_,n,_,_,_,_),e,_,_) if(f.name == n) => ExpressionStatement(e)
-        case _ => s 
-      }
-    )
-  }
   
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     val mCtxt = f.kind match {
@@ -342,7 +329,7 @@ class ChiselDefFunction(val f: DefFunction) extends Chiselized {
         s += ChiselTxt(mCtxt, s" =")
     }
     s += ChiselTxt(mCtxt, s" {")
-    s ++= removeImplicitReturn(f.mapPort(_ => EmptyStmt).body).chiselize(mCtxt)
+    s ++= f.mapPort(_ => EmptyStmt).body.chiselize(mCtxt)
     s += ChiselClosingLine(f, ctx, "}")
   }
 }

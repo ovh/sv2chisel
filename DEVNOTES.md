@@ -6,7 +6,6 @@
 
 #### URGENT
 
-- fix deflogic for functions (not reg allowed in verilog standard)
 - add support for recursive concat + test case (beautiful verilog!)
 - add support for filling bit pattern in concat (filling on left or right)
 

@@ -14,12 +14,12 @@ import collection.mutable.{HashMap, HashSet, ArrayBuffer}
   *   > input reg raise [fatal] (non-sense) (resolved as input wire port)
   *   > output reg are resolved with the generation of an intermediate reg and wire
   */
-class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) extends DefModuleBasedTransform {
+class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
   
   val seenModules = new HashMap[String, DefModule]()
   
-  def processModule(mod: DefModule): DefModule = {
-    mod match {
+  def processDescription(d: Description): Description = {
+    d match {
       case m: Module =>       
         if (seenModules.contains(m.name)) {
           debug(m, s"Ignoring multiple processing for module ${m.name}")
@@ -27,10 +27,32 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
         } else {
           processModuleCore(m)
         }
-      case _ =>
-        debug(mod, s"Ignoring non-module ${mod.name} for logic inference")
-        mod
+        
+      case p: DefPackage => processPackage(p)
+        
+      case _ => d
     }
+  }
+  
+  private def processFunction(f:DefFunction): DefFunction = {
+    def processStatement(s: Statement): Statement = {
+      s match {
+        case l: DefLogic => l.copy(resolution = LogicWire) // register forbidden in function in verilog
+        case _ => s.mapStmt(processStatement) 
+      }
+    }
+    f.mapStmt(processStatement)
+  }
+  
+  private def processPackage(p: DefPackage): DefPackage = {
+    def processStatement(s: Statement): Statement = {
+      s match {
+        case f: DefFunction => processFunction(f)
+        case _ => s.mapStmt(processStatement) 
+      }
+      
+    }
+    p.mapStmt(processStatement)
   }
   
   private def processModuleCore(m: Module): DefModule = {
@@ -126,7 +148,7 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
             val stream = currentStream
             val src = currentSourceFile
             updateContext(d.name)
-            val res = Some(processModule(d))
+            val res = Some(processDescription(d))
             currentStream = stream
             currentSourceFile = src
             res
@@ -136,7 +158,7 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
         }
       }
       instModule match {
-        case Some(d) =>
+        case Some(d: Module) =>
           val clock = d.ports.zipWithIndex.collectFirst{
             case (Port(_,_,_,_,_,_,_,_,_,Some(n),_),p) => (n,p)
           }.getOrElse(("<unknown>", -1))
@@ -147,7 +169,7 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
             case _ => 
           })
           i
-        case None => i // nothing to do 
+        case _ => i // nothing to do 
       }
       
     }
@@ -288,6 +310,7 @@ class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) ex
     def processStatement(s: Statement): Statement = {
       s match {
         case r: DefLogic => processLogic(r)
+        case f: DefFunction => processFunction(f)
         case p: Port => processPort(p)
         case _ => s.mapStmt(processStatement)
       }
