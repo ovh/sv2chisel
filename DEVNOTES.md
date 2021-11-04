@@ -6,9 +6,6 @@
 
 #### URGENT
 
-- add support for recursive concat + test case (beautiful verilog!)
-- add support for filling bit pattern in concat (filling on left or right)
-
 - add support for truly generic enum (no values in verilog)
 - fix SInt cast weird behavior for params... (investigate behavior of InlineIf whose kind should depend on kind of the value being tested (test at elab or actual hw Mux)) (see tfpa:361 for ex)
 

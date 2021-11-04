@@ -41,7 +41,7 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     result should contain ("val B_TRUE: Boolean = true")
     result should contain ("val B_FALSE: Boolean = false")
     result should contain ("val C_UNKNOWN: Boolean")
-    result should contain ("val INTP = (if(B_TRUE) 5 else 4)+(if(C_UNKNOWN) 1 else 0)*(if(B_FALSE) 1 else 0)")
+    result should contain ("val INTP = (if(B_TRUE) 5 else 4)+((if(C_UNKNOWN) 1 else 0)*(if(B_FALSE) 1 else 0))")
     result should contain ("val a = Wire(Bool())")
     result should contain ("val b = Wire(Bool())")
     result should contain ("val c = Wire(Bool())")
@@ -55,7 +55,7 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     result should contain ("w(15,0) := z(10,0).asTypeOf(SInt(16.W)).asBools") 
     result should contain ("w(14,0) := Cat(z(5,0), z(7,6)).asTypeOf(SInt(15.W)).asBools")
     result should contain ("wu := w.asTypeOf(SInt(32.W)).asUInt") 
-    result should contain ("w := (z*z+z+1.U).asTypeOf(Vec(32, Bool()))") 
+    result should contain ("w := (((z*z)+z)+1.U).asTypeOf(Vec(32, Bool()))")
     
     result should contain ("ww(31,25) := Mux(w(6,5).asUInt === \"b00\".U(2.W), \"b0100000\".U(7.W), \"b0000000\".U(7.W)).asBools")
     // ugly rendering but ... it works ...
@@ -113,8 +113,8 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     result should contain ("val a = Wire(UInt(32.W))")
     result should contain ("val b = Wire(Vec(32, Bool()))")
     result should contain ("val res = Wire(Bool())")
-    result should contain ("b(15,0) := (65535.U).asTypeOf(Vec(16, Bool()))")
-    result should contain ("res := (a& ~b.asUInt).orR()")
+    result should contain ("b(15,0) := 65535.U.asTypeOf(Vec(16, Bool()))")
+    result should contain ("res := (a&( ~b.asUInt)).orR()")
 
   }
   

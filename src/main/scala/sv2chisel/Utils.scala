@@ -31,6 +31,9 @@ object Utils extends LazyLogging with InfoLogger {
   
   def isSimple(e: Expression): Boolean = {
     e match {
+      case _: BoolLiteral => true
+      case _: UIntLiteral => true
+      case _: SIntLiteral => true
       case _: StringLit => true
       case _: Reference => true
       case _: DoCast => true
@@ -41,6 +44,9 @@ object Utils extends LazyLogging with InfoLogger {
       case s: SubIndex => isSimple(s.expr)
       case s: SubRange => isSimple(s.expr)
       case DoPrim(_,PrimOps.InlineIf(_), _, HwExpressionKind, _) => true // Mux
+      case DoPrim(_,PrimOps.Par(_), _, _, _) => true // Parenthesis
+      case DoPrim(_,PrimOps.CeilLog2(_), _, _, _) => true
+      case DoPrim(_,PrimOps.GetWidth(_), _, _, _) => true
       case _ => false
     }
   }
@@ -67,6 +73,7 @@ object Utils extends LazyLogging with InfoLogger {
       case n: PrimOp => n
       case n: Expression => n.mapExpr(cleanTok).mapType(cleanTok) match {
           case d: DoPrim => d.copy(op = cleanTok(d.op))
+          case r: Reference => r.copy(flow = UnknownFlow)
           case e => e 
         }
       
@@ -97,7 +104,13 @@ object Utils extends LazyLogging with InfoLogger {
   }
   
   def eq[T <: SVNode](n1: T, n2: T): Boolean = {
-    cleanTok(n1) == cleanTok(n2)
+    val clean1 = cleanTok(n1)
+    val clean2 = cleanTok(n2)
+    val res = clean1 == clean2
+    trace(s"$res: ${n1.serialize} == ${n2.serialize}")
+    trace(s" |-> Before cleaning ${n1} & ${n2}")
+    trace(s" |-> After cleaning ($res) of ${clean1} & ${clean2}")
+    res
   }
   
   

@@ -27,7 +27,7 @@ class IfElseGenSpec extends Sv2ChiselSpec {
     )
     result should contain ("class Test() extends MultiIOModule {")
     
-    result should contain ( "if( !(a != 0) || (b != 0)) {",
+    result should contain ( "if(( !(a != 0)) || (b != 0)) {",
                                "res := 0.U",
                              "} else if((c != 0)) {",
                                "res := 1.U",
@@ -56,7 +56,7 @@ class IfElseGenSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     result should contain ("class Test() extends MultiIOModule {")
-    result should contain ( "if( !(a != 0) || (b != 0)) {",
+    result should contain ( "if(( !(a != 0)) || (b != 0)) {",
                                "res := 0.U",
                              "} else if((c != 0)) {",
                                "res := 1.U",
@@ -85,7 +85,7 @@ class IfElseGenSpec extends Sv2ChiselSpec {
     )
     debug(result)
     result should contain ("class Test() extends MultiIOModule {")
-    result should contain ( "if( !(a != 0) || (b != 0)) {",
+    result should contain ( "if(( !(a != 0)) || (b != 0)) {",
                                "res := 0.U",
                              "} else {",
                                 "if((c != 0)) {",
@@ -119,7 +119,7 @@ class IfElseGenSpec extends Sv2ChiselSpec {
     debug(result)
     result should contain ("class Test() extends MultiIOModule {")
     
-    result should contain ( "if( !(a != 0) || (b != 0)) {",
+    result should contain ( "if(( !(a != 0)) || (b != 0)) {",
                                "res := 0.U",
                              "} else {",
                                 "if((c != 0)) {",

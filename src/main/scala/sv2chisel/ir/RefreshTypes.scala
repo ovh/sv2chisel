@@ -101,6 +101,21 @@ class SubIndexRefreshType(s: SubIndex) extends LazyLogging with InfoLogger {
         debug(s, s"Converting index to UInt: ${s.serialize}")
         s.copy(tpe = BoolType(u.tokens), kind = s.expr.kind) // index of UInt is bool
         
+      case i: IntType => 
+        debug(s, s"Converting index to UInt: ${s.serialize}")
+        s.expr match {
+          // Number(tokens: Interval, value: String, width: Width, base: NumberBase, kind: ExpressionKind)
+          // UIntLiteral(tokens: Interval, value: BigInt, width: Width, base: NumberBase)
+          case n: Number => 
+            val expr = UIntLiteral(n.tokens, n.getBigInt, n.width, n.base)
+            s.copy(tpe = BoolType(i.tokens), kind = HwExpressionKind, expr = expr)
+            
+          case e =>
+            critical(s, s"Unsupported IntType for expr '${e.serialize}' for subindex expression '${s.serialize}'")
+            s.copy(tpe = UnknownType(), kind = s.expr.kind)
+        }
+        
+        
       case u: UserRefType => 
         debug(s, s"Unsupported user-defined type '${u.serialize}' for subrange expression '${s.serialize}' (this should be adressed by LegalizeExpression transform)")
         s.copy(tpe = UnknownType(), kind = s.expr.kind)

@@ -44,7 +44,7 @@ class ComplexRangeSpec extends Sv2ChiselSpec {
     result should contain ("a_res := a_vect(15,8).asTypeOf(UInt(8.W)) // == a_vect[15 : 8]")
     result should contain ("b_res := b_vect(7,0).asUInt // == b_vect[0 : 7]")
     result should contain ("b_res := b_vect(15,8).asTypeOf(UInt(8.W)) // == b_vect[8 :15]")
-    result should contain ("d_res := dword(8.U*sel+7.U,8.U*sel).asTypeOf(UInt(8.W))")
+    result should contain ("d_res := dword((8.U*sel)+7.U,8.U*sel).asTypeOf(UInt(8.W))")
     
   }
 

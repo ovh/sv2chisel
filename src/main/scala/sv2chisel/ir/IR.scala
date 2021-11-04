@@ -403,7 +403,7 @@ case class Reference(
   type T = Reference
   def serialize: String = (path :+ name).mkString(".")
   def mapExpr(f: Expression => Expression): Reference = this
-  def mapType(f: Type => Type): Reference = this
+  def mapType(f: Type => Type): Reference = this.copy(tpe = f(tpe))
   def mapWidth(f: Width => Width): Reference = this
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))

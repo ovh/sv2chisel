@@ -49,5 +49,15 @@ class AsUIntSubAccessSpec extends Sv2ChiselSpec {
     result shouldNot contain ( "b := a.asUInt(3)" )
     result should contain ( "b := (a.asUInt)(3)" )
   }
+  
+  it should "add parenthesis for literals in subindex" in {
+    val result = emitInModule("""
+      |localparam P = 5[2];
+      """.stripMargin
+    )
+    debug(result)
+
+    result should contain ( "val P = (5.U)(2)" )
+  }
 
 }

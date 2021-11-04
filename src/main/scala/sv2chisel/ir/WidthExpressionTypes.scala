@@ -28,6 +28,7 @@ class WidthExpressionType(t: Type) extends LazyLogging with InfoLogger {
     t match {
       case v: VecType =>
         v.tpe match {
+          case Seq(_: BoolType) => v.getWidth() // avoid a useless mul by one
           case Seq(t) => DoPrim(ui, PrimOps.Mul(ui), Seq(v.getWidth(), t.getWidthExpression))
           case _ => 
             fatal(v, "Unsupported MixedVec Type for width expression calculation")

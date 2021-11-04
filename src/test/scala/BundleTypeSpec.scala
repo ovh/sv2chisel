@@ -64,14 +64,14 @@ class BundleTypeSpec extends Sv2ChiselSpec {
     result should contain ("val test_reg = Reg(Vec(A, new t2_t))")
     
     result should contain ("test_reg(0).bool := true.B")
-    result should contain ("test_reg(0).uint := (0.U).asTypeOf(Vec(W, Bool()))")
-    result should contain ("test_reg(0).vec := (0.U).asTypeOf(Vec(B, new t1_t))")
-    result should contain ("test_reg(0).vec(0) := (0.U).asTypeOf(new t1_t)")
-    result should contain ("test_reg(0).vec(0).uint := (0.U).asTypeOf(Vec(B, Bool()))")
-    result should contain ("test_reg(0).tpe.uint := (0.U).asTypeOf(Vec(B, Bool()))")
+    result should contain ("test_reg(0).uint := 0.U.asTypeOf(Vec(W, Bool()))")
+    result should contain ("test_reg(0).vec := 0.U.asTypeOf(Vec(B, new t1_t))")
+    result should contain ("test_reg(0).vec(0) := 0.U.asTypeOf(new t1_t)")
+    result should contain ("test_reg(0).vec(0).uint := 0.U.asTypeOf(Vec(B, Bool()))")
+    result should contain ("test_reg(0).tpe.uint := 0.U.asTypeOf(Vec(B, Bool()))")
     
-    result should contain ("test_wire := (0.U).asTypeOf(Vec(A, new t2_t))")
-    result should contain ("test_wire := ((1.U<<A*(new t2_t).getWidth())-1.U).asTypeOf(Vec(A, new t2_t))")
+    result should contain ("test_wire := 0.U.asTypeOf(Vec(A, new t2_t))")
+    result should contain ("test_wire := ((1.U<<(A*(new t2_t).getWidth()))-1.U).asTypeOf(Vec(A, new t2_t))")
     
   }
 

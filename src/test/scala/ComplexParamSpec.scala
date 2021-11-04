@@ -67,16 +67,16 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     result should contain ("val IT_DOWN: Seq[Int] = Seq(IT_RIGHT, IT_LEFT)")
     result should contain ("val IT_UP: Seq[Int] = Seq(IT_LEFT, IT_RIGHT)")
     
-    result should contain ("val count = RegInit(Vec(DBLW, SInt(65.W)), (0.U).asTypeOf(Vec(DBLW, SInt(65.W))))")
+    result should contain ("val count = RegInit(Vec(DBLW, SInt(65.W)), 0.U.asTypeOf(Vec(DBLW, SInt(65.W))))")
     // IDEAL: 
     // result should contain ("val count = RegInit(VecInit.tabulate(DBLW)(_ => 0.S(65.W))")
     
-    result should contain ("val stats_count = RegInit(Vec(DBLW, UInt(64.W)), (0.U).asTypeOf(Vec(DBLW, UInt(64.W))))")
+    result should contain ("val stats_count = RegInit(Vec(DBLW, UInt(64.W)), 0.U.asTypeOf(Vec(DBLW, UInt(64.W))))")
     result should contain ("val count_live = Wire(Vec(DBLW, SInt(65.W)))")
-    result should contain ("val stats_total = WireDefault(Vec(DBLW, UInt(64.W)), (0.U).asTypeOf(Vec(DBLW, UInt(64.W))))")
+    result should contain ("val stats_total = WireDefault(Vec(DBLW, UInt(64.W)), 0.U.asTypeOf(Vec(DBLW, UInt(64.W))))")
     
-    result should contain ("val en = RegInit(Vec(DBLW, Bool()), (0.U).asTypeOf(Vec(DBLW, Bool())))")
-    result should contain ("val cnt = RegInit(Vec(DBLW, UInt(65.W)), (0.U).asTypeOf(Vec(DBLW, UInt(65.W))))")
+    result should contain ("val en = RegInit(Vec(DBLW, Bool()), 0.U.asTypeOf(Vec(DBLW, Bool())))")
+    result should contain ("val cnt = RegInit(Vec(DBLW, UInt(65.W)), 0.U.asTypeOf(Vec(DBLW, UInt(65.W))))")
     
     // TO DO:
     // result should contain ("val en = RegInit(VecInit(Seq.fill(DBLW)(false.B)))")
@@ -84,7 +84,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     // a bit more obscur however
     // result should contain ("val en = RegInit(VecInit.tabulate(DBLW)(_ => false.B))")
     
-    result should contain ("val cnter = RegInit(Vec(DBLW, UInt(65.W)), ((1.U<<DBLW*65)-1.U).asTypeOf(Vec(DBLW, UInt(65.W))))")
+    result should contain ("val cnter = RegInit(Vec(DBLW, UInt(65.W)), ((1.U<<(DBLW*65))-1.U).asTypeOf(Vec(DBLW, UInt(65.W))))")
     // to do 
     // result should contain ("val cnter = RegInit(VecInit.tabulate(DBLW)(_ => ((1.U<<65)-1.U))")
     
@@ -126,8 +126,8 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     result should contain ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
     
     result should contain ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
-    result should contain ("val en: Vec[Bool] = (0.U).asTypeOf(Vec(DBLW, Bool()))")
-    result should contain ("val cnt: Vec[UInt] = (0.U).asTypeOf(Vec(DBLW, UInt(65.W)))")
+    result should contain ("val en: Vec[Bool] = 0.U.asTypeOf(Vec(DBLW, Bool()))")
+    result should contain ("val cnt: Vec[UInt] = 0.U.asTypeOf(Vec(DBLW, UInt(65.W)))")
   }
   
   it should "support complex tables in package" in {
@@ -150,8 +150,8 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     result should contain ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
     
     result should contain ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
-    result should contain ("val en: Vec[Bool] = (0.U).asTypeOf(Vec(DBLW, Bool()))")
+    result should contain ("val en: Vec[Bool] = 0.U.asTypeOf(Vec(DBLW, Bool()))")
     // no InferUInt in package params
-    result should contain ("val cnt: Vec[Vec[Bool]] = (0.U).asTypeOf(Vec(DBLW, Vec(65, Bool())))")
+    result should contain ("val cnt: Vec[Vec[Bool]] = 0.U.asTypeOf(Vec(DBLW, Vec(65, Bool())))")
   }
 }

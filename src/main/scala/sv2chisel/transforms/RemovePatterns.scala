@@ -28,13 +28,16 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
     implicit val stream = currentStream
     // SINGLE PASS 
     
-    def getFilling(e: Expression, tpe: Type, bit: String): Expression = {
+    def getFilling(e: Expression, tpe: Type, bit: String, forceWidth: Boolean = false): Expression = {
       trace(e, s"get filling for $e $tpe $bit")
       (tpe, bit) match {
         case (_: BoolType, "'0") => BoolLiteral(e.tokens, false, HwExpressionKind)
         case (_: BoolType, "'1") => BoolLiteral(e.tokens, true, HwExpressionKind)
 
-        case (_: UIntType, "'0") => 
+        case (u: UIntType, "'0") if(forceWidth) => 
+          UIntLiteral(e.tokens, 0, u.width, NumberDecimal)
+          
+        case (_: UIntType, "'0") => // specific width usually not required
           UIntLiteral(e.tokens, 0, uw, NumberDecimal)
           
         case (_, "'0") => 
@@ -131,6 +134,16 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
       trace(s"Process expression ${e.serialize} e.tpe = ${e.tpe.serialize} ; expected = ${expected.serialize}")
       
       val exp = e match {
+        case r@ReplicatePattern(_, _, f:FillingBitPattern, _, _) =>
+          val newPattern = f.bit match {
+              case "'0" => BoolLiteral(e.tokens, false, HwExpressionKind)
+              case "'1" => BoolLiteral(e.tokens, true, HwExpressionKind)
+              case _ => critical(f, s"unsupported filling bit pattern ${f.bit}"); f
+            }
+          val details = s"Using `${f.bit}` as simple Bool (${newPattern.serialize})"
+          warn(r, s"Syntax glitch: Replicating a filling pattern defeats the automated *filling* system. $details")
+          r.copy(pattern = newPattern)
+          
         case FillingBitPattern(_, bit, _, _) => getFilling(e, tpe, bit) // kind to be used ?
         case a: AssignPattern =>
           a.assign match {
@@ -150,7 +163,65 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
         
         case _ => e
       }
-      exp.mapExpr(processExpression(_, tpe))
+      exp match {
+        case c:Concat =>
+          // some special case to handle :)
+          val stdArgs = c.args.filter { 
+            case _: FillingBitPattern => false 
+            case _ => true
+          }
+          ((c.args.size - stdArgs.size), stdArgs.isEmpty) match {
+            case (0, _) => exp.mapExpr(processExpression(_, tpe)) // Nothing to do
+              
+            case (1, false) =>
+              trace(c, s"concat with fillingbit pattern ${c.serialize}\n with tpe ${expected.serialize}")
+
+              val wExprs = stdArgs.map(_.tpe.getWidthExpression)
+              val bgOptions = wExprs.map(_.evalBigIntOption)
+              
+              def reductor(a:Option[BigInt], b: Option[BigInt]): Option[BigInt] = {
+                (a, b) match { 
+                  case (Some(a: BigInt), Some(b: BigInt)) => Some(a+b)
+                  case _ => None
+                }
+              }
+              val fullBg = bgOptions.reduce(reductor)
+              
+              val expW = expected.getWidthExpression
+              
+              val fbWidth = (fullBg, expW.evalBigIntOption) match {
+                case (Some(sum), Some(total)) => Width(total-sum)
+                case (_, total) => 
+                  val sumWidthExpression = (wExprs.zip(bgOptions).map {
+                      case (_, Some(bg)) => Number(UndefinedInterval, s"$bg")
+                      case (e, _) => e
+                    }).reduce((a, b) => {
+                      DoPrim(ui, PrimOps.Add(ui), Seq(a, b))
+                    })
+                  
+                  val totalWidthExpresion = total match {
+                    case Some(bg) => Number(UndefinedInterval, s"$bg")
+                    case _ => expW
+                  }
+                  Width(DoPrim(ui, PrimOps.Sub(ui), Seq(totalWidthExpresion, sumWidthExpression)))
+              }
+              val utpeW = UIntType(ui, fbWidth, NumberDecimal)
+              val args = c.args.map {
+                case p@FillingBitPattern(_, bit, _, _) => getFilling(p, utpeW, bit, forceWidth = true)
+                case a => processExpression(a, tpe)
+              }
+              c.copy(args = args)
+              
+              
+            case(1, true) => processExpression(c.args.head, tpe) // weird edge case: concat with single bit pattern
+              
+            case _ => 
+              critical(c, s"Illegal concat with multiple filling bit patterns: ${c.serialize}")
+              c // no need for further processing
+          }
+          
+        case _ => exp.mapExpr(processExpression(_, tpe))
+      }
     }
     
     def processStatement(s: Statement): Statement = {

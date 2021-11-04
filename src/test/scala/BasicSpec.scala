@@ -62,8 +62,8 @@ class BasicSpecs extends Sv2ChiselSpec {
     result should contain ("w := Mux(A.U === 5.U, true.B, (A != 0).B)")
     result should contain ("z := Mux(state === hw, r, w)")
     
-    result should contain ("c := a === 63.U && b")
-    result should contain ("c := aa.asUInt === 63.U && b")
+    result should contain ("c := (a === 63.U) && b")
+    result should contain ("c := (aa.asUInt === 63.U) && b")
     // TO DO : leverage implicits ???
     // result should contain ("c := a === Ones && b")
     
@@ -88,11 +88,11 @@ class BasicSpecs extends Sv2ChiselSpec {
     result should contain ("class Test() extends MultiIOModule {")
     result should contain ("val test = Wire(Vec(32, Bool()))")
     result should contain ("test := ( ~0.U(32.W)).asBools")
-    result should contain ("test(5,0) := (0.U).asTypeOf(Vec(6, Bool()))")
+    result should contain ("test(5,0) := 0.U.asTypeOf(Vec(6, Bool()))")
     result should contain ("val test2 = Wire(UInt(32.W))")
     result should contain ("test2 :=  ~0.U(32.W)")
     result should contain ("val test3 = Wire(UInt(32.W))")
-    result should contain ("test3 :=  ~((0+0)).U(32.W)")
+    result should contain ("test3 :=  ~(0+0).U(32.W)")
   }
 
 }

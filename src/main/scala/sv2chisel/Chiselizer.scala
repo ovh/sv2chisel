@@ -770,14 +770,16 @@ class ChiselSubField(e: SubField){
   }
 }
 
-object getSafeBeforeParenthesis {
-  // hacky fix, waiting for chisel to remove parenthesis for asUInt in its def to avoid this syntax conflict
-  // deprecation started in chisel 3.5, maybe removed in 3.6 ?
+object getSafeExprApply {
+  // ensure the previous emitted token is not a method without parameters (which probably accepts some...)
+  // typical use cases : .asUInt & .U
+  // avoiding the trivial subfield case which matches the regex but does not require additional brackets
   def apply(expr: Expression, ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    val underlying = expr.chiselize(ctx)
-    (Utils.isSimple(expr), underlying.last.txt) match {
-      case (true, ".asUInt") => ChiselTxtS(expr, ctx, "(") ++ underlying ++ ChiselTxtS(")")
-      case (false, _) => ChiselTxtS(expr, ctx, "(") ++ underlying ++ ChiselTxtS(")")
+    val underlying = safeChiselize(expr, ctx)
+    val notSoSimple = Utils.isSimple(expr) && underlying.last.txt.matches(".*\\.[a-zA-Z]\\w*$")
+    (notSoSimple, expr) match {
+      case (true, _:SubField) => underlying // always a special case within special cases
+      case (true, _) => ChiselTxtS(expr, ctx, "(") ++ underlying ++ ChiselTxtS(")")
       case _ => underlying
     }
   }
@@ -785,7 +787,7 @@ object getSafeBeforeParenthesis {
 
 class ChiselSubIndex(e: SubIndex){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    getSafeBeforeParenthesis(e.expr, ctx) ++ ChiselTxtS(e, ctx, "(") ++ 
+    getSafeExprApply(e.expr, ctx) ++ ChiselTxtS(e, ctx, "(") ++ 
       e.index.chiselize(ctx) ++ ChiselTxtS(")")
   }
 }
@@ -800,7 +802,7 @@ class ChiselSubRange(e: SubRange){
       case _ => rwarn(ctx, e, s"Probably unsupported subrange of expression ${e.expr.serialize} of type ${e.expr.tpe.serialize} (${e.flow})")
     }
     
-    getSafeBeforeParenthesis(e.expr, ctx) ++ ChiselTxtS(e, ctx, "(") ++ 
+    getSafeExprApply(e.expr, ctx) ++ ChiselTxtS(e, ctx, "(") ++ 
       e.left.chiselize(ctx) ++ ChiselTxtS(",") ++
       e.right.chiselize(ctx) ++ ChiselTxtS(")")
   }
@@ -910,19 +912,44 @@ class ChiselBoolLiteral(e: BoolLiteral){
 
 class ChiselUIntLiteral(e: UIntLiteral){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    ChiselTxtS(e, ctx, e.serialize) // to refactor ???
+    e.base match {
+      case NumberDecimal =>
+      case b => rwarn(ctx, e, s"Unexpected number base $b for literal ${e.serialize} -- please review if it makes sense") 
+    }
+    
+    val base = s"${e.value}.U"
+    e.width.expr match {
+      case _: UndefinedExpression => ChiselTxtS(e, ctx, base) 
+      case w if(Utils.isSimple(w)) => ChiselTxtS(e, ctx, base + s"(") ++ w.chiselize(ctx) ++ ChiselTxtS(".W)")
+      case w => ChiselTxtS(e, ctx, base + s"((") ++ w.chiselize(ctx) ++ ChiselTxtS(").W)")
+    }
   }
 }
 
 class ChiselSIntLiteral(e: SIntLiteral){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    ChiselTxtS(e, ctx, e.serialize) // to refactor ???
+    val base = s"${e.value}.U"
+    e.width.expr match {
+      case _: UndefinedExpression => ChiselTxtS(e, ctx, base) 
+      case w if(Utils.isSimple(w)) => ChiselTxtS(e, ctx, base + s"(") ++ w.chiselize(ctx) ++ ChiselTxtS(".W)")
+      case w => ChiselTxtS(e, ctx, base + s"((") ++ w.chiselize(ctx) ++ ChiselTxtS(").W)")
+    }
   }
 }
 
 class ChiselFixedLiteral(e: FixedLiteral){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     unsupportedChisel(ctx,e, "FixedLiteral")
+  }
+}
+
+object safeChiselize {
+  def apply(e: Expression, ctx: ChiselEmissionContext):Seq[ChiselTxt] = {
+    Utils.isSimple(e) match {
+      case true => e.chiselize(ctx) 
+      case false => ChiselTxtS("(") ++ e.chiselize(ctx) ++ ChiselTxtS(")") 
+    }
+    
   }
 }
 
@@ -1032,7 +1059,7 @@ class ChiselDoPrim(e: DoPrim){
       
       // Reduction operators
       case (r: RedOp, Seq(expr)) => 
-        val chiExpr = expr.chiselize(uctx)
+        val chiExpr = safeChiselize(expr, uctx)
         r match {
           case o: OrRed => chiExpr ++ ChiselTxtS(o, ctx, ".orR()")
           case o: AndRed => chiExpr ++ ChiselTxtS(o, ctx, ".andR()")
@@ -1044,15 +1071,15 @@ class ChiselDoPrim(e: DoPrim){
       case (_: RedOp, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 1 was expected.") 
       
       // Usual unary operators
-      case (u: UnaryOp, Seq(expr)) => ChiselTxtS(u, ctx, s" ${u.serialize}") ++ expr.chiselize(uctx)
+      case (u: UnaryOp, Seq(expr)) => ChiselTxtS(u, ctx, s" ${u.serialize}") ++ safeChiselize(expr, uctx)
       case (_: UnaryOp, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 1 was expected.") 
       
       // usual bool & binary operators (add spaces)
-      case (b: BoolOp, Seq(e1, e2)) => e1.chiselize(uctx) ++ ChiselTxtS(b, ctx, s" ${b.serialize} ") ++ e2.chiselize(uctx)
+      case (b: BoolOp, Seq(e1, e2)) => safeChiselize(e1, uctx) ++ ChiselTxtS(b, ctx, s" ${b.serialize} ") ++ safeChiselize(e2, uctx)
       case (_: BoolOp, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 2 were expected.")
        
       // usual binary operators
-      case (b: BinaryOp, Seq(e1, e2)) => e1.chiselize(uctx) ++ ChiselTxtS(b, ctx, s"${b.serialize}") ++ e2.chiselize(uctx)
+      case (b: BinaryOp, Seq(e1, e2)) => safeChiselize(e1, uctx) ++ ChiselTxtS(b, ctx, s"${b.serialize}") ++ safeChiselize(e2, uctx)
       case (_: BinaryOp, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 2 were expected.") 
       
       // default: unsupported

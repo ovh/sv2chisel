@@ -298,7 +298,7 @@ class RemoveConcats(
     def warnHiddenConcat(e: Expression): Unit = {
       e.foreachExpr(warnHiddenConcat)
       e match {
-        case _: Concat => critical(e, "Unmanaged hidden concatenation ... Consider upgrading RemoveConcat transform to add proper support for this one.")
+        case c: Concat => critical(e, s"Unmanaged hidden concatenation ... Consider upgrading RemoveConcat transform to add proper support for this one: ${c.serialize}")
         case _ =>
       }
     }

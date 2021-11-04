@@ -165,8 +165,8 @@ class FunctionSpec extends Sv2ChiselSpec {
     result should contain ( "val o = IO(Output(UInt(8.W)))")
     result should contain ( "val o_v = IO(Output(Vec(8, Bool())))")
 
-    result should contain ( "i_a(2,0) := (0.U).asTypeOf(Vec(3, Bool()))")
-    result should contain ( "o_v(2,0) := (0.U).asTypeOf(Vec(3, Bool()))")
+    result should contain ( "i_a(2,0) := 0.U.asTypeOf(Vec(3, Bool()))")
+    result should contain ( "o_v(2,0) := 0.U.asTypeOf(Vec(3, Bool()))")
     
     result should contain ( "o := sum(i_a.asUInt, i_b)")
     result should contain ( "o_v := sum(i_a.asUInt, i_c).asBools") // Bool is a subtype of UInt => no need for a cast

@@ -575,7 +575,21 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
           
         case r: ReplicatePattern => 
           val scaler = processExpression(r.scaler, SwExpressionKind, IntType(UndefinedInterval, NumberDecimal))
-          val pat = processExpressionRec(r.pattern, expected, baseTpe)
+          
+          val subtype = baseTpe match {
+            case u: UIntType => BoolType(u.tokens)
+            case v: VecType =>
+              v.tpe match {
+                case Seq(t) => t
+                case _ => critical(r, "Unsupported mixed vec type") ; baseUInt
+              }
+            case _ =>  
+              critical(r, s"Expected a VecType for replicate pattern: ${r.serialize} ")
+              baseUInt
+          }
+          
+          val pat = processExpression(r.pattern, expected, subtype)
+          
           val ui = UndefinedInterval
           val bound = DoPrim(ui, PrimOps.Sub(ui), Seq(scaler, Number(ui, "1")), scaler.kind, scaler.tpe)
           val tpe = PackedVecType(ui, Seq(pat.tpe), bound, true)
@@ -648,6 +662,8 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
         case na: NamedAssign => na.mapExpr(processExpressionRec(_, expected, baseTpe))
         
         case t: TypeInst => if(t.name.isDefined) t else t.mapType(processType) // no need to process references
+        
+        case u: UIntLiteral => u 
         
         case _ => 
           warn(e, s"unsupported expression: ${e.serialize}")

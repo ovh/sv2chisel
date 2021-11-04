@@ -338,7 +338,7 @@ class EmitterSpec extends Sv2ChiselSpec {
       "  val res = Wire(UInt(32.W))  // my wire",
       "",
       "  // starting big block  // generate",
-      "  if( !(a != 0) || (b != 0)) { // \"if\"",
+      "  if(( !(a != 0)) || (b != 0)) { // \"if\"",
       "    res := 0.U // zero",
       "  } else if((c != 0)) { // \"else if\"",
       "    res := 1.U // one",
