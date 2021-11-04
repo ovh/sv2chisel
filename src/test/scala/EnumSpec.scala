@@ -38,6 +38,32 @@ class EnumSpec extends Sv2ChiselSpec {
     
   }
   
+  it should " support verilog generic enumeration" in {
+    val result = emit(wrapInPackage(s"""
+      |// comment
+      |typedef enum logic [1:0] {
+      |    STATE_A,
+      |    STATE_B,
+      |    STATE_C
+      |} state_t;
+      """.stripMargin
+    ))
+    debug(result)
+    result should contain ("import chisel3._")
+    result should contain ("import sv2chisel.helpers.enum._")
+    
+    result should contain ("object state_t extends GenericHwEnum {")
+    result should contain ("val STATE_A = Value")
+    result should contain ("val STATE_B = Value")
+    result should contain ("val STATE_C = Value")
+    
+    // compression option to discuss below a given number of characters 
+    // object state_t extends GenericHwEnum {
+    //   val STATE_A, STATE_B, STATE_C = Value
+    // }
+    
+  }
+  
   it should " support custom enumeration" in {
     val result = emit(wrapInPackage(s"""
       |// comment

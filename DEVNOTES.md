@@ -6,7 +6,6 @@
 
 #### URGENT
 
-- add support for truly generic enum (no values in verilog)
 - fix SInt cast weird behavior for params... (investigate behavior of InlineIf whose kind should depend on kind of the value being tested (test at elab or actual hw Mux)) (see tfpa:361 for ex)
 
 - add the ability to includes blackboxes (only parsing the ports and generate proper chisel blackboxes with corresponding resources)

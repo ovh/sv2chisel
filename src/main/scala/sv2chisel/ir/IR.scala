@@ -1716,6 +1716,12 @@ case class EnumType(tokens: Interval, fields: Seq[EnumField], tpe: Type, kind: E
   def widthOption: Option[Width] = tpe.widthOption
   
   def isGeneric: Boolean = {
+    // no user-specified values in verilog
+    fields.map({
+      case EnumField(_,_,_:UndefinedExpression) => true
+      case _ => false
+    }).reduce(_ && _) ||
+    // incremental values specified by user in verilog
     fields.zipWithIndex.map({
       case (EnumField(_,_,n:Number), i) => n.getInt == i
       case _ => false
