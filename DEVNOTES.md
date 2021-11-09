@@ -6,11 +6,10 @@
 
 #### URGENT
 
-- fix SInt cast weird behavior for params... (investigate behavior of InlineIf whose kind should depend on kind of the value being tested (test at elab or actual hw Mux)) (see tfpa:361 for ex)
-
 - add the ability to includes blackboxes (only parsing the ports and generate proper chisel blackboxes with corresponding resources)
 
 - fix unexpected intervals at emission (non-critical)
+- infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)
 
 - add true regression tests based on actual sv files (internal repo and CI ?) down to 
   - scala compilation
@@ -32,6 +31,7 @@
 - FIX & USE OR DROP Special Vec of Char Inference for register affected to 
 - LESS URGENT : support printf
 - infer Boolean instead of UInt for parameters & then legalize software expression or include implicit conversion Int to Bool
+- Remove all Utils.throwInternalError in IR & implicits => replace with Option, can raise errors properly on None in visitor/transforms/chiselizer 
 
 #### NEXT-STEPS
 

@@ -10,7 +10,9 @@ import logger._
 class LegalizeExpressionSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "LegalizeExpression" should "manage general types properly" in {
+  behavior of "LegalizeExpression"
+  
+  it should "manage general types properly" in {
     val result = emitInModule("""
       |localparam [0:0] B_TRUE = 1;
       |localparam [0:0] B_FALSE = 0;
@@ -136,6 +138,46 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     result should contain ( "r := w^c" )
     result should contain ( "o := (w&c)|(a&b)" )
     result should contain ( "o := (w && c) || (a && b)" )
+  }
+  
+  it should "manage edge cases" in {
+    val result = emitInModule("""
+      |localparam PA = 2;
+      |localparam PB = 2;
+      |localparam PC = 6;
+      |
+      |typedef struct packed {
+      |    logic [7:0] fieldA;
+      |    logic [13:0] fieldB;
+      |    logic [13:0] fieldC;
+      |} my_struct_t;
+      |
+      |wire my_struct_t s;
+      |
+      |wire v;
+      |wire [7:0] u;
+      |
+      |assign u = (s.fieldA == PC ? PB : 0) + $bits(my_struct_t)/8;
+      |assign u = s.fieldB + PA + (s.fieldA == PC ? PB : 0) + $bits(my_struct_t)/8;
+      |
+      |// NB:(Chisel error): can't create Mux with heterogeneous types class chisel3.SInt and class chisel3.UInt
+      |assign v = s.fieldC >= (s.fieldB + PA + (s.fieldA == PC ? PB : 0) + $bits(my_struct_t)/8);
+      |assign v = s.fieldC == (s.fieldB + PA + (s.fieldA == PC ? PB : 0) + $bits(my_struct_t)/8);
+      """.stripMargin
+    )
+    debug(result)
+    
+    result should contain ("val v = Wire(Bool())")
+    result should contain ("val u = Wire(UInt(8.W))")
+    result should contain (
+      "u := (Mux(s.fieldA.asUInt === PC.U, PB.U(8.W), 0.U))+((new my_struct_t).getWidth()/8).U",
+      "u := ((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U(8.W), 0.U)))+((new my_struct_t).getWidth()/8).U"
+    )
+
+    result should contain (
+      "v := s.fieldC.asUInt >= (((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U, 0.U)))+((new my_struct_t).getWidth()/8).U)",
+      "v := s.fieldC.asUInt === (((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U, 0.U)))+((new my_struct_t).getWidth()/8).U)"
+    )
   }
 
 }

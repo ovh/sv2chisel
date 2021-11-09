@@ -1577,8 +1577,8 @@ class Visitor(
           case _ => (t, HwExpressionKind)
         }
       case (_, Some(u:UIntLiteral)) =>(u.tpe, HwExpressionKind)
-      case (_, Some(n:Number)) if(n.width != UnknownWidth()) =>
-        (UIntType(n.tokens, n.width, n.base), HwExpressionKind)
+      case (_, Some(n:Number)) if(n.width != UnknownWidth()) => (UIntType(n.tokens, n.width, n.base), HwExpressionKind)
+      case (_:UnknownType, Some(n:Number)) => (IntType(n.tokens, n.base), SwExpressionKind)
       case _ => (t, SwExpressionKind)
     }
     
@@ -1586,7 +1586,7 @@ class Visitor(
       case Seq() => updatedTpe
       case s => getFullType(s.map(getUnpackedDim),updatedTpe)
     }
-    trace(ctx, s"param $name: ${tpe.serialize} $kind")
+    trace(ctx, s"param $name: ${tpe.serialize} $kind = ${value.map(_.serialize).getOrElse("<none>")} (${value.map(_.getClass.getName).getOrElse("<none>")})")
 
     DefParam(ctx.getSourceInterval(), attr, name, tpe, value, kind)
   }

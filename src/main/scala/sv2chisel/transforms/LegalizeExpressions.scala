@@ -10,6 +10,7 @@ import sv2chisel.ir._
 import sv2chisel.ir.refreshTypes._
 import sv2chisel.ir.evalExpression._
 import sv2chisel.ir.expressionWidth._
+import sv2chisel.ir.expressionToLiteral._
 
 class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
   
@@ -73,10 +74,19 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               e
           }
         
-        case (_: UnknownType, _, _) => 
+        case (_: UnknownType, _, _) =>
           (e.kind, kind) match {
-            case (SwExpressionKind, HwExpressionKind) => DoCast(e.tokens, e, kind, tpe) 
-            case _ => e // nothing to do 
+            case (SwExpressionKind, HwExpressionKind) => 
+              e.toLiteralOption match {
+                case Some(l) => l
+                case None =>
+                  critical(e, s"Aborting cast of ${e.serialize}(@Sw) to UnknownType()@Hw")
+                  e
+              }
+              
+            case _ => 
+              trace(e, s"Aborting cast to UnknownType(): ${e.serialize}")
+              e // nothing to do 
           }
         
         case _ =>  
@@ -208,7 +218,14 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
       (commonKind(s), commonType(s), required) match {
         // Rules based on kinds
         // > required HW
-        case ((_, Some(SwExpressionKind)), _, Some(HwExpressionKind)) => (HwExpressionKind, baseHwType, s.map(doCast(_, HwExpressionKind, baseHwType)))
+        case ((_, Some(SwExpressionKind)), _, Some(HwExpressionKind)) => 
+          val updated =  s.map(doCast(_, HwExpressionKind, baseHwType))
+          val upTpe = (baseHwType, commonType(updated)) match {
+            case (_:UnknownType, Some(t)) => t
+            case (b, _) => b
+          }
+          (HwExpressionKind, upTpe, updated)
+          
         // > Make uneven kinds even (NB: uneven kinds means uneven types)
         case ((true, None), _, _) => 
           val (tpe, se) = defaultToHw(s, baseHwType)
@@ -303,12 +320,12 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
               
             case (_: PrimOps.InlineIf, _) => 
               // NOTE: not using Rec here, instantiating a new thread with final cast
-              trace(p, s"InlineIf: ${p.serialize}")
               val pred = processExpression(p.args(0), expected, BoolType(UndefinedInterval))
               
               val conseq = processExpressionRec(p.args(1), expected, castTpe)
               val alt = processExpressionRec(p.args(2), expected, castTpe)
               val (kind, tpe, cast) = castTypeAll(Seq(conseq, alt), castTpe, Some(expected))
+              trace(p, s"InlineIf: ${p.serialize} kind: $kind tpe: $tpe cast: $cast")
               
               val args = (pred.kind, kind) match {
                 case (SwExpressionKind, HwExpressionKind) => 
@@ -371,8 +388,31 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
             
             case (o: PrimOps.BoolOp, _) => 
               val boolTpe = BoolType(UndefinedInterval)
+              trace(p, s"Processing comparison ${p.serialize}")
+              val exprs = p.args.map(processExpressionRec(_, expected, UnknownType())) match {
+                case Seq(a, b) => (a.tpe, b.tpe) match {
+                    case (_:UnknownType, _:UnknownType) => 
+                      // let's try again as UInts
+                      trace(o, s"No type known - attempting cast as ${baseUInt.serialize}")
+                      p.args.map(processExpressionRec(_, expected, baseUInt))
+                    case (t, _:UnknownType) =>
+                      trace(o, s"One type known - attempting cast as ${t.serialize}")
+                      Seq(a, processExpressionRec(p.args(1), expected, t))
+                      
+                    case (_:UnknownType, t) =>
+                      trace(o, s"One type known - attempting cast as ${t.serialize}")
+                      Seq(processExpressionRec(p.args(0), expected, t), b)
+                      
+                    case (t1, t2) => 
+                      trace(o, s"Both type known: ${t1.serialize} ; ${t2.serialize}")
+                      Seq(a, b)
+                  }
+                
+                case l => 
+                  fatal(p, s"Got unexpected number of arguments ${l.length} for a comparison op (2 were expected)")
+                  Seq(UndefinedExpression(), UndefinedExpression())
+              }
               
-              val exprs = p.args.map(processExpressionRec(_, expected, UnknownType()))
               val (kind, args) = castThemAll(exprs, baseUInt, Some(expected))
 
               val res = o match {

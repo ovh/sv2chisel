@@ -64,7 +64,7 @@ class InferParamTypes(val llOption: Option[logger.LogLevel.Value] = None) extend
           case Seq(cond@_, conseq, alt) => 
             val a = getType(name, conseq)
             val b = getType(name, alt)
-            if (a != b) Utils.throwInternalError(s"Unable to infer type for param $name")
+            if (!Utils.eq(a, b)) fatal(a, s"Unable to infer type for param $name (mux with ${a.serialize} & ${b.serialize})")
             a
             
           case _ => Utils.throwInternalError(s"Unexpected number of arguments (${args.size}) for primop InlineIf while 3 were expected ")
@@ -72,7 +72,10 @@ class InferParamTypes(val llOption: Option[logger.LogLevel.Value] = None) extend
         case DoPrim(_, _, args, _, _) => args.map(a => getType(name, a)) match {
           case Seq() => IntType(UndefinedInterval, NumberDecimal)
           case Seq(t) => t 
-          case s => s.reduce((a, b) => { if(a != b) Utils.throwInternalError(s"Unable to infer type for param $name"); a })
+          case s => s.reduce((a, b) => { 
+            if (!Utils.eq(a, b)) fatal(a, s"Unable to infer type for param $name (op with ${a.serialize} & ${b.serialize})")
+            a 
+          })
         }
           
         case _ => 
