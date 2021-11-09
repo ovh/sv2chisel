@@ -59,6 +59,7 @@ package object chiselize extends EasyLogging {
   implicit def defPackageToChisel(s: DefPackage) = new ChiselDefPackage(s)
 
   implicit def moduleToChisel(s: Module) = new ChiselModule(s)
+  implicit def extmoduleToChisel(s: ExtModule) = new ChiselExtModule(s)
   
   implicit def defParamToChisel(s: DefParam) = new ChiselDefParam(s)
   
@@ -268,6 +269,7 @@ class ChiselDefModule(val m: DefModule) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     m match {
       case mod: Module => mod.chiselize(ctx)
+      case e: ExtModule => e.chiselize(ctx)
       case _ => unsupportedChisel(ctx,m) 
     }
   }
@@ -299,6 +301,50 @@ class ChiselModule(val m: Module) extends Chiselized {
     }
     s ++= mod.body.chiselize(mCtxt)
     s += ChiselClosingLine(m, ctx, "}")
+  }
+}
+
+class ChiselExtModule(val e: ExtModule) extends Chiselized {
+  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
+    val mCtxt = ctx.incr()
+    val pCtxt = mCtxt.incr()
+    
+    val comma = Seq(ChiselTxt(mCtxt, ", "))
+    val s = ArrayBuffer[ChiselTxt]()
+    val dq = "\""
+    
+    val resource = e.resourcePath match {
+      case _:Some[String] => 
+        ctx.src.addDep(PackageRef(UndefinedInterval, "chisel3.util", "HasBlackBoxResource"))
+        "with HasBlackBoxResource"
+      case None => ""
+    }
+
+    s += ChiselLine(e, ctx, s"class ${e.name}(") // NB: not in chisel3.experimental anymore
+    if(e.params.size > 0) {
+      // usual scala parameters
+      s ++= e.params.map(_.chiselize(pCtxt, forceType=true) ++ comma).flatten.dropRight(1)
+      s += ChiselClosingLine(e.params.last, mCtxt, s") extends BlackBox(Map(")
+      // additional named mapping for blackboxes
+      s ++= e.params.map(p => {
+        ChiselLine(p, pCtxt.incr(5), s"$dq${p.name}$dq -> ${p.name}") +: comma
+      }).flatten.dropRight(1)
+      s += ChiselLine(mCtxt, s")) $resource {")
+    } else {
+      s += ChiselTxt(mCtxt, s") extends BlackBox $resource {")
+    }
+    s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
+    s ++= e.ports.flatMap(_.chiselize(pCtxt, withIO = false))
+    s += ChiselClosingLine(e.body, mCtxt, s"})")
+    // NEED ADD RESSOURCE HERE !!
+    e.resourcePath match {
+      case Some(path) => 
+        rwarn(ctx, e, s"TODO: copy resource $path in src/main/resource folder (vs src/main/scala for chisel files)")
+        s += ChiselClosingLine(e.body, mCtxt, s"addResource($dq$path$dq)")
+      case None => 
+    }
+      
+    s += ChiselClosingLine(e, ctx, "}")
   }
 }
 
@@ -369,10 +415,13 @@ class ChiselDefParam(val p: DefParam) extends Chiselized {
 }
 
 class ChiselPort(val p: Port) extends Chiselized {
-  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    Seq(ChiselLine(p, ctx, s"val ${p.name} = IO(${p.direction.serialize}(")) ++
+  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = chiselize(ctx, true)
+  def chiselize(ctx: ChiselEmissionContext, withIO: Boolean): Seq[ChiselTxt] = {
+    val io = if(withIO) "IO(" else ""
+    val cb = if(withIO) ")" else ""
+    Seq(ChiselLine(p, ctx, s"val ${p.name} = $io${p.direction.serialize}(")) ++
       p.tpe.chiselize(ctx.hw()) ++ 
-      Seq(ChiselTxt(ctx, s"))"))
+      Seq(ChiselTxt(ctx, s"$cb)"))
   }
   def chiselizeAsArgument(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     Seq(ChiselTxt(p, ctx, s"${p.name}:")) ++ p.tpe.chiselize(ctx.hw(),scalaTypeOnly=true)

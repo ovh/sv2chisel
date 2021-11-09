@@ -23,17 +23,17 @@ case class SyntaxErrorsException(message: String) extends ParserException(messag
 object Parser extends EasyLogging {
 
   /** Parses a file in a given filename and returns a parsed [[sv2chisel.ir.SourceFile SourceFile]] */
-  def parseFile(filename: String, basePath: String=""): (SourceFile, CommonTokenStream) = {
+  def parseFile(filename: String, basePath: String="", blackboxes: Boolean = false): (SourceFile, CommonTokenStream) = {
     val path = if (basePath != "") basePath + "/" + filename else filename
-    parseCharStream(CharStreams.fromFileName(path), filename)
+    parseCharStream(CharStreams.fromFileName(path), filename, blackboxes)
   }
 
   /** Parses a String and returns a parsed [[sv2chisel.ir.SourceFile SourceFile]] */
-  def parseString(text: String, path: String = ""): (SourceFile, CommonTokenStream) =
-    parseCharStream(CharStreams.fromString(text), path)
+  def parseString(text: String, path: String = "", blackboxes: Boolean = false): (SourceFile, CommonTokenStream) =
+    parseCharStream(CharStreams.fromString(text), path, blackboxes)
 
   /** Parses a org.antlr.v4.runtime.CharStream and returns a parsed [[sv2chisel.ir.SourceFile SourceFile]] */
-  def parseCharStream(charStream: CharStream, path: String = ""): (SourceFile, CommonTokenStream) = {
+  def parseCharStream(charStream: CharStream, path: String = "", blackboxes: Boolean = false): (SourceFile, CommonTokenStream) = {
     struct(s"############# Parsing $path #############")
     val (parseTimeMillis, (cst, tokens)) = time {
       val lexer = new sv2017Lexer(charStream)
@@ -50,7 +50,7 @@ object Parser extends EasyLogging {
       (cst, tokens)
     }
     
-    val visitor = new Visitor(DelayedWarning, tokens, path)
+    val visitor = new Visitor(DelayedWarning, tokens, path, blackboxes)
     val (visitTimeMillis, visit) = time {
       visitor.visit(cst)
     }

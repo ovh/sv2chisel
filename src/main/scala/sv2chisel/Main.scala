@@ -30,7 +30,8 @@ case class Sv2ChiselProjectConfig(
   name: String = "",
   basePath: String = "",
   emissionPath: String = "",
-  files: Seq[String] = Seq()
+  files: Seq[String] = Seq(),
+  blackboxes: Seq[String] = Seq()
 ) {
   /** Decoder for circe parsing from yaml */
   def decode: Decoder[Sv2ChiselProjectConfig] = Decoder.instance(c => {
@@ -40,8 +41,9 @@ case class Sv2ChiselProjectConfig(
       basePath <- c.getOrElse[String]("basePath")(default.basePath)
       emissionPath <- c.getOrElse[String]("emissionPath")(default.emissionPath)
       files <- c.getOrElse[Seq[String]]("files")(default.files)
+      blackboxes <- c.getOrElse[Seq[String]]("blackboxes")(default.blackboxes)
     } yield {
-      Sv2ChiselProjectConfig(name, basePath, emissionPath, files)
+      Sv2ChiselProjectConfig(name, basePath, emissionPath, files, blackboxes)
     }
   })
 }
@@ -135,7 +137,7 @@ object Main extends App with EasyLogging {
   // Main Loop
   projects.foreach( p => {
     struct(s" ---- Processing project ${p.name} ---- ")
-    Driver.emitChisel(Project(p.name, p.basePath, p.files), p.emissionPath)
+    Driver.emitChisel(Project(p.name, p.basePath, p.files, p.blackboxes), p.emissionPath)
   })
 
 }

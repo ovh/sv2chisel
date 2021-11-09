@@ -294,16 +294,51 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
     }
   }
   
+  private val currentEntryDescriptions = HashMap[String, Description]()
+  
+  /** safely update description by first looking among current project entry descriptions to avoid conflicts */
+  def safeUpdateDescription(name: String, f: Description => Description): Unit = {
+    // Prevent the most basic modification access conflict  
+    if(currentDescription.collect({case h: HasName => h}).map(_.name == name).getOrElse(false)){
+      // get is safe here
+      fatal(currentDescription.get, s"Abort unexpected concurrent modification attempt of $name description") 
+    } else if(currentEntryDescriptions.contains(name)) {
+      currentEntryDescriptions(name) = f(currentEntryDescriptions(name))
+    } else {
+      currentProject.map(_.updateDescription(name, f))
+    }
+  }
+  
   protected def execute(project: Project): Unit = {
     currentProject = Some(project)
     def processEntry(e: ProjectEntry, f: Description => Description): ProjectEntry = {
       importedPackages.clear()
       remoteRefsStore.clear()
       localPackages.clear()
+      currentEntryDescriptions.clear()
       refOutdated = true
       currentSourceFile = Some(e.src)
       currentStream = Some(e.stream)
-      e.copy(src = e.src.mapDescription(f)) //NOTE: project only updated once per entry (not on description basis)
+      // all this side-effet logic is to safely enable side-effect transforms (update a remote description)
+      currentEntryDescriptions ++= e.src.descriptions.collect({case h: HasName => h}).groupBy(_.name).mapValues(v => {
+        v match {
+          case Seq(i) => i
+          case s => 
+            fatal(s.head, s"Found multiple descriptions with name ${s.head.name}")
+            s.head // NB: cannot be empty
+        }
+      })
+      val desc = e.src.descriptions.map(d => d match {
+        case named: HasName => 
+          currentEntryDescriptions(named.name) = f(currentEntryDescriptions(named.name))
+          Left(named.name)
+        case _ => Right(f(d))
+      })
+      //NOTE: project only updated once per entry (not on description basis)
+      e.copy(src = e.src.copy(descriptions = desc.map(d => d match {
+        case Left(name) => currentEntryDescriptions(name)
+        case Right(d) => d
+      })))
     }
     
     // Note : project is mutable

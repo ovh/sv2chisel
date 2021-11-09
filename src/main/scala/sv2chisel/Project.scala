@@ -17,7 +17,8 @@ import scala.annotation.tailrec
 case class ProjectEntry(
   basePath: String,
   src: SourceFile,
-  stream: CommonTokenStream
+  stream: CommonTokenStream,
+  blackboxes: Boolean
 )
 
 class Project(name: String) extends EasyLogging {
@@ -31,9 +32,9 @@ class Project(name: String) extends EasyLogging {
   
   def addEntry(e: ProjectEntry): Unit = sources += e
   
-  def addFiles(files: Seq[String], basePath: String = ""): Unit = {
+  def addFiles(files: Seq[String], basePath: String = "", blackboxes: Boolean = false): Unit = {
     files.foreach(f => {
-      val (src, tokens) = Parser.parseFile(f, basePath)
+      val (src, tokens) = Parser.parseFile(f, basePath, blackboxes)
       src.foreachDescription(d => {
         d match {
           case IsolatedStatement(_, IncludeHeader(_, s)) => addFiles(Seq(s))
@@ -44,7 +45,7 @@ class Project(name: String) extends EasyLogging {
           case _ => 
         }
       })
-      sources += ProjectEntry(basePath, src, tokens)
+      sources += ProjectEntry(basePath, src, tokens, blackboxes = blackboxes)
     })
   }
   
@@ -117,13 +118,7 @@ class Project(name: String) extends EasyLogging {
     }
   }
   
-  def getDescription(des: String): Description = {
-    findDescription(des) match {
-      case None => Utils.throwInternalError(s"Cannot find description with name $des within project $name") 
-      case Some(d) => d
-    }
-  }
-  
+  /** NB: might conflict with current transform if affecting the same ProjectEntry */
   def updateDescription(name: String, f: Description => Description): Unit = {
     var count = 0
     sources.zipWithIndex.map(t => {
@@ -172,16 +167,17 @@ class Project(name: String) extends EasyLogging {
 }
 
 object Project {
-  def apply(name: String, basePath: String, files: Seq[String]): Project = {
+  def apply(name: String, basePath: String, files: Seq[String], blackboxes: Seq[String] = Seq()): Project = {
     val p = new Project(name)
-    p.addFiles(files, basePath)
+    p.addFiles(files, basePath, blackboxes = false)
+    p.addFiles(blackboxes, basePath, blackboxes = true)
     p
   }
   // Minimal version for single source tests
   def apply(name: String, rawVerilog: String) = {
     val p = new Project(name)
     val (src, stream) = Parser.parseString(rawVerilog)
-    p.addEntry(ProjectEntry("raw", src, stream))
+    p.addEntry(ProjectEntry("raw", src, stream, blackboxes = false))
     p
   }
 }

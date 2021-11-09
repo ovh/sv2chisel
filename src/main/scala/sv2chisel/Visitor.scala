@@ -19,7 +19,8 @@ import sv2chisel.ir.evalExpression._
 class Visitor(
     val unsupportedMode: UnsupportedBehavior,
     val tokenStream: CommonTokenStream,
-    val path: String
+    val path: String,
+    val blackboxesOnly: Boolean
   ) extends AbstractParseTreeVisitor[SVNode] with ParseTreeVisitor[SVNode] with ParserLogging {
 
   def visit(ctx: Source_textContext): SourceFile = {
@@ -60,7 +61,9 @@ class Visitor(
     ctx.getChild(0) match {
       case m: Module_declarationContext => visitModule(m)
       case h: Header_textContext => IsolatedStatement(ctx.getSourceInterval(), visitHeader(h))
-      case p: Package_declarationContext => visitPackage_declaration(p)
+      case p: Package_declarationContext => 
+        if(blackboxesOnly) warn(ctx, "Cannot parse packages as BlackBox -- processing as normal source")
+        visitPackage_declaration(p)
       
       case u: Udp_declarationContext => unsupportedDesc(u, "Udp_declarationContext")
       case i: Interface_declarationContext => unsupportedDesc(i, "Interface_declarationContext")
@@ -2484,11 +2487,23 @@ class Visitor(
     val name = getRefText(h.identifier)
     val params = visitParams(h.parameter_port_list)
     
-    // ports are considered directly as the first statements in all cases
     val (ports, declared) = visitPortsDeclaration(ctx.list_of_port_declarations)
-    val body = SimpleBlock(ports ++ ctx.module_item.asScala.map(visitModule_item))
-
-    val module = Module(ctx.getSourceInterval(), attr,name,params,body)
+    val module = if(blackboxesOnly) {
+      (ports, declared) match {
+        // avoid full parsing
+        case (s, Seq()) if(!s.isEmpty) => 
+          ExtModule(ctx.getSourceInterval(), attr, name, params, SimpleBlock(s), Some(path))
+        case _ =>
+          info(ctx, "Non ansi port declarations or empty port declaration: parsing blackbox body to fetch inline ports")
+          val body = SimpleBlock(ports ++ ctx.module_item.asScala.map(visitModule_item))
+          val m = Module(ctx.getSourceInterval(), attr,name,params,body)
+          ExtModule(ctx.getSourceInterval(), attr, name, params, SimpleBlock(m.ports), Some(path))
+      }
+    } else {
+      // ports are considered directly as the first statements in all cases
+      val body = SimpleBlock(ports ++ ctx.module_item.asScala.map(visitModule_item))
+      Module(ctx.getSourceInterval(), attr,name,params,body)
+    }
     
     // check nonansi ports against actual port declaration
     val inlineDeclared = module.ports.map(p => p.name).toSet

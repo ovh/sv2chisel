@@ -28,10 +28,7 @@ sealed abstract class SVNode {
   def mapInterval(f: Interval => Interval): T
 }
 
-case class SourceFile(
-    tokens: Interval, 
-    path: String, descriptions: Seq[Description]
-  ) extends SVNode {
+case class SourceFile(tokens: Interval, path: String, descriptions: Seq[Description]) extends SVNode {
   type T = SourceFile
   
   private val dep = HashSet[PackageRef]()
@@ -2112,7 +2109,7 @@ trait FetchPort {
 }
 
 /** Base class for modules */
-abstract class DefModule extends Description with IsDeclaration with FetchPort {
+sealed abstract class DefModule extends Description with IsDeclaration with FetchPort {
   val attributes : VerilogAttributes
   val name : String
   val params : Seq[DefParam]
@@ -2160,51 +2157,22 @@ case class Module(
   
 }
 
-case class CompanionModule(
-  name: String, 
-  constsDefault: Seq[NamedAssign],
-  paramSeq: Seq[Seq[DefParam]])
-extends DefModule {
-  type T = CompanionModule
-  
-  val tokens : Interval = UndefinedInterval
-  val attributes: VerilogAttributes = NoVerilogAttribute
-  val body: Statement = EmptyStmt
-  val params : Seq[DefParam] = Seq()
-  val clock : Option[String] = None
-  val reset: Option[String] = None
-  
-  def serialize: String = serializeHeader("module")
-  def mapStmt(f: Statement => Statement): T = this
-  def mapPort(f: Port => Statement): T = this
-  def mapParam(f: DefParam => DefParam): T = this.copy(paramSeq = paramSeq.map(_.map(f)))
-  def mapString(f: String => String): T = this.copy(name = f(name))
-  def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes): T = this
-  def mapInterval(f: Interval => Interval) = this
-  
-  override def foreachStmt(f: Statement => Unit): Unit = Unit
-  override def foreachPort(f: Port => Unit): Unit = Unit
-  override def foreachParam(f: DefParam => Unit): Unit = paramSeq.foreach(_.foreach(f))
-  override def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
-}
 /** External Module
   *
-  * Generally used for Verilog black boxes
-  * @param defname Defined name of the external module (ie. the name Firrtl will emit)
+  * Used for Verilog black boxes
   */
 case class ExtModule(
     tokens: Interval, 
     attributes: VerilogAttributes,
     name: String,
-    body: Statement, // contain only port statements
-    defname: String,
     params: Seq[DefParam],
+    body: Statement, // contain only port statements
+    resourcePath: Option[String],
     clock : Option[String] = None,
     reset: Option[String] = None) extends DefModule {
   type T = ExtModule
   
-  def serialize: String = serializeHeader("extmodule") +
-    indent(s"\ndefname = $defname\n" + params.map(_.serialize).mkString("\n"))
+  def serialize: String = serializeHeader("extmodule")
   
   def mapStmt(f: Statement => Statement): T = this.copy(body = f(body))
   def mapPort(f: Port => Statement): T = this.copy(body = mapPortStatement(body, f))

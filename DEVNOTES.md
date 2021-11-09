@@ -6,7 +6,8 @@
 
 #### URGENT
 
-- add the ability to includes blackboxes (only parsing the ports and generate proper chisel blackboxes with corresponding resources)
+- add test case for black box
+- add support for HW parameters such as parameter "logic [WIDTH-1:0] INIT_VALUE = '0"
 
 - fix unexpected intervals at emission (non-critical)
 - infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)
@@ -26,6 +27,8 @@
   - Prim BitNot
 
 - add special case for empty string used as hardware => single char at 0 
+
+- front: catch "file not found" exception & terminate properly
 
 #### CRITICAL
 - FIX & USE OR DROP Special Vec of Char Inference for register affected to 

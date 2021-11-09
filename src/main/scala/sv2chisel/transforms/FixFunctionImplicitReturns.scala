@@ -7,8 +7,6 @@ package transforms
 
 import sv2chisel.ir._
 
-import collection.mutable.{HashMap, HashSet, ArrayBuffer}
-
 /** 
   * 
   */

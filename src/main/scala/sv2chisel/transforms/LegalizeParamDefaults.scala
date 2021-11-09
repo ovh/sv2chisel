@@ -9,29 +9,18 @@ import sv2chisel.ir._
 
 import collection.mutable.{HashSet, ArrayBuffer}
 
-// PASS TO DO : legalize PARAM value (cannot contain reference => wont compile)
-// Move those paramaters such that param can be options 
-// None => local param takes
-// suggest simpler logic as comment
-
-// TO DO : chiselize module with default parameters using companion objects
-// NOTE : hash_table has too many args for such an automated approach allowing to provide any combination of args => 1 << N !!! =>  N = 21 for hash table 
-// Might be an approach to be enforced in project mode 
-// => remove default for parameter that are always set
-// => provide companion corresponding to actually used 
-
-
-// for now only provide convert override_auto_computed_<param_name> as Option[Type] = None + warn bad practice 
-// TODO??? + provide companion object without default with original names for easy override 
-
+/** Legalize PARAM value (cannot contain reference => wont compile)
+  * Move those paramaters such that param can be options 
+  * None => local param takes
+  * suggest simpler logic as comment
+  * Provide convert override_auto_computed_<param_name> as Option[Type] = None + warn bad practice 
+  */
 class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) extends DefModuleBasedTransform {
-  // TO DO : add proper error management within passes
-    
+  
   def processModule(m: DefModule): DefModule = {
     val stmts = ArrayBuffer[Statement]() 
     val knownParams = new HashSet[String]()
     
-    // SINGLE PASS
     def isLegalExpression(e: Expression): Boolean = {
       var allLegalSubExprs = true
       e.foreachExpr( expr => allLegalSubExprs &= isLegalExpression(expr))
@@ -81,16 +70,17 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
           }
       }
     }
-    m.foreachParam(p => knownParams += (p.name))
-    
-    
-    // WARNING : handle the added statement pre-io
-    val mod = m.mapParam(processParam).asInstanceOf[Module]
-    mod.copy(body = (mod.body, stmts.toSeq) match {
-        case (b: Statement, Seq()) => b
-        case (s: Block, st) => s.prependStmts(st)
-        case (s: Statement, st) => SimpleBlock(s.tokens, st ++ Seq(s))
-      }
-    )
+      
+    m match {
+      case mod: Module =>
+        // SINGLE PASS
+        mod.foreachParam(p => knownParams += (p.name))
+        mod.mapParam(processParam).copy(body = (mod.body, stmts.toSeq) match {
+          case (b: Statement, Seq()) => b
+          case (s: Block, st) => s.prependStmts(st)
+          case (s: Statement, st) => SimpleBlock(s.tokens, st ++ Seq(s))
+        })
+      case e: ExtModule => e // nothing to do
+    }
   }
 }

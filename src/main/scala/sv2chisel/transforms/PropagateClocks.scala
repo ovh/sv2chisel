@@ -17,7 +17,7 @@ class PropagateClocks(val llOption: Option[logger.LogLevel.Value] = None) extend
   def processModule(module: DefModule): DefModule = {
     
     def processInstance(i: DefInstance) = {
-      currentProject.get.findModule(i.module.serialize) match {
+      currentProject.get.findModule(i.module.name) match {
         case Some(m: DefModule) =>
           (m.clock, module.clock) match {
             case (Some(ci), Some(cm)) if (ci == cm) => 
@@ -35,10 +35,31 @@ class PropagateClocks(val llOption: Option[logger.LogLevel.Value] = None) extend
               })
               i.copy(portMap = portMap, clock = Some(ci))
 
-            case (None, Some(cm@_)) => 
+            case (None, Some(cm)) => 
               // update port map for instance
-              critical(i, "TODO: update port map for instance")
-              i
+              m match {
+                case e: ExtModule =>
+                  // all of this is probably completely useless as clock have no special meaning for blackbox emission
+                  safeUpdateDescription(i.module.name, _ => {
+                    i.portMap.flatMap(p => {
+                      p match {
+                        case NamedAssign(_, n, r: Reference, _, _, _, _) if(r.serialize == cm) => Some(n) 
+                        case NoNameAssign(_, r: Reference, _, _, _, _, _) if(r.serialize == cm) => None // index ?
+                        case _ => None
+                      }
+                    }) match {
+                      case Seq() => e // nothing to do, clock does not seem connected
+                      case Seq(n) => e.copy(clock = Some(n))
+                      case _ =>
+                        warn(i, "Found multiple clock connected - unable to update remote")
+                        e
+                    }
+                  })
+                  i // nothing to update in portmap
+                case _ =>  
+                  critical(i, "TODO? update remote instance clock definition if required?")
+                  i
+              }
               
             case (Some(ci), None) => 
               // update port map for instance
