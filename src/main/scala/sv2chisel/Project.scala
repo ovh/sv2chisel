@@ -174,9 +174,17 @@ object Project {
     p
   }
   // Minimal version for single source tests
-  def apply(name: String, rawVerilog: String) = {
+  def apply(name: String, rawVerilog: String, path: Option[String]) = {
     val p = new Project(name)
-    val (src, stream) = Parser.parseString(rawVerilog)
+    val (src, stream) = Parser.parseString(rawVerilog, path)
+    p.addEntry(ProjectEntry("raw", src, stream, blackboxes = false))
+    p
+  }
+  def apply(name: String, rawBlackboxes: String, rawVerilog: String, path: Option[String]) = {
+    val p = new Project(name)
+    val (srcB, streamB) = Parser.parseString(rawBlackboxes, path, blackboxes = true)
+    p.addEntry(ProjectEntry("raw", srcB, streamB, blackboxes = true))
+    val (src, stream) = Parser.parseString(rawVerilog, path)
     p.addEntry(ProjectEntry("raw", src, stream, blackboxes = false))
     p
   }

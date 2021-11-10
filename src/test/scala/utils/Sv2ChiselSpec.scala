@@ -12,7 +12,10 @@ import logger._
 
 abstract class Sv2ChiselSpec extends AnyFlatSpec with ChiselMatchers with EasyLogging {
   
-  def emit(input: String): String = Driver.emitChisel(Project("test", input))
+  def emit(input: String, path: Option[String] = None): String = Driver.emitChisel(Project("test", input, path))
+  def emit(blackboxes: String, main: String, path: Option[String]): String = 
+    Driver.emitChisel(Project("test", blackboxes, main, path))
+  
   // to do add optional param & ports 
   def wrapInModule(body: String, name : String = "Test") : String = {
     s"""

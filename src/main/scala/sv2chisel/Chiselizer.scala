@@ -316,7 +316,7 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
     val resource = e.resourcePath match {
       case _:Some[String] => 
         ctx.src.addDep(PackageRef(UndefinedInterval, "chisel3.util", "HasBlackBoxResource"))
-        "with HasBlackBoxResource"
+        " with HasBlackBoxResource"
       case None => ""
     }
 
@@ -329,9 +329,9 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       s ++= e.params.map(p => {
         ChiselLine(p, pCtxt.incr(5), s"$dq${p.name}$dq -> ${p.name}") +: comma
       }).flatten.dropRight(1)
-      s += ChiselLine(mCtxt, s")) $resource {")
+      s += ChiselLine(mCtxt, s"))$resource {")
     } else {
-      s += ChiselTxt(mCtxt, s") extends BlackBox $resource {")
+      s += ChiselTxt(mCtxt, s") extends BlackBox$resource {")
     }
     s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
     s ++= e.ports.flatMap(_.chiselize(pCtxt, withIO = false))

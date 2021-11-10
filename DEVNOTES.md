@@ -6,7 +6,6 @@
 
 #### URGENT
 
-- add test case for black box
 - add support for HW parameters such as parameter "logic [WIDTH-1:0] INIT_VALUE = '0"
 
 - fix unexpected intervals at emission (non-critical)

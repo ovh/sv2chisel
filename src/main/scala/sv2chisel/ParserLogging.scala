@@ -14,7 +14,7 @@ import sv2chisel.ir.{UndefinedInterval, Interval}
 
 trait ParserLogging extends EasyLogging {
   def tokenStream: CommonTokenStream
-  def path: String
+  def pathInfo: String
   
   def getInfo(ctx: ParserRuleContext): String = {
     getInfo(ctx.getSourceInterval())
@@ -26,7 +26,7 @@ trait ParserLogging extends EasyLogging {
   
   def getInfo(i: Interval): String = {
     i match {
-      case UndefinedInterval => s"${path}:???"
+      case UndefinedInterval => s"${pathInfo}:???"
       case _ => 
       val tokens = tokenStream.getTokens(i.a, i.b)
       val sl = tokens.asScala.head.getLine()
@@ -35,9 +35,9 @@ trait ParserLogging extends EasyLogging {
       // val sc = tokens.asScala.head.getStartIndex()
       // val stc = tokens.asScala.last.getStopIndex()
       if (sl == stl) {
-        s"${path}:$sl"
+        s"${pathInfo}:$sl"
       } else {
-        s"${path}:$sl>>$stl"
+        s"${pathInfo}:$sl>>$stl"
       }
     }
   }

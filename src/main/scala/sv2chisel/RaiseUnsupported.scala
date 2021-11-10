@@ -25,7 +25,7 @@ case object DelayedWarning extends UnsupportedBehavior
 class RaiseUnsupported(
     val mode: UnsupportedBehavior,
     val tokenStream: CommonTokenStream,
-    val path: String
+    val pathInfo: String
 ) extends ParserLogging {
   
   private val errors = ArrayBuffer[String]()

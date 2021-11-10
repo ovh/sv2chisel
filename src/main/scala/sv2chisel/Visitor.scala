@@ -19,12 +19,12 @@ import sv2chisel.ir.evalExpression._
 class Visitor(
     val unsupportedMode: UnsupportedBehavior,
     val tokenStream: CommonTokenStream,
-    val path: String,
+    val path: Option[String],
     val blackboxesOnly: Boolean
   ) extends AbstractParseTreeVisitor[SVNode] with ParseTreeVisitor[SVNode] with ParserLogging {
 
   def visit(ctx: Source_textContext): SourceFile = {
-    val s = visitSourceText(ctx, path)
+    val s = visitSourceText(ctx)
     unsupported.raise()
     s
   }
@@ -40,16 +40,19 @@ class Visitor(
     }
   }
   
+  def pathInfo = path.getOrElse("<rawString>")
+  private def safePath = path.getOrElse("")
+  
   // underlying unsupported logger
-  private val unsupported = new RaiseUnsupported(unsupportedMode, tokenStream, path)
+  private val unsupported = new RaiseUnsupported(unsupportedMode, tokenStream, pathInfo)
   
   // helper
   private def throwParserError(ctx: ParserRuleContext, str: String = "") = {
     Utils.throwInternalError(s"Parser Issue ($str) in context: ${getRawText(ctx)}")
   }
   
-  private def visitSourceText(ctx: Source_textContext, path: String): SourceFile = {
-    SourceFile(ctx.getSourceInterval(), path, ctx.description.asScala.map(visitDescription))
+  private def visitSourceText(ctx: Source_textContext): SourceFile = {
+    SourceFile(ctx.getSourceInterval(), safePath, ctx.description.asScala.map(visitDescription))
   }
   
   private def unsupportedDesc(ctx: ParserRuleContext, msg : String): Description = {
@@ -2492,12 +2495,12 @@ class Visitor(
       (ports, declared) match {
         // avoid full parsing
         case (s, Seq()) if(!s.isEmpty) => 
-          ExtModule(ctx.getSourceInterval(), attr, name, params, SimpleBlock(s), Some(path))
+          ExtModule(ctx.getSourceInterval(), attr, name, params, SimpleBlock(s), path)
         case _ =>
           info(ctx, "Non ansi port declarations or empty port declaration: parsing blackbox body to fetch inline ports")
           val body = SimpleBlock(ports ++ ctx.module_item.asScala.map(visitModule_item))
           val m = Module(ctx.getSourceInterval(), attr,name,params,body)
-          ExtModule(ctx.getSourceInterval(), attr, name, params, SimpleBlock(m.ports), Some(path))
+          ExtModule(ctx.getSourceInterval(), attr, name, params, SimpleBlock(m.ports), path)
       }
     } else {
       // ports are considered directly as the first statements in all cases

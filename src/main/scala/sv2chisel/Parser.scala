@@ -25,16 +25,16 @@ object Parser extends EasyLogging {
   /** Parses a file in a given filename and returns a parsed [[sv2chisel.ir.SourceFile SourceFile]] */
   def parseFile(filename: String, basePath: String="", blackboxes: Boolean = false): (SourceFile, CommonTokenStream) = {
     val path = if (basePath != "") basePath + "/" + filename else filename
-    parseCharStream(CharStreams.fromFileName(path), filename, blackboxes)
+    parseCharStream(CharStreams.fromFileName(path), Some(filename), blackboxes)
   }
 
   /** Parses a String and returns a parsed [[sv2chisel.ir.SourceFile SourceFile]] */
-  def parseString(text: String, path: String = "", blackboxes: Boolean = false): (SourceFile, CommonTokenStream) =
+  def parseString(text: String, path: Option[String] = None, blackboxes: Boolean = false): (SourceFile, CommonTokenStream) =
     parseCharStream(CharStreams.fromString(text), path, blackboxes)
 
   /** Parses a org.antlr.v4.runtime.CharStream and returns a parsed [[sv2chisel.ir.SourceFile SourceFile]] */
-  def parseCharStream(charStream: CharStream, path: String = "", blackboxes: Boolean = false): (SourceFile, CommonTokenStream) = {
-    struct(s"############# Parsing $path #############")
+  def parseCharStream(charStream: CharStream, path: Option[String] = None, blackboxes: Boolean = false): (SourceFile, CommonTokenStream) = {
+    struct(s"############# Parsing ${path.getOrElse("<rawString>")} #############")
     val (parseTimeMillis, (cst, tokens)) = time {
       val lexer = new sv2017Lexer(charStream)
       val tokens = new CommonTokenStream(lexer)
@@ -58,7 +58,7 @@ object Parser extends EasyLogging {
       case c: SourceFile => c
       case _ => throw new ClassCastException("Error! AST not rooted with SourceFile node!")
     }
-    struct(s"######### Elapsed time for $path #########")
+    struct(s"######### Elapsed time for ${path.getOrElse("<rawString>")} #########")
     struct(s"# Lexing+Parsing Time : $parseTimeMillis ms")
     struct(s"# Mapping to IR Time  : $visitTimeMillis ms")
     (ast, tokens)

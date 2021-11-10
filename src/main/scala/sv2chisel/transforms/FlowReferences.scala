@@ -217,7 +217,7 @@ class FlowReferences(
   
   override val preprocessDescription = Some(((d: Description) => {
     d match {
-      case m: Module => moduleStore.register(m); m
+      case m: DefModule => moduleStore.register(m); m
       case d => d
     }
   }))
