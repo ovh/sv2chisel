@@ -589,8 +589,20 @@ case class Number(tokens: Interval, value: String, width: Width, base: NumberBas
     }
   }
 
-  def getInt: Int = Integer.parseInt(value, base.value)
-  def getBigInt: BigInt = BigInt(value, base.value)
+  def getInt: Option[Int] = {
+    try { 
+      Some(Integer.parseInt(value, base.value))
+    } catch {
+      case _:java.lang.NumberFormatException => None
+    }
+  }
+  def getBigInt: Option[BigInt] = {
+    try { 
+      Some(BigInt(value, base.value))
+    } catch {
+      case _:java.lang.NumberFormatException => None
+    }
+  }
   
   def flow: Flow = SourceFlow
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
@@ -1723,7 +1735,10 @@ case class EnumType(tokens: Interval, fields: Seq[EnumField], tpe: Type, kind: E
     }).reduce(_ && _) ||
     // incremental values specified by user in verilog
     fields.zipWithIndex.map({
-      case (EnumField(_,_,n:Number), i) => n.getInt == i
+      case (EnumField(_,_,n:Number), i) => n.getInt match {
+        case Some(v) => v == i
+        case _ => false
+      }
       case _ => false
     }).reduce(_ && _)
   }

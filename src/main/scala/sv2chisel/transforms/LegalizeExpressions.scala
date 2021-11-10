@@ -95,8 +95,11 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
             case n: Number => 
               tpe match {
                 case _: BoolType => n.getInt match {
-                  case 0 => BoolLiteral(n.tokens, false, kind)
-                  case _ => BoolLiteral(n.tokens, true, kind)
+                  case Some(0) => BoolLiteral(n.tokens, false, kind)
+                  case Some(1) => BoolLiteral(n.tokens, true, kind)
+                  case _ =>
+                    warn(n, s"Unexpected number ${n.serialize} for bool conversion")
+                    BoolLiteral(n.tokens, true, kind)
                 }
                 case _: VecType => doCastIfCompat(n.copy(kind = kind), kind, tpe)
                   

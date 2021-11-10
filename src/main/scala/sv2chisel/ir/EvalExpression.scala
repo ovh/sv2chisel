@@ -44,7 +44,7 @@ class EvalExpression(e: Expression) {
   private def recEvalBigInt(e: Expression): Option[BigInt] = {
     e match {
       // supported primitives
-      case n: Number => Some(n.getBigInt) 
+      case n: Number => n.getBigInt
       case l :Literal => Some(l.value)
       
       // DoPrim 

@@ -107,8 +107,16 @@ class SubIndexRefreshType(s: SubIndex) extends LazyLogging with InfoLogger {
           // Number(tokens: Interval, value: String, width: Width, base: NumberBase, kind: ExpressionKind)
           // UIntLiteral(tokens: Interval, value: BigInt, width: Width, base: NumberBase)
           case n: Number => 
-            val expr = UIntLiteral(n.tokens, n.getBigInt, n.width, n.base)
-            s.copy(tpe = BoolType(i.tokens), kind = HwExpressionKind, expr = expr)
+            n.getBigInt match {
+              case Some(bg) => 
+                val expr = UIntLiteral(n.tokens, bg, n.width, n.base)
+                s.copy(tpe = BoolType(i.tokens), kind = HwExpressionKind, expr = expr)
+                
+              case _ => 
+                warn(n, s"Unable to convert ${n.serialize} to BigInt")
+                s
+            }
+            
             
           case e =>
             critical(s, s"Unsupported IntType for expr '${e.serialize}' for subindex expression '${s.serialize}'")

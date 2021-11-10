@@ -6,7 +6,8 @@
 
 #### URGENT
 
-- fix big parameter values such as 4294967295 
+- fix blackboxes params (HwKind? Legalization)
+- fix ref serialization with path forgotten 
 
 - infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)
 - Improve behavior of inlineif: should be emitted as sw as soon as pred is sw 

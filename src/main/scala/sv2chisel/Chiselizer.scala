@@ -859,22 +859,31 @@ class ChiselSubRange(e: SubRange){
 
 class ChiselNumber(e: Number){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    def baseValue: Seq[ChiselTxt] = {
+    def baseLit: Seq[ChiselTxt] = {
       e.base match {
-        case NumberDecimal if(!e.value.contains("_") && e.value.length < 16) => ChiselTxtS(e, ctx, e.value)
+        // Hw Only
+        case NumberDecimal if(e.getInt.isDefined) => ChiselTxtS(e, ctx, e.value)
         case NumberDecimal => ChiselTxtS(e, ctx, "\"d" + e.value + "\"")
         case NumberBinary  => ChiselTxtS(e, ctx, "\"b" + e.value + "\"")
         case NumberOctal   => ChiselTxtS(e, ctx, "\"o" + e.value + "\"")
         case NumberHexa    => ChiselTxtS(e, ctx, "\"h" + e.value + "\"")
       }
     }
-    
+    val q = "\""
     (e.kind, e.tpe) match {
-      case (HwExpressionKind, SIntType(_, UnknownWidth())) => baseValue ++ ChiselTxtS(".U.asSInt")
-      case (HwExpressionKind, SIntType(_, w)) => baseValue ++ ChiselTxtS(".U.asTypeOf(SInt(") ++ w.chiselize(ctx) ++ ChiselTxtS("))")
-      case (HwExpressionKind, UIntType(_, UnknownWidth(), _)) => baseValue ++ ChiselTxtS(".U")
-      case (HwExpressionKind, UIntType(_, w, _)) => baseValue ++ ChiselTxtS(".U(") ++ w.chiselize(ctx) ++ ChiselTxtS(")")
-      case (SwExpressionKind, _) => baseValue
+      case (HwExpressionKind, SIntType(_, UnknownWidth())) => baseLit ++ ChiselTxtS(".U.asSInt")
+      case (HwExpressionKind, SIntType(_, w)) => baseLit ++ ChiselTxtS(".U.asTypeOf(SInt(") ++ w.chiselize(ctx) ++ ChiselTxtS("))")
+      case (HwExpressionKind, UIntType(_, UnknownWidth(), _)) => baseLit ++ ChiselTxtS(".U")
+      case (HwExpressionKind, UIntType(_, w, _)) => baseLit ++ ChiselTxtS(".U(") ++ w.chiselize(ctx) ++ ChiselTxtS(")")
+      case (SwExpressionKind, _) => 
+        if(e.getInt.isDefined) {
+          ChiselTxtS(e, ctx, e.value)
+        } else if(e.getBigInt.isDefined) {
+          ChiselTxtS(e, ctx, s"BigInt($q${e.value}$q, ${e.base.value})")
+        } else {
+          unsupportedChisel(ctx, e, s"Unable to emit value ${e.value}")
+        }
+        
       case _ => 
         rcritical(ctx, e, s"Probably unsupported emission for number '${e.serialize}' $e")
         ChiselTxtS(e, ctx, e.value + "/* expect trouble here */")

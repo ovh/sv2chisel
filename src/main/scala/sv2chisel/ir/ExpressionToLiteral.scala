@@ -25,17 +25,22 @@ class ExpressionToLiteral(e: Expression) extends LazyLogging with InfoLogger {
     this.currentStream = currentStream
     e match {
       case n: Number => 
-        val value = n.getBigInt
-        if(value < 0) {
-          n.base match {
-            case NumberDecimal => Some(SIntLiteral(n.tokens, n.getBigInt, n.width))
-            case b =>
+        n.getBigInt match {
+          case Some(bg) if (bg < 0) => 
+            n.base match {
+              case NumberDecimal => Some(SIntLiteral(n.tokens, bg, n.width))
+              case b =>
               warn(n, s"[fixable] Unable to convert negative numbers with base $b to Literal")
               None
-          }
-        } else {
-          Some(UIntLiteral(n.tokens, n.getBigInt, n.width, n.base))
+            }
+            
+          case Some(bg) => Some(UIntLiteral(n.tokens, bg, n.width, n.base))
+          
+          case _ =>
+            warn(n, s"Unable to convert ${n.serialize} to BigInt")
+            None
         }
+        
       case r: Reference => 
         r.tpe match {
           case i:IntType =>
