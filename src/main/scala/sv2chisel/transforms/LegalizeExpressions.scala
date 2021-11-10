@@ -56,7 +56,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
         case _ => critical(e, s"Illegal cast attempted from ${e.serialize} to $toKind $toTpe"); false
       }) match {
         case false => e
-        case true => DoCast(e.tokens, e, toKind, toTpe)
+        case true => DoCast(e.tokens, e, toKind, Utils.cleanTokens(toTpe))
       }
     }
 
@@ -496,14 +496,14 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
                 case (HwExpressionKind, Some(UnknownWidth()), Some(w)) => 
                   arg match {
                     case n: Number => 
-                      DoCast(UndefinedInterval, n, expected, UIntType(UndefinedInterval, w, n.base))
+                      DoCast(UndefinedInterval, n, expected, UIntType(UndefinedInterval, Utils.cleanTokens(w), n.base))
                     case _ => 
                       debug(o, "Automated cast within BitNeg might be inaccurate")
-                      DoCast(UndefinedInterval, arg, expected, arg.tpe.mapWidth(_ => w))
+                      DoCast(UndefinedInterval, arg, expected, Utils.cleanTokens(arg.tpe.mapWidth(_ => w)))
                   }
                 case (HwExpressionKind, None, Some(w)) => 
                   // use intermediary UInt anyway to be able to apply the Neg operator
-                  DoCast(UndefinedInterval, arg, expected, UIntType(UndefinedInterval, w, NumberDecimal))
+                  DoCast(UndefinedInterval, arg, expected, UIntType(UndefinedInterval, Utils.cleanTokens(w), NumberDecimal))
                   
                 case _ => arg // nothing to do (no width or SwExpressionKind where width does not make sense)
               }
@@ -658,7 +658,7 @@ class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) ex
                 case _: UIntType => sl // nothing to do
                 case _ => 
                   warn(s, s"Probably inconsistent stringLit baseType: $baseTpe")
-                  DoCast(UndefinedInterval, sl, HwExpressionKind, baseTpe)
+                  DoCast(UndefinedInterval, sl, HwExpressionKind, Utils.cleanTokens(baseTpe))
               }
             case _ => s 
           }

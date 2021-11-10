@@ -41,7 +41,7 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
           UIntLiteral(e.tokens, 0, uw, NumberDecimal)
           
         case (_, "'0") => 
-          DoCast(e.tokens, UIntLiteral(e.tokens, 0, uw, NumberDecimal), e.kind, tpe)
+          DoCast(e.tokens, UIntLiteral(e.tokens, 0, uw, NumberDecimal), e.kind, Utils.cleanTokens(tpe))
             
         case (_, "'1") => 
           val castTpe = tpe match {
@@ -59,10 +59,10 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
                   val shift = DoPrim(ui, PrimOps.Shl(ui), Seq(Number(ui, "1"), expr), sw)
                   val par = DoPrim(ui, PrimOps.Par(ui), Seq(shift), sw)
                   val decr = DoPrim(ui, PrimOps.Sub(ui), Seq(par, Number(ui, "1")), sw)
-                  DoCast(e.tokens, decr, e.kind, castTpe)
+                  DoCast(e.tokens, decr, e.kind, Utils.cleanTokens(castTpe))
                   
-                case (HwExpressionKind, _) => DoCast(e.tokens, genOnes(expr), e.kind, castTpe)
-                case (_, HwExpressionKind) => DoCast(e.tokens, genOnes(expr), e.kind, castTpe)
+                case (HwExpressionKind, _) => DoCast(e.tokens, genOnes(expr), e.kind, Utils.cleanTokens(castTpe))
+                case (_, HwExpressionKind) => DoCast(e.tokens, genOnes(expr), e.kind, Utils.cleanTokens(castTpe))
                   
                 case _ => fatal(e, s"Unexpected UnknownExpressionKind for expression ${e.serialize}"); e
               }  
@@ -72,7 +72,7 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
               castTpe match {
                 case _:UIntType => lit
                 case _:SIntType => SIntLiteral(e.tokens, (1 << v.toInt) - 1, uw)
-                case _ => DoCast(e.tokens, lit, e.kind, castTpe)
+                case _ => DoCast(e.tokens, lit, e.kind, Utils.cleanTokens(castTpe))
               }
           }
 

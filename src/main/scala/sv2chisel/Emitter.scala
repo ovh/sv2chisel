@@ -280,6 +280,7 @@ object Emitter extends EasyLogging {
           // only one example of this behaviour on the current corpus
           if(i.a > maxToken){
             critical(s" Unexpected interval !! maxToken: $maxToken i.a: ${i.a}, low: ${low}")
+            emitted += "???"
             critical(cToken.toString)
             false
           } else {            

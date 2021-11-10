@@ -307,15 +307,15 @@ class RemoveConcats(
       expr.mapExpr(legalizeConcatArgs) match {
         case c: Concat => 
           c.mapExpr(exp => exp match {
-            case DoCast(t, from, HwExpressionKind, TypeOf(tt, to)) if(from == to) => 
-              DoCast(t, from, HwExpressionKind, UIntType(tt, UnknownWidth(), NumberDecimal))
-            case DoCast(t, from, HwExpressionKind, TypeOf(tt, DoCast(_, to, _, _:UIntType))) if(from == to) => 
-              DoCast(t, from, HwExpressionKind, UIntType(tt, UnknownWidth(), NumberDecimal))
+            case DoCast(t, from, HwExpressionKind, TypeOf(_, to)) if(from == to) => 
+              DoCast(t, from, HwExpressionKind, UIntType(ui, UnknownWidth(), NumberDecimal))
+            case DoCast(t, from, HwExpressionKind, TypeOf(_, DoCast(_, to, _, _:UIntType))) if(from == to) => 
+              DoCast(t, from, HwExpressionKind, UIntType(ui, UnknownWidth(), NumberDecimal))
             case e => e.tpe match {
               case _: UIntType => e 
               case _: SIntType => e 
               case _: BoolType => e
-              case _ => DoCast(e.tokens, e, HwExpressionKind, UIntType(e.tpe.tokens, UnknownWidth(), NumberDecimal))
+              case _ => DoCast(e.tokens, e, HwExpressionKind, UIntType(ui, UnknownWidth(), NumberDecimal))
             }
           })
         case exp => exp

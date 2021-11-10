@@ -6,9 +6,11 @@
 
 #### URGENT
 
-- fix unexpected intervals at emission (non-critical)
+- fix big parameter values such as 4294967295 
+
 - infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)
 - Improve behavior of inlineif: should be emitted as sw as soon as pred is sw 
+- fix behavior of emission with path relative to ~ (~ considered as standard name)
 
 - add true regression tests based on actual sv files (internal repo and CI ?) down to 
   - scala compilation
