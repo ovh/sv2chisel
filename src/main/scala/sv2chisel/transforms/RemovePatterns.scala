@@ -228,10 +228,29 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
       s match {
         case c: Connect => c.copy(expr = processExpression(c.expr, c.loc.tpe))
         case p: DefParam => p.mapExpr(processExpression(_, p.tpe))
+        case i: DefInstance =>
+          // add support for remoteTypes
+          val portMap = i.portMap.map(a => {
+            a match {
+              case r: RemoteLinked => a.mapExpr(processExpression(_, r.remoteType.getOrElse(ut)))
+              case _ => a.mapExpr(processExpression(_, ut))
+            }
+          })
+          val paramMap = i.paramMap.map(a => {
+            a match {
+              case r: RemoteLinked => a.mapExpr(processExpression(_, r.remoteType.getOrElse(ut)))
+              case _ => a.mapExpr(processExpression(_, ut))
+            }
+          })
+          i.copy(portMap = portMap, paramMap = paramMap)
+          
         case _ => s.mapExpr(processExpression(_, ut)).mapStmt(processStatement)
       }
     }
     
-    m.mapStmt(processStatement)
+    m.mapStmt(processStatement) match {
+      case d: DefModule => d.mapParam(p => p.mapExpr(processExpression(_, p.tpe)))
+      case mod => mod 
+    }
   }
 }

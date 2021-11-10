@@ -424,6 +424,9 @@ sealed trait RemoteLinked {
   def remoteName : Option[String]
   def getName: String = remoteName.getOrElse("<?>")
   def assignExpr : Option[Expression]
+  
+  def remoteTypeStr: String = 
+    s"${remoteType.getOrElse(UnknownType()).serialize}@${remoteKind.getOrElse(UnknownExpressionKind).serialize}"
 }
 
 case class AutoAssign(tokens: Interval) extends Assign {
@@ -450,9 +453,9 @@ case class NamedAssign(
   def tpe : Type = expr.tpe
   def kind: ExpressionKind = expr.kind
   def serialize: String = flow match {
-    case SourceFlow => s"$name <- " + expr.serialize
-    case SinkFlow => s"$name -> " + expr.serialize
-    case _ => s"$name <?> " + expr.serialize
+    case SourceFlow => s"$name: <$remoteTypeStr> <- " + expr.serialize
+    case SinkFlow => s"$name: <$remoteTypeStr> -> " + expr.serialize
+    case _ => s"$name: <$remoteTypeStr> <-?-> " + expr.serialize
   }
   
   def mapExpr(f: Expression => Expression) = this.copy(expr = f(expr))
@@ -471,7 +474,7 @@ case class NoNameAssign(
   type T = NoNameAssign
   def tpe : Type = expr.tpe
   def kind: ExpressionKind = expr.kind
-  def serialize: String = s"NoNameAssign(" + expr.serialize + ")"
+  def serialize: String = s"NoNameAssign(" + expr.serialize + s"): <$remoteTypeStr>"
   def mapExpr(f: Expression => Expression) = this.copy(expr = f(expr))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = f(expr)

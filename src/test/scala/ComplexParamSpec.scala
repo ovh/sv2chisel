@@ -154,4 +154,70 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     // no InferUInt in package params
     result should contain ("val cnt: Vec[Vec[Bool]] = 0.U.asTypeOf(Vec(DBLW, Vec(65, Bool())))")
   }
+  
+  it should "support explicit hardware parameters in instances" in {
+    val p = wrapInPackage(s"""
+          |localparam WIDTH = 5;
+          |localparam logic [WIDTH-1:0] INIT_VALUE = '0;
+      """.stripMargin, "test_p"
+    )
+    val inner = """
+          |
+          |import test_p::WIDTH;
+          |
+          |module my_module #(
+          |  parameter logic [WIDTH-1:0] INIT_VALUE = '0,
+          |  parameter TEST
+          |)(
+          |  input a,
+          |  output b
+          |);
+          |assign b = TEST ? a : '0;
+          |endmodule
+        """.stripMargin
+        
+    val main = wrapInModule("""
+          |input  a;
+          |input  b;
+          |
+          |my_module #(.INIT_VALUE('0), .TEST(0)) inst(
+          |  .a(a),
+          |  .b(b)
+          |);
+        """.stripMargin)
+    
+    val result = emit(p + inner + main)
+    debug(result)
+    result should contain ("import chisel3._")
+    
+    result should contain (
+      "package object test_p {",
+        "",
+        "val WIDTH = 5",
+        "val INIT_VALUE: Vec[Bool] = 0.U.asTypeOf(Vec(WIDTH, Bool()))",
+        "",
+      "}"
+    )
+    
+    result should contain ("import test_p.WIDTH")
+
+    result should contain (
+      "class my_module(",
+          "val INIT_VALUE: Vec[Bool] = 0.U.asTypeOf(Vec(WIDTH, Bool())),",
+          "val TEST: Int",
+        ") extends MultiIOModule {",
+        "val a = IO(Input(Bool()))",
+        "val b = IO(Output(Bool()))"
+    )
+    
+    result should contain (
+      "val inst = Module(new my_module(",
+          "INIT_VALUE = 0.U.asTypeOf(Vec(WIDTH, Bool())),",
+          "TEST = 0",
+      "))",
+      "inst.a := a",
+      "b := inst.b"
+    )
+
+  }
 }

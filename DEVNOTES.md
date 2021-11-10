@@ -6,10 +6,9 @@
 
 #### URGENT
 
-- add support for HW parameters such as parameter "logic [WIDTH-1:0] INIT_VALUE = '0"
-
 - fix unexpected intervals at emission (non-critical)
 - infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)
+- Improve behavior of inlineif: should be emitted as sw as soon as pred is sw 
 
 - add true regression tests based on actual sv files (internal repo and CI ?) down to 
   - scala compilation
