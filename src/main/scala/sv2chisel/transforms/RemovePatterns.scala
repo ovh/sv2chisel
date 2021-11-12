@@ -28,11 +28,11 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
     implicit val stream = currentStream
     // SINGLE PASS 
     
-    def getFilling(e: Expression, tpe: Type, bit: String, forceWidth: Boolean = false): Expression = {
-      trace(e, s"get filling for $e $tpe $bit")
-      (tpe, bit) match {
-        case (_: BoolType, "'0") => BoolLiteral(e.tokens, false, HwExpressionKind)
-        case (_: BoolType, "'1") => BoolLiteral(e.tokens, true, HwExpressionKind)
+    def getFilling(e: Expression, ftpe: FullType, bit: String, forceWidth: Boolean = false): Expression = {
+      trace(e, s"get filling for $e $ftpe $bit")
+      (ftpe.tpe, bit) match {
+        case (_: BoolType, "'0") => BoolLiteral(e.tokens, false, ftpe.kind)
+        case (_: BoolType, "'1") => BoolLiteral(e.tokens, true, ftpe.kind)
 
         case (u: UIntType, "'0") if(forceWidth) => 
           UIntLiteral(e.tokens, 0, u.width, NumberDecimal)
@@ -40,10 +40,10 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
         case (_: UIntType, "'0") => // specific width usually not required
           UIntLiteral(e.tokens, 0, uw, NumberDecimal)
           
-        case (_, "'0") => 
+        case (tpe, "'0") => 
           DoCast(e.tokens, UIntLiteral(e.tokens, 0, uw, NumberDecimal), e.kind, Utils.cleanTokens(tpe))
             
-        case (_, "'1") => 
+        case (tpe, "'1") => 
           val castTpe = tpe match {
             // avoid useless detailed cast for UInt / SInt
             case UIntType(t,_,b) => UIntType(t, UnknownWidth(), b)
@@ -80,18 +80,18 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
       }
     }
     
-    def getSeqValues(a: AssignPattern, tpe: Type): Expression = {
+    def getSeqValues(a: AssignPattern, ftpe: FullType): Expression = {
       // TO DO : make it recursive with underlying type fetching and so on ...
       
-      val underlyingTpe = tpe match {
+      val underlyingTpe = ftpe.tpe match {
         case v: VecType => v.tpe match {
           case Seq(t) => t
           case _ => 
-            critical(a, s"unable to retrieve proper underlying type of ${tpe.serialize} for assign pattern ${a.serialize}")
+            critical(a, s"unable to retrieve proper underlying type of ${ftpe.tpe.serialize} for assign pattern ${a.serialize}")
             UnknownType()
         }
         case _ => 
-          critical(a, s"unable to retrieve proper underlying type of ${tpe.serialize} for assign pattern ${a.serialize}: a VecType was expected here")
+          critical(a, s"unable to retrieve proper underlying type of ${ftpe.tpe.serialize} for assign pattern ${a.serialize}: a VecType was expected here")
           UnknownType()
       }
       
@@ -101,14 +101,14 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
       
       a.assign.foreach(t => {
         t match {
-          case (_: UndefinedExpression, e) => seqValues += processExpression(e, underlyingTpe)
-          case (_: DefaultAssignPattern, e) => default = Some(processExpression(e, underlyingTpe))
-          case (i, e) => mapValues += ((i, processExpression(e, underlyingTpe)))
+          case (_: UndefinedExpression, e) => seqValues += processExpression(e, ftpe.copy(tpe = underlyingTpe))
+          case (_: DefaultAssignPattern, e) => default = Some(processExpression(e, ftpe.copy(tpe = underlyingTpe)))
+          case (i, e) => mapValues += ((i, processExpression(e, ftpe.copy(tpe = underlyingTpe))))
         }
       })
       (seqValues.toSeq, mapValues.isEmpty) match {
-        case (s, true) => SeqValues(a.tokens, s, a.kind, tpe)
-        case (Seq(), false) => MappedValues(a.tokens, mapValues, default, a.kind, tpe)
+        case (s, true) => SeqValues(a.tokens, s, ftpe.kind, ftpe.tpe)
+        case (Seq(), false) => MappedValues(a.tokens, mapValues, default, ftpe.kind, ftpe.tpe)
         case (_, false) => critical(a, s"unexpected assign pattern leading to both mapped and sequential assignment in ${a.serialize}"); UndefinedExpression(a.tokens)
       }
     }
@@ -126,37 +126,39 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
       }
     }
     
-    def processExpression(e: Expression, expected: Type): Expression = {
-      val tpe = (e.tpe, expected) match {
-        case (_: UnknownType, _) => expected
-        case _ => e.tpe
+    def processExpression(e: Expression, expected: FullType): Expression = {
+      val ftpe = (e.tpe, e.kind, expected) match {
+        case (_: UnknownType, UnknownExpressionKind, _) => expected
+        case (_: UnknownType, k, _) => FullType(expected.tpe, k)
+        case (t, UnknownExpressionKind, _) => FullType(t, expected.kind)
+        case (t, k, _) => FullType(t, k)
       }
       trace(s"Process expression ${e.serialize} e.tpe = ${e.tpe.serialize} ; expected = ${expected.serialize}")
       
       val exp = e match {
         case r@ReplicatePattern(_, _, f:FillingBitPattern, _, _) =>
           val newPattern = f.bit match {
-              case "'0" => BoolLiteral(e.tokens, false, HwExpressionKind)
-              case "'1" => BoolLiteral(e.tokens, true, HwExpressionKind)
+              case "'0" => BoolLiteral(e.tokens, false, ftpe.kind)
+              case "'1" => BoolLiteral(e.tokens, true, ftpe.kind)
               case _ => critical(f, s"unsupported filling bit pattern ${f.bit}"); f
             }
           val details = s"Using `${f.bit}` as simple Bool (${newPattern.serialize})"
           warn(r, s"Syntax glitch: Replicating a filling pattern defeats the automated *filling* system. $details")
           r.copy(pattern = newPattern)
           
-        case FillingBitPattern(_, bit, _, _) => getFilling(e, tpe, bit) // kind to be used ?
+        case FillingBitPattern(_, bit, _, _) => getFilling(e, ftpe, bit)
         case a: AssignPattern =>
           a.assign match {
             // usual fill them all
             case Seq((DefaultAssignPattern(_), FillingBitPattern(_, bit, _, _))) => 
-              getFilling(e, tpe, bit)
-            case _ => getSeqValues(a, tpe)
+              getFilling(e, ftpe, bit)
+            case _ => getSeqValues(a, ftpe)
           }
         
         case d@DoPrim(_, _:PrimOps.BoolOp, args, _, _) =>
           val clean = args match {
-            case Seq(f: FillingBitPattern, e) => Seq(getFilling(f, tpeW(e), f.bit), e)
-            case Seq(e, f: FillingBitPattern) => Seq(e, getFilling(f, tpeW(e), f.bit))
+            case Seq(f: FillingBitPattern, e) => Seq(getFilling(f, FullType(tpeW(e), ftpe.kind), f.bit), e)
+            case Seq(e, f: FillingBitPattern) => Seq(e, getFilling(f, FullType(tpeW(e), ftpe.kind), f.bit))
             case s => s
           }
           d.copy(args = clean)
@@ -171,7 +173,7 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
             case _ => true
           }
           ((c.args.size - stdArgs.size), stdArgs.isEmpty) match {
-            case (0, _) => exp.mapExpr(processExpression(_, tpe)) // Nothing to do
+            case (0, _) => exp.mapExpr(processExpression(_, ftpe)) // Nothing to do
               
             case (1, false) =>
               trace(c, s"concat with fillingbit pattern ${c.serialize}\n with tpe ${expected.serialize}")
@@ -187,7 +189,7 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
               }
               val fullBg = bgOptions.reduce(reductor)
               
-              val expW = expected.getWidthExpression
+              val expW = expected.tpe.getWidthExpression
               
               val fbWidth = (fullBg, expW.evalBigIntOption) match {
                 case (Some(sum), Some(total)) => Width(total-sum)
@@ -207,49 +209,49 @@ class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends
               }
               val utpeW = UIntType(ui, fbWidth, NumberDecimal)
               val args = c.args.map {
-                case p@FillingBitPattern(_, bit, _, _) => getFilling(p, utpeW, bit, forceWidth = true)
-                case a => processExpression(a, tpe)
+                case p@FillingBitPattern(_, bit, _, _) => getFilling(p, ftpe.copy(tpe = utpeW), bit, forceWidth = true)
+                case a => processExpression(a, ftpe)
               }
               c.copy(args = args)
               
               
-            case(1, true) => processExpression(c.args.head, tpe) // weird edge case: concat with single bit pattern
+            case(1, true) => processExpression(c.args.head, ftpe) // weird edge case: concat with single bit pattern
               
             case _ => 
               critical(c, s"Illegal concat with multiple filling bit patterns: ${c.serialize}")
               c // no need for further processing
           }
           
-        case _ => exp.mapExpr(processExpression(_, tpe))
+        case _ => exp.mapExpr(processExpression(_, ftpe))
       }
     }
     
     def processStatement(s: Statement): Statement = {
       s match {
-        case c: Connect => c.copy(expr = processExpression(c.expr, c.loc.tpe))
-        case p: DefParam => p.mapExpr(processExpression(_, p.tpe))
+        case c: Connect => c.copy(expr = processExpression(c.expr, FullType(c.loc.tpe, c.loc.kind)))
+        case p: DefParam => p.mapExpr(processExpression(_, FullType(p.tpe, p.kind)))
         case i: DefInstance =>
           // add support for remoteTypes
           val portMap = i.portMap.map(a => {
             a match {
-              case r: RemoteLinked => a.mapExpr(processExpression(_, r.remoteType.getOrElse(ut)))
-              case _ => a.mapExpr(processExpression(_, ut))
+              case r: RemoteLinked => a.mapExpr(processExpression(_, r.remoteFullTypeOrUnknown))
+              case _ => a.mapExpr(processExpression(_, FullType(ut, UnknownExpressionKind)))
             }
           })
           val paramMap = i.paramMap.map(a => {
             a match {
-              case r: RemoteLinked => a.mapExpr(processExpression(_, r.remoteType.getOrElse(ut)))
-              case _ => a.mapExpr(processExpression(_, ut))
+              case r: RemoteLinked => a.mapExpr(processExpression(_, r.remoteFullTypeOrUnknown))
+              case _ => a.mapExpr(processExpression(_, FullType(ut, UnknownExpressionKind)))
             }
           })
           i.copy(portMap = portMap, paramMap = paramMap)
           
-        case _ => s.mapExpr(processExpression(_, ut)).mapStmt(processStatement)
+        case _ => s.mapExpr(processExpression(_, FullType(ut, UnknownExpressionKind))).mapStmt(processStatement)
       }
     }
     
     m.mapStmt(processStatement) match {
-      case d: DefModule => d.mapParam(p => p.mapExpr(processExpression(_, p.tpe)))
+      case d: DefModule => d.mapParam(p => p.mapExpr(processExpression(_, FullType(p.tpe, p.kind))))
       case mod => mod 
     }
   }

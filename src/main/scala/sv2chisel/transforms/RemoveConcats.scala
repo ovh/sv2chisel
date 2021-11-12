@@ -348,7 +348,7 @@ class RemoveConcats(
           case _ => critical(e, s"Unsuported conversion to string for expression ${e.serialize}: Ignored")
         }  
       }
-      RawScalaExprWrapper(c.tokens, fmt.mkString(" + "), exprs.toSeq)
+      RawScalaExprWrapper(c.tokens, fmt.mkString(" + "), exprs.toSeq, SwExpressionKind)
     }
     
     def processSwValue(v: Option[Expression]): Option[Expression] = {

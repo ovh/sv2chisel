@@ -179,4 +179,75 @@ class BlackBoxSpec extends Sv2ChiselSpec {
     )
   }
   
+  it should "support explicit hardware parameters" in {
+    val p = wrapInPackage(s"""
+          |localparam WIDTH = 5;
+          |localparam logic [WIDTH-1:0] INIT_VALUE = '0;
+      """.stripMargin, "test_p"
+    )
+    val inner = """
+          |
+          |import test_p::WIDTH;
+          |
+          |module my_module #(
+          |  parameter logic [WIDTH-1:0] INIT_VALUE = '0,
+          |  parameter TEST
+          |)(
+          |  input a,
+          |  output b
+          |);
+          |assign b = TEST ? a : '0;
+          |endmodule
+        """.stripMargin
+        
+    val main = wrapInModule("""
+          |input  a;
+          |input  b;
+          |
+          |my_module #(.INIT_VALUE('0), .TEST(0)) inst(
+          |  .a(a),
+          |  .b(b)
+          |);
+        """.stripMargin)
+    
+    val result = emit(inner, p + main, None)
+    debug(result)
+    result should contain ("import chisel3._")
+    
+    result should contain (
+      "package object test_p {",
+        "",
+        "val WIDTH = 5",
+        "val INIT_VALUE: Vec[Bool] = 0.U.asTypeOf(Vec(WIDTH, Bool()))",
+        "",
+      "}"
+    )
+    
+    result should contain ("import test_p.WIDTH")
+
+    result should contain (
+      "class my_module(",
+          "val INIT_VALUE: Vec[Bool] = 0.U.asTypeOf(Vec(WIDTH, Bool())),", // probably not the best style but compilable
+          "val TEST: Int",
+        ") extends BlackBox(Map(",
+                  "\"INIT_VALUE\" -> INIT_VALUE.litValue,", // thanks to litValue
+                  "\"TEST\" -> TEST",
+        ")) {",
+        "val io = IO(new Bundle {",
+          "val a = Input(Bool())",
+          "val b = Output(Bool())",
+        "})"
+    )
+    
+    result should contain (
+      "val inst = Module(new my_module(",
+          "INIT_VALUE = 0.U.asTypeOf(Vec(WIDTH, Bool())),",
+          "TEST = 0",
+      "))",
+      "inst.a := a",
+      "b := inst.b"
+    )
+
+  }
+  
 }

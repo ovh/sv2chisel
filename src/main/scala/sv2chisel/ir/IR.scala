@@ -268,9 +268,13 @@ case class RawScalaExpression(str: String, kind: ExpressionKind) extends Express
   def foreachType(f: Type => Unit): Unit = Unit
   def foreachWidth(f: Width => Unit): Unit = Unit
 }
-case class RawScalaExprWrapper(tokens: Interval, fmt: String, exprs: Seq[Expression]) extends Expression {
+case class RawScalaExprWrapper(
+  tokens: Interval, 
+  fmt: String, 
+  exprs: Seq[Expression], 
+  kind: ExpressionKind
+) extends Expression {
   type T = RawScalaExprWrapper
-  def kind: ExpressionKind = SwExpressionKind
   def serialize: String = {
     var str = fmt
     exprs.foreach(e => str = str.replaceFirst("%e", e.serialize))
@@ -424,6 +428,16 @@ sealed trait RemoteLinked {
   def remoteName : Option[String]
   def getName: String = remoteName.getOrElse("<?>")
   def assignExpr : Option[Expression]
+  
+  def remoteFullType : Option[FullType] = {
+    (remoteKind, remoteType) match {
+      case (Some(k), Some(t)) => Some(FullType(t, k))
+      case _ => None
+    }
+  }
+  def remoteFullTypeOrUnknown : FullType = {
+    FullType(remoteType.getOrElse(UnknownType()), remoteKind.getOrElse(UnknownExpressionKind))
+  }
   
   def remoteTypeStr: String = 
     s"${remoteType.getOrElse(UnknownType()).serialize}@${remoteKind.getOrElse(UnknownExpressionKind).serialize}"
@@ -2062,7 +2076,9 @@ case class FullType(
   kind: ExpressionKind, 
   tpeRef: Boolean = false,
   portRefs: Seq[Port] = Seq() // use-case: for DefDunction args
-)
+){
+  def serialize: String = s"${tpe.serialize}@${kind.serialize}${if(tpeRef) "(type)" else ""}"
+}
 case class WRef(
   name: String, 
   path: Seq[String] = Seq()

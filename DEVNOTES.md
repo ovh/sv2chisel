@@ -6,8 +6,10 @@
 
 #### URGENT
 
-- fix blackboxes params (HwKind? Legalization)
 - fix ref serialization with path forgotten 
+- LegalizeParamDefault
+  - add cli option to *NOT* add override_auto_computed_ logic (only comment value as for extModule)
+  - propagate override_auto_computed_ to defInstances
 
 - infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)
 - Improve behavior of inlineif: should be emitted as sw as soon as pred is sw 

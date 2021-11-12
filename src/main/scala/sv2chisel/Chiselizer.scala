@@ -327,7 +327,12 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       s += ChiselClosingLine(e.params.last, mCtxt, s") extends BlackBox(Map(")
       // additional named mapping for blackboxes
       s ++= e.params.map(p => {
-        ChiselLine(p, pCtxt.incr(5), s"$dq${p.name}$dq -> ${p.name}") +: comma
+        val lv = p.tpe match {
+          case _:StringType => "" 
+          case _:IntType => ""
+          case _ => ".litValue"
+        }
+        ChiselLine(p, pCtxt.incr(5), s"$dq${p.name}$dq -> ${p.name}$lv") +: comma
       }).flatten.dropRight(1)
       s += ChiselLine(mCtxt, s"))$resource {")
     } else {
@@ -395,10 +400,16 @@ class ChiselDefParam(val p: DefParam) extends Chiselized {
         (eq ++ e.chiselize(ctx), Seq(ChiselTxt(ctx, tpe)))
       case (Some(e), t: Type) => 
         // priority of HwExpressionKind value over ctx hw/sw
-        val eCtx = e.kind match {
-          case HwExpressionKind => ctx.hw() 
-          case SwExpressionKind => ctx.sw()
-          case _ => ctx 
+        val eCtx = (e.kind, p.kind) match {
+          case (HwExpressionKind, HwExpressionKind) => ctx.hw() 
+          case (SwExpressionKind, SwExpressionKind) => ctx.sw()
+          case (UnknownExpressionKind, SwExpressionKind) => ctx.sw()
+          case (UnknownExpressionKind, HwExpressionKind) => ctx.hw()
+          case (SwExpressionKind, UnknownExpressionKind) => ctx.sw()
+          case (HwExpressionKind, UnknownExpressionKind) => ctx.hw()
+          case _ => 
+            rcritical(ctx, p, s"Mismatching kind beetween param ${p.name}@${p.kind.serialize} and value ${e.kind.serialize}")
+            ctx
         }
         (eq ++ e.chiselize(eCtx), t.chiselize(eCtx, scalaTypeOnly = true))
     }

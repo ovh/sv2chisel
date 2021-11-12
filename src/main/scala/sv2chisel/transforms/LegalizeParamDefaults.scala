@@ -36,11 +36,14 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
           }
           
         case _:Reference => true // this is fine => undefined remote ref not to be legalized
-        case _ => true
+        case _ => 
+          var allLegalSubTypes = true
+          e.foreachType(_.foreachWidth(w => allLegalSubTypes &= isLegalExpression(w.expr)))
+          allLegalSubTypes
       })
     }
     
-    def processParam(p: DefParam): DefParam = {
+    def processParam(p: DefParam, name: String): DefParam = {
       p.value match {
         case None => p
         case Some(v) =>  
@@ -48,7 +51,7 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
             case true => p
             case false => 
               // do whatever is needed to legalize this default port value
-              val warning = s"Legalizing ugly verilog syntax: ${p.name} has a default value which contains (at least) one reference to another parameter."
+              val warning = s"Legalizing ugly verilog syntax: ${p.name} in module $name has a default value which contains (at least) one reference to another parameter."
               warn(p, warning)
               val msg = warning + (if(stmts.isEmpty) s"\n[HINT] Such dependent default values for class instantiations are not allowed in scala and must be adapted. \nIMPORTANT: Please note that you most likely do not want to do that in chisel since you can compute some `localparam` before specifying IOs Widths. \n           This 1-1 legalization should be refactored and shall not serve as syntax example!" else " (Please see [HINT] above.)")
               val autoName = "override_auto_computed_" + p.name
@@ -59,7 +62,7 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
               |  case Some(v) => v
               |}
               | """.stripMargin
-              val init = RawScalaExprWrapper(v.tokens,template, Seq(v))
+              val init = RawScalaExprWrapper(v.tokens,template, Seq(v), SwExpressionKind)
               stmts += DefParam(UndefinedInterval,NoVerilogAttribute, p.name, p.tpe, Some(init), p.kind)
               
               val tpe = p.tpe match {
@@ -70,17 +73,32 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
           }
       }
     }
+    
+    def processExtParam(p: DefParam, name: String): DefParam = {
+      p.value match {
+        case None => p
+        case Some(v) =>  
+          isLegalExpression(v) match {
+            case true => p
+            case false => 
+              // do whatever is needed to legalize this default port value
+              warn(p, s"Parameter ${p.name} in blackbox ${name} has a default value which contains references to other parameters. Commenting the value out: execution will crash if no value is passed at instantiation")
+              
+              p.copy(value = Some(RawScalaExprWrapper(v.tokens,"??? /* %e */", Seq(v), p.kind)))
+          }
+      }
+    }
       
+    m.foreachParam(p => knownParams += (p.name))
     m match {
       case mod: Module =>
         // SINGLE PASS
-        mod.foreachParam(p => knownParams += (p.name))
-        mod.mapParam(processParam).copy(body = (mod.body, stmts.toSeq) match {
+        mod.mapParam(processParam(_, mod.name)).copy(body = (mod.body, stmts.toSeq) match {
           case (b: Statement, Seq()) => b
           case (s: Block, st) => s.prependStmts(st)
           case (s: Statement, st) => SimpleBlock(s.tokens, st ++ Seq(s))
         })
-      case e: ExtModule => e // nothing to do
+      case e: ExtModule => e.mapParam(processExtParam(_, e.name))
     }
   }
 }
