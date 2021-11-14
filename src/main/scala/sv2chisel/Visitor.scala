@@ -5,7 +5,7 @@
 package sv2chisel
 
 import org.antlr.v4.runtime.{ParserRuleContext,CommonTokenStream}
-import org.antlr.v4.runtime.tree.{AbstractParseTreeVisitor, ParseTreeVisitor, ParseTree, TerminalNode}
+import org.antlr.v4.runtime.tree.{AbstractParseTreeVisitor, ParseTreeVisitor, ParseTree, TerminalNode, TerminalNodeImpl}
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer}
 import scala.util.matching.Regex
@@ -260,7 +260,9 @@ class Visitor(
       case l: Let_declarationContext => unsupportedStmt(l, "let_declaration")
       case a: Anonymous_programContext => unsupportedStmt(a, "anonymous_program")
       case t: Timeunits_declarationContext => unsupportedStmt(t, "timeunits_declaration")
-      case _ => throwParserError(ctx)
+      
+      case c: TerminalNodeImpl if (c.getSymbol.getType == SEMI) => EmptyStmt // weird case with additional SEMI
+      case c => unsupportedStmt(ctx, s"Unexpected package item ${c.getClass.getName}")
     }
   }
   

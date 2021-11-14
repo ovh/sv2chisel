@@ -6,7 +6,7 @@
 
 #### URGENT
 
-- fix Concat castTypeAll
+- fix raw access to enumeration values (either import or explicit)
 
 - LegalizeParamDefault: propagate override_auto_computed_ to defInstances
 

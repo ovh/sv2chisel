@@ -8,6 +8,20 @@ import io.circe._
 
 import logger._
 
+case class RemoveConcatOptions(
+  useChiselCat: Boolean = true
+){
+  /** Decoder for circe parsing from yaml */
+  def decode: Decoder[RemoveConcatOptions] = Decoder.instance(c => {
+    val default = RemoveConcatOptions()
+    for {
+      useChiselCat <- c.getOrElse[Boolean]("useChiselCat")(default.useChiselCat)
+    } yield {
+      RemoveConcatOptions(useChiselCat)
+    }
+  })
+}
+
 case class LegalizeParamDefaultOptions(
   legalizeMethod: LegalizeParamDefaultOptions.LegalizeMethod.Value = LegalizeParamDefaultOptions.LegalizeMethod.default
 ){
@@ -43,16 +57,19 @@ object LegalizeParamDefaultOptions extends EasyLogging {
 }
 
 case class TranslationOptions(
-  legalizeParamDefault: LegalizeParamDefaultOptions = LegalizeParamDefaultOptions()
+  legalizeParamDefault: LegalizeParamDefaultOptions = LegalizeParamDefaultOptions(),
+  removeConcat: RemoveConcatOptions = RemoveConcatOptions()
 ) {
   /** Decoder for circe parsing from yaml */
   def decode: Decoder[TranslationOptions] = Decoder.instance(c => {
     val default = TranslationOptions()
-    implicit val decoder = LegalizeParamDefaultOptions().decode
+    implicit val d1 = LegalizeParamDefaultOptions().decode
+    implicit val d2 = RemoveConcatOptions().decode
     for {
       legalizeParamDefault <- c.getOrElse[LegalizeParamDefaultOptions]("LegalizeParamDefaults")(default.legalizeParamDefault)
+      removeConcat <- c.getOrElse[RemoveConcatOptions]("RemoveConcats")(default.removeConcat)
     } yield {
-      TranslationOptions(legalizeParamDefault)
+      TranslationOptions(legalizeParamDefault, removeConcat)
     }
   })
 }

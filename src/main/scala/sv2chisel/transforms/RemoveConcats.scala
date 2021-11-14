@@ -12,17 +12,17 @@ import sv2chisel.ir.evalExpression._
 import scala.annotation.tailrec
 import collection.mutable.{HashMap, HashSet, ArrayBuffer}
 
-class RemoveConcats(
-  val options: TranslationOptions,
-  val forceConcatsAsBundle : Boolean = false, 
-  val noRHSasBundle : Boolean = true // TODO partially implemented
-) extends DefModuleBasedTransform {
+class RemoveConcats(val options: TranslationOptions) extends DescriptionBasedTransform {
   implicit var srcFile = currentSourceFile
   implicit var stream = currentStream
   private val ui = UndefinedInterval
   private val nv = NoVerilogAttribute
   
-  def processModule(m: DefModule): DefModule = {
+  val forceConcatsAsBundle : Boolean = if(options.removeConcat.useChiselCat) false else true 
+  // TODO partially implemented
+  val noRHSasBundle : Boolean = if(options.removeConcat.useChiselCat) true else false 
+  
+  def processDescription(d: Description): Description = {
     val refs = new HashSet[String]()
     
     // Note: only useful for lhs refs (no doPrim operations except ignored concat)
@@ -48,8 +48,13 @@ class RemoveConcats(
       }
     }
     
-    m.foreachParam(p => refs += p.name)
-    m.foreachStmt(visitStatement)
+    d match {
+      case m: DefModule => 
+        m.foreachParam(p => refs += p.name)
+        m.foreachStmt(visitStatement)
+      case _ => //nothing to do
+    }
+    
     
     // SECOND PASS => walk to concat
     // not assigned & used in a port map => port output => emit accordingly
@@ -490,6 +495,10 @@ class RemoveConcats(
       }
     }
     
-    m.mapStmt(processStatement).mapParam(p => p.copy(value = processSwValue(p.value)))
+    d.mapStmt(processStatement) match {
+      case m: DefModule => m.mapParam(p => p.copy(value = processSwValue(p.value)))
+      case des => des
+    }
+    
   }
 }

@@ -595,23 +595,28 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
           cast.copy(tpe = tpe)
         
         case c: Concat => // might be too aggressive ?
-          c.args.foreach(e => trace(e, s"Before Concat expr: ${e.serialize} - ${e.kind} - ${e.tpe}"))
+          c.args.foreach(e => trace(e, s"Before Concat expr: ${e.serialize}(${e.getClass.getName}) - ${e.kind} - ${e.tpe.serialize}(${e.tpe.getClass.getName})"))
           val exprs = c.args.map(processExpressionRec(_, expected, baseTpe))
-          exprs.foreach(e => trace(e, s"After Concat expr: ${e.serialize} - ${e.kind} - ${e.tpe}"))
-          val (kind, args) = castThemAll(exprs, baseUInt, Some(expected), true)
-          args.foreach(e => debug(e, s"Concat args: ${e.serialize} - ${e.kind} - ${e.tpe}"))
+          exprs.foreach(e => trace(e, s"After Concat expr: ${e.serialize}(${e.getClass.getName}) - ${e.kind} - ${e.tpe.serialize}(${e.tpe.getClass.getName})"))
           
-          // let's try to compute the actual width of this concat
-          // 1st build the expression as a sum of each terms width
-          // 2nd then try to evaluate this expression if it is only made of
-          val tpe = c.copy(args = args).getWidthOption match {
-            case Some(e) =>
-              val w = e.evalBigIntOption() match {
-                case Some(bg) => Width(bg)
-                case None => Width(e)
+          val (kind, args) = castThemAll(exprs, baseUInt, Some(expected), true)
+          
+          val tpe = options.removeConcat.useChiselCat match {
+            case true => 
+              // let's try to compute the actual width of this concat
+              // 1st build the expression as a sum of each terms width
+              // 2nd then try to evaluate this expression if it is only made of numbers
+              c.copy(args = args).getWidthOption match {
+                case Some(e) =>
+                  val w = e.evalBigIntOption() match {
+                    case Some(bg) => Width(bg)
+                    case None => Width(e)
+                  }
+                  UIntType(UndefinedInterval, w, NumberDecimal)
+                case None => baseUInt
               }
-              UIntType(UndefinedInterval, w, NumberDecimal)
-            case None => baseUInt
+              
+            case false => UnknownType() // proper Type update to be handled by RemoveConcats
           }
           
           c.copy(args = args, kind = kind, tpe = tpe)
