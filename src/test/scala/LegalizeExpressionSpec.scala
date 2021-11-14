@@ -170,13 +170,13 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     result should contain ("val v = Wire(Bool())")
     result should contain ("val u = Wire(UInt(8.W))")
     result should contain (
-      "u := (Mux(s.fieldA.asUInt === PC.U, PB.U(8.W), 0.U))+((new my_struct_t).getWidth()/8).U",
-      "u := ((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U(8.W), 0.U)))+((new my_struct_t).getWidth()/8).U"
+      "u := (Mux(s.fieldA.asUInt === PC.U, PB.U(8.W), 0.U))+((new my_struct_t).getWidth/8).U",
+      "u := ((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U(8.W), 0.U)))+((new my_struct_t).getWidth/8).U"
     )
 
     result should contain (
-      "v := s.fieldC.asUInt >= (((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U, 0.U)))+((new my_struct_t).getWidth()/8).U)",
-      "v := s.fieldC.asUInt === (((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U, 0.U)))+((new my_struct_t).getWidth()/8).U)"
+      "v := s.fieldC.asUInt >= (((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U, 0.U)))+((new my_struct_t).getWidth/8).U)",
+      "v := s.fieldC.asUInt === (((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U, 0.U)))+((new my_struct_t).getWidth/8).U)"
     )
   }
 

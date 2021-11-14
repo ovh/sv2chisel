@@ -187,7 +187,11 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
             val ctx = s"for instance `${i.name}` of module `${i.module}`"
             val portMap = processAssignSeq(i.portMap, m.ports.map(p => (p.name, FullType(p.tpe,HwExpressionKind))),ctx)
             val paramMap = processAssignSeq(i.paramMap, m.params.map(p => (p.name, FullType(p.tpe, p.kind))), ctx)
-            i.copy(portMap = portMap, paramMap = paramMap)
+            val isBlackbox = m match {
+              case _:ExtModule => true
+              case _ => false
+            }
+            i.copy(portMap = portMap, paramMap = paramMap, ioBundleConnect = isBlackbox)
 
           case _ => i
         }

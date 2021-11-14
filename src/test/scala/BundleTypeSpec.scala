@@ -53,7 +53,7 @@ class BundleTypeSpec extends Sv2ChiselSpec {
                               "val matrix = Vec(A, Vec(B, Bool()))",
                             "}")
                             
-    result should contain ("val W = (new t1_t).getWidth()")
+    result should contain ("val W = (new t1_t).getWidth")
     result should contain ("class t2_t extends Bundle {",
                               "val bool = Bool()",
                               "val uint = Vec(W, Bool())",
@@ -71,7 +71,7 @@ class BundleTypeSpec extends Sv2ChiselSpec {
     result should contain ("test_reg(0).tpe.uint := 0.U.asTypeOf(Vec(B, Bool()))")
     
     result should contain ("test_wire := 0.U.asTypeOf(Vec(A, new t2_t))")
-    result should contain ("test_wire := ((1.U<<(A*(new t2_t).getWidth()))-1.U).asTypeOf(Vec(A, new t2_t))")
+    result should contain ("test_wire := ((1.U<<(A*(new t2_t).getWidth))-1.U).asTypeOf(Vec(A, new t2_t))")
     
   }
 

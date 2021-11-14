@@ -708,7 +708,7 @@ class ChiselExpression(val e: Expression) extends Chiselized {
 class ChiselTypeInst(t: TypeInst){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     (t.name) match {
-      case Some(n) => ChiselTxtS(t.tokens, "new " + n)
+      case Some(n) => ChiselTxtS(t.tokens, "new " + (t.path :+ n).mkString("."))
       case None => t.tpe.chiselize(ctx)
     }
   }
@@ -1110,7 +1110,7 @@ class ChiselDoPrim(e: DoPrim){
       case (_: CeilLog2, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 1 was expected.") 
       /// GetWidth 
       case (i: GetWidth, Seq(expr)) => 
-        ChiselTxtS(i, ctx, "(") ++ expr.chiselize(uctx) ++ ChiselTxtS(").getWidth()")
+        ChiselTxtS(i, ctx, "(") ++ expr.chiselize(uctx) ++ ChiselTxtS(").getWidth")
       case (_: GetWidth, _) => unsupportedChisel(ctx,e, s"Unexpected number of args providen (${e.args.size}) where 1 was expected.") 
       /// InlineIf 
       case (i: InlineIf, Seq(cond, conseq, alt)) => 
@@ -1531,6 +1531,11 @@ class ChiselDefInstance(val i: DefInstance) extends Chiselized {
     val openBracket = Seq(ChiselTxt(ctx, "("))
     val closeBracket = Seq(ChiselTxt(ctx, ")"))
     val finalBracket = Seq(ChiselLine(ctx, ")"))
+    val iob = i.ioBundleConnect match {
+      case true => ".io"
+      case false => ""
+    }
+    
     val decl = ArrayBuffer[ChiselTxt]()
     decl += ChiselLine(i, ctx, s"val ${i.name} = Module(new ${i.module.serialize}")
     decl ++= ((i.paramMap.map(getParams).flatten) match {
@@ -1550,41 +1555,41 @@ class ChiselDefInstance(val i: DefInstance) extends Chiselized {
               val comment = s"""// TODO FIXME $str
               |// NOTE: > uncomment the following line if ${na.name} is an input of ${i.name}.
               |//       > remove these comments it if ${na.name} is an output of ${i.name}.
-              |// ${i.name}.${na.name} := DontCare
+              |// ${i.name}$iob.${na.name} := DontCare
               """.stripMargin
               Seq(ChiselLine(na, ctx, comment))
             case (r@Reference(_,_,_, _: BundleType,_, _), SinkFlow) => 
                 // default: cast with asTypeOf
                 val chi = r.chiselize(hctx)
                 Seq(ChiselLine(na, ctx, "")) ++ chi ++
-                  ChiselTxtS(s" := ${i.name}.${na.name}.asTypeOf(") ++
+                  ChiselTxtS(s" := ${i.name}$iob.${na.name}.asTypeOf(") ++
                   chi ++ ChiselTxtS(")")
                   
             case (r@Reference(_,_,_, _: BundleType,_, _), SourceFlow) => 
                 // default: cast with asTypeOf
-                Seq(ChiselLine(na, ctx, s"${i.name}.${na.name} := ")) ++
+                Seq(ChiselLine(na, ctx, s"${i.name}$iob.${na.name} := ")) ++
                   r.chiselize(hctx) ++
-                  ChiselTxtS(s".asTypeOf(${i.name}.${na.name})")
+                  ChiselTxtS(s".asTypeOf(${i.name}$iob.${na.name})")
             
             // special case for undefined expression (nothing connected)
             case (_:UndefinedExpression, SourceFlow) => 
-              Seq(ChiselLine(na, ctx, s"${i.name}.${na.name} := DontCare"))
+              Seq(ChiselLine(na, ctx, s"${i.name}$iob.${na.name} := DontCare"))
               
             case (_:UndefinedExpression, SinkFlow) => Seq() // no need to emit
             
             case (e, SourceFlow) => 
-              Seq(ChiselLine(na, ctx, s"${i.name}.${na.name} := ")) ++
+              Seq(ChiselLine(na, ctx, s"${i.name}$iob.${na.name} := ")) ++
                 e.chiselize(hctx)
                 
             case (e, SinkFlow) => 
               val ref = na.assignExpr match {
                 case Some(exp) => ChiselTxtS(na, ctx, s" := ") ++ exp.chiselize(hctx)
-                case _ => ChiselTxtS(na, ctx, s" := ${i.name}.${na.name}")
+                case _ => ChiselTxtS(na, ctx, s" := ${i.name}$iob.${na.name}")
               }
               Seq(ChiselLine(na, ctx, "")) ++ e.chiselize(hctx) ++ ref
                 
             case _ => 
-              Seq(ChiselLine(na, ctx, s"${i.name}.${na.name} <> ")) ++
+              Seq(ChiselLine(na, ctx, s"${i.name}$iob.${na.name} <> ")) ++
                 na.expr.chiselize(hctx) // UnknownType without more context here ...
           }
         case _ => // to do => feasible thanks to flows

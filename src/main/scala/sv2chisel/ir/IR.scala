@@ -943,7 +943,8 @@ case class DefInstance(
   portMap: Seq[Assign],
   paramMap: Seq[Assign],
   clock : Option[String] = None,
-  reset: Option[String] = None
+  reset: Option[String] = None,
+  ioBundleConnect: Boolean = false
 ) extends Statement with IsDeclaration {
   type T = DefInstance
   def serialize: String = s"inst $name of ${module.serialize} : ${attributes.serialize}${indent(paramMap.map("\n" + _.serialize).mkString)}${indent(portMap.map("\n" + _.serialize).mkString)}\n"  

@@ -61,11 +61,11 @@ class BlackBoxSpec extends Sv2ChiselSpec {
     
     result should contain ( 
       "val inst = Module(new my_black_box)",
-      "inst.i_a := i_a",
-      "inst.i_b := i_b",
-      "inst.i_c := i_c",
-      "o := inst.o",
-      "o_v := inst.o_v"
+      "inst.io.i_a := i_a",
+      "inst.io.i_b := i_b",
+      "inst.io.i_c := i_c",
+      "o := inst.io.o",
+      "o_v := inst.io.o_v"
     )
   }
   
@@ -117,11 +117,11 @@ class BlackBoxSpec extends Sv2ChiselSpec {
     
     result should contain ( 
       "val inst = Module(new my_black_box)",
-      "inst.i_a := i_a",
-      "inst.i_b := i_b",
-      "inst.i_c := i_c",
-      "o := inst.o",
-      "o_v := inst.o_v"
+      "inst.io.i_a := i_a",
+      "inst.io.i_b := i_b",
+      "inst.io.i_c := i_c",
+      "o := inst.io.o",
+      "o_v := inst.io.o_v"
     )
   }
   
@@ -174,8 +174,8 @@ class BlackBoxSpec extends Sv2ChiselSpec {
       "val inst = Module(new my_black_box(",
           "TEST = 1",
       "))",
-      "inst.a := a",
-      "b := inst.b"
+      "inst.io.a := a",
+      "b := inst.io.b"
     )
   }
   
@@ -244,8 +244,8 @@ class BlackBoxSpec extends Sv2ChiselSpec {
           "INIT_VALUE = 0.U.asTypeOf(Vec(WIDTH, Bool())),",
           "TEST = 0",
       "))",
-      "inst.a := a",
-      "b := inst.b"
+      "inst.io.a := a",
+      "b := inst.io.b"
     )
 
   }
