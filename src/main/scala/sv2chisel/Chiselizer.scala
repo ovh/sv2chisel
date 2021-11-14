@@ -614,22 +614,31 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
     }
     
     // to do : proper management of clock & reset for non trivial cases
-    val decl = s.tpe match {
-      case u: UnpackedVecType => 
+    val decl = (s.tpe, s.init) match {
+      case (u: UnpackedVecType, _) => 
         u.tpe match {
           case Seq(t) => Seq(ChiselLine(s, ctx, s"val ${s.name} = Mem(")) ++ u.getWidth().chiselize(ctx) ++
             ChiselTxtS(",") ++ t.chiselize(hCtxt)
           case _ => unsupportedChisel(ctx, s, "MixedVecType")
         }
+      case (UserRefType(_,_,_,_:EnumType), _:UndefinedExpression) => // standard 
+        Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) ++ s.tpe.chiselize(hCtxt)
+        
+      case (UserRefType(_,_,_,_:EnumType), _) => Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) // avoid type
+      
       case _ => Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) ++ s.tpe.chiselize(hCtxt)
     }
     
     val comma = Seq(ChiselTxt(ctx, ", "))
     val rpar = Seq(ChiselTxt(ctx, ") "))
     
-    decl ++ (s.init match {
-      case _: UndefinedExpression => rpar
-      case e => comma ++ e.chiselize(hCtxt) ++ rpar
+    decl ++ ((s.tpe, s.init) match {
+      case (_, _: UndefinedExpression) => rpar
+      case (UserRefType(_,_,_,_:EnumType), e) => // special case for RegInit & WireDefault with HwEnum
+        val baseUInt = UIntType(UndefinedInterval, UnknownWidth(), NumberDecimal)
+        DoCast(e.tokens, e, e.kind, baseUInt).chiselize(hCtxt) ++ rpar
+        
+      case (_, e) => comma ++ e.chiselize(hCtxt) ++ rpar
     })
   }
 }
@@ -649,12 +658,14 @@ class ChiselDefType(val t: DefType) extends Chiselized {
         Seq(ChiselLine(t, ctx, s"object ${t.name} extends GenericHwEnum {")) ++
           e.fields.flatMap(_.chiselize(ctx.hw().incr())) ++
           Seq(ChiselClosingLine(t, ctx, "} "))
+          // Seq(ChiselClosingLine(t, ctx, "} "), ChiselLine(ctx, s"import ${t.name}._ "))
           
       case e: EnumType => 
         addHwEnumDep()
         Seq(ChiselLine(t, ctx, s"object ${t.name} extends CustomHwEnum {")) ++
           e.fields.flatMap(_.chiselize(ctx.hw().incr(), forceValues = true)) ++
           Seq(ChiselClosingLine(t, ctx, "} "))
+          // Seq(ChiselClosingLine(t, ctx, "} "), ChiselLine(ctx, s"import ${t.name}._ "))
       
       case tpe => // assuming alias case
         Seq(ChiselLine(t, ctx, s"object ${t.name} {"),
@@ -839,7 +850,7 @@ object getSafeExprApply {
     val notSoSimple = Utils.isSimple(expr) && underlying.last.txt.matches(".*\\.[a-zA-Z]\\w*$")
     (notSoSimple, expr) match {
       case (true, _:SubField) => underlying // always a special case within special cases
-      case (true, _) => ChiselTxtS(expr, ctx, "(") ++ underlying ++ ChiselTxtS(")")
+      case (true, _) => underlying ++ ChiselTxtS(".apply") // NB: wrapping underlying in parenthesis has no effect
       case _ => underlying
     }
   }

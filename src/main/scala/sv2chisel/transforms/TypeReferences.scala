@@ -36,7 +36,8 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
       case t: DefType => 
         val kind = t.tpe match {
           case e: EnumType => e.fields.foreach(f => {
-              refStore += ((WRef(f.name), FullType(e.tpe, e.kind))) // weird but seems standard to flatten
+              // weird but seems standard to flatten => needs to be explicit in scala
+              refStore += ((WRef(f.name), FullType(e.tpe, e.kind, implicitPath = Seq(t.name)))) 
               refStore += ((WRef(f.name, Seq(t.name)), FullType(e.tpe, e.kind))) // not sure if used in this way ?
             })
             HwExpressionKind
@@ -60,15 +61,16 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
     trace(e, s"Continuing processExpression for ${e.getClass.getName}: ${e.serialize} - ${e.tpe.serialize}")
     proc.mapType(processType) match {
       case r: Reference => 
-        if(refStore.contains(r)){
-          val tpe = Utils.cleanTokens(refStore(r).tpe) // do not refer to remote tokens
-          refStore(r).tpeRef match {
-            case true => TypeInst(r.tokens, tpe, Some(r.name), r.path, HwExpressionKind, UnknownFlow)
-            case false => r.copy(tpe = processType(tpe), kind = refStore(r).kind)
-          }          
-        } else {
-          warn(r, s"Undeclared reference ${r.serialize}")
-          r
+        refStore.get(r) match {
+          case Some(ftpe) => 
+            val tpe = Utils.cleanTokens(ftpe.tpe) // do not refer to remote tokens
+            (ftpe.tpeRef) match {
+              case true => TypeInst(r.tokens, tpe, Some(r.name), r.path, HwExpressionKind, UnknownFlow)
+              case false => r.copy(tpe = processType(tpe), kind = ftpe.kind, path = r.path ++ ftpe.implicitPath)
+            }          
+          case _ => 
+            warn(r, s"Undeclared reference ${r.serialize}")
+            r
         }
       case s: SubField =>
         val tpe = s.expr.tpe match {

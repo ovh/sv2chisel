@@ -2076,7 +2076,8 @@ case class FullType(
   tpe: Type, 
   kind: ExpressionKind, 
   tpeRef: Boolean = false,
-  portRefs: Seq[Port] = Seq() // use-case: for DefDunction args
+  portRefs: Seq[Port] = Seq(), // use-case: for DefDunction args
+  implicitPath: Seq[String] = Seq() // use-case: legalize flat Enum access
 ){
   def serialize: String = s"${tpe.serialize}@${kind.serialize}${if(tpeRef) "(type)" else ""}"
 }
