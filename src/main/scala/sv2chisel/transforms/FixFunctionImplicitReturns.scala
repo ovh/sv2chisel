@@ -10,7 +10,7 @@ import sv2chisel.ir._
 /** 
   * 
   */
-class FixFunctionImplicitReturns(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
+class FixFunctionImplicitReturns(val options: TranslationOptions) extends DescriptionBasedTransform {
 
   private def processFunction(f: DefFunction): DefFunction = {
     // first pass on function body: lookup connect with function name

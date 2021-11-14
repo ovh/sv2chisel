@@ -13,7 +13,7 @@ import sv2chisel.ir._
   * declaration of instatiated module is available within the current project 
   */
 class NameInstancePorts(
-  val llOption: Option[logger.LogLevel.Value] = None
+  val options: TranslationOptions
 ) extends DefModuleBasedTransform {
   
   def processModule(m: DefModule): DefModule = {

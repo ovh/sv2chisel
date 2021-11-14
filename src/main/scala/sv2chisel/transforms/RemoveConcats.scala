@@ -13,7 +13,7 @@ import scala.annotation.tailrec
 import collection.mutable.{HashMap, HashSet, ArrayBuffer}
 
 class RemoveConcats(
-  val llOption: Option[logger.LogLevel.Value] = None,
+  val options: TranslationOptions,
   val forceConcatsAsBundle : Boolean = false, 
   val noRHSasBundle : Boolean = true // TODO partially implemented
 ) extends DefModuleBasedTransform {

@@ -12,7 +12,7 @@ import sv2chisel.ir._
   * 
   * 
   */
-class PropagateClocks(val llOption: Option[logger.LogLevel.Value] = None) extends DefModuleBasedTransform {
+class PropagateClocks(val options: TranslationOptions) extends DefModuleBasedTransform {
   
   def processModule(module: DefModule): DefModule = {
     

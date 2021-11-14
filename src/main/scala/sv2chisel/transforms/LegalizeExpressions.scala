@@ -12,7 +12,7 @@ import sv2chisel.ir.evalExpression._
 import sv2chisel.ir.expressionWidth._
 import sv2chisel.ir.expressionToLiteral._
 
-class LegalizeExpressions(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
+class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBasedTransform {
   
   def processDescription(d: Description): Description = {
     // for refreshedType

@@ -10,7 +10,7 @@ import sv2chisel.ir.refreshTypes._
 
 import org.antlr.v4.runtime.CommonTokenStream
 
-class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
+class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTransform {
   // for refreshedType -- initial declaration to be in scope of process expression 
   implicit var srcFile : Option[SourceFile] = None
   implicit var stream : Option[CommonTokenStream] = None
@@ -61,7 +61,7 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
     proc.mapType(processType) match {
       case r: Reference => 
         if(refStore.contains(r)){
-          val tpe = refStore(r).tpe.mapInterval(_ => r.tokens) // do not refer to remote tokens
+          val tpe = Utils.cleanTokens(refStore(r).tpe) // do not refer to remote tokens
           refStore(r).tpeRef match {
             case true => TypeInst(r.tokens, tpe, Some(r.name), r.path, HwExpressionKind, UnknownFlow)
             case false => r.copy(tpe = processType(tpe), kind = refStore(r).kind)
@@ -95,7 +95,7 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
       case c: DoCall => 
         if(refStore.contains(c.fun)){
           val fdef = refStore(c.fun)
-          val cleanTpe = fdef.tpe.mapInterval(_ => c.fun.tokens) // do not refer to remote tokens
+          val cleanTpe = Utils.cleanTokens(fdef.tpe) // do not refer to remote tokens
           val scopedTpe = cleanTpe match {
             case u: UserRefType if(!refStore.contains(u)) => 
               // simple attempt to apply current call scope to type
@@ -138,7 +138,7 @@ class TypeReferences(val llOption: Option[logger.LogLevel.Value] = None) extends
           critical(u, s"Undeclared type ${u.serialize}")
           u
         } else {
-          val tpe = refStore(u).tpe.mapInterval(_ => u.tokens)
+          val tpe = Utils.cleanTokens(refStore(u).tpe)
           u.copy(tpe = processType(tpe)) // could be optimized with some cache system ?
         }
       case tpe => tpe

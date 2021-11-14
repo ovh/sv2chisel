@@ -31,19 +31,22 @@ case class Sv2ChiselProjectConfig(
   basePath: String = "",
   emissionPath: String = "",
   files: Seq[String] = Seq(),
-  blackboxes: Seq[String] = Seq()
+  blackboxes: Seq[String] = Seq(),
+  translationOptions: TranslationOptions = TranslationOptions()
 ) {
   /** Decoder for circe parsing from yaml */
   def decode: Decoder[Sv2ChiselProjectConfig] = Decoder.instance(c => {
     val default = Sv2ChiselProjectConfig()
+    implicit val decoder = TranslationOptions().decode
     for {
       name <- c.getOrElse[String]("name")(default.name)
       basePath <- c.getOrElse[String]("basePath")(default.basePath)
       emissionPath <- c.getOrElse[String]("emissionPath")(default.emissionPath)
       files <- c.getOrElse[Seq[String]]("files")(default.files)
       blackboxes <- c.getOrElse[Seq[String]]("blackboxes")(default.blackboxes)
+      translationOptions <- c.getOrElse[TranslationOptions]("translationOptions")(default.translationOptions)
     } yield {
-      Sv2ChiselProjectConfig(name, basePath, emissionPath, files, blackboxes)
+      Sv2ChiselProjectConfig(name, basePath, emissionPath, files, blackboxes, translationOptions)
     }
   })
 }
@@ -53,6 +56,7 @@ object Main extends App with EasyLogging {
   
   // Command-line argument parsing
   val cli = new OptionParser[Sv2ChiselCliConfig] {
+    case class ClassLogLevel(name: String, level: LogLevel.Value)
     // Add an argument parser to handle LogLevel values
     addArgumentParser[LogLevel.Value] { arg => 
       try { 
@@ -61,12 +65,27 @@ object Main extends App with EasyLogging {
         case e: Exception => throw new InvalidArgumentException(s" (${e.getMessage})") 
       }
     }
+    addArgumentParser[ClassLogLevel] { arg => 
+      arg.split(":") match {
+        case Array(name, value) => 
+          try { 
+            ClassLogLevel(name, LogLevel(value))
+          } catch {
+            case e: Exception => throw new InvalidArgumentException(s" (${e.getMessage})") 
+          }
+        case _ => throw new InvalidArgumentException(s" (Invalid class log level format, expected CLASS_NAME:LEVEL)") 
+      }  
+    }
     
     banner = "sv2chisel [Options] sv_files... or sv2chisel [Options] -c config_file"
     separator("")
     separator("Commons Options:")
     reqd[LogLevel.Value]("-l", "--log-level <error|warn|struct|info|debug|trace>", "Logger verbosity level") { 
       (value, cfg) => cfg.copy(logLevel = value)
+    }
+    reqd[ClassLogLevel]("-L", "--class-log-level CLASS_NAME:<error|warn|struct|info|debug|trace>", 
+      "Logger verbosity level within given CLASS_NAME (useful for transforms)") { 
+      (value, cfg) => Logger.setLevel(value.name, value.level); cfg // no config update
     }
     reqd[String]("-o", "--emission-path PATH", "Base emission path") { (value, cfg) => cfg.copy(emissionPath = value) }
     separator("")
@@ -102,7 +121,7 @@ object Main extends App with EasyLogging {
     // YAML PARSING
     yaml.parser.parse(new InputStreamReader(new FileInputStream(cfg.configFile))) match {
       case Left(failure) => 
-        fatal(s"Error while reading YAML: $failure")
+        fatal(s"Error while reading YAML: ${failure.getMessage}")
         sys.exit(1)
       
       case Right(json) => 
@@ -110,7 +129,7 @@ object Main extends App with EasyLogging {
         json.asArray match {
           case Some(a) => a.flatMap(e => e.as[Sv2ChiselProjectConfig] match {
               case Left(failure) => 
-                critical(s"Error while reading YAML: $failure")
+                critical(s"Error while reading YAML: ${failure.getMessage}")
                 critical(s"Ignoring project entry $e")
                 None
               case Right(p) => if(cfg.emissionPath != "") Some(p.copy(emissionPath = cfg.emissionPath)) else Some(p)
@@ -137,7 +156,7 @@ object Main extends App with EasyLogging {
   // Main Loop
   projects.foreach( p => {
     struct(s" ---- Processing project ${p.name} ---- ")
-    Driver.emitChisel(Project(p.name, p.basePath, p.files, p.blackboxes), p.emissionPath)
+    Driver.emitChisel(Project(p.name, p.basePath, p.files, p.blackboxes), p.translationOptions, p.emissionPath)
   })
 
 }

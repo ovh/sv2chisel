@@ -7,7 +7,7 @@ package transforms
 
 import sv2chisel.ir._
 
-class CheckUseBeforeDecl(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
+class CheckUseBeforeDecl(val options: TranslationOptions) extends DescriptionBasedTransform {
   implicit var srcFile = currentSourceFile
   implicit var stream = currentStream
   

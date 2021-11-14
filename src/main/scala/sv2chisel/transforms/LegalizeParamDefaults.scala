@@ -15,7 +15,7 @@ import collection.mutable.{HashSet, ArrayBuffer}
   * suggest simpler logic as comment
   * Provide convert override_auto_computed_<param_name> as Option[Type] = None + warn bad practice 
   */
-class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) extends DefModuleBasedTransform {
+class LegalizeParamDefaults(val options: TranslationOptions) extends DefModuleBasedTransform {
   
   def processModule(m: DefModule): DefModule = {
     val stmts = ArrayBuffer[Statement]() 
@@ -43,7 +43,7 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
       })
     }
     
-    def processParam(p: DefParam, name: String): DefParam = {
+    def legalizeParam(p: DefParam, name: String): DefParam = {
       p.value match {
         case None => p
         case Some(v) =>  
@@ -74,7 +74,7 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
       }
     }
     
-    def processExtParam(p: DefParam, name: String): DefParam = {
+    def commentParam(p: DefParam, name: String): DefParam = {
       p.value match {
         case None => p
         case Some(v) =>  
@@ -82,7 +82,7 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
             case true => p
             case false => 
               // do whatever is needed to legalize this default port value
-              warn(p, s"Parameter ${p.name} in blackbox ${name} has a default value which contains references to other parameters. Commenting the value out: execution will crash if no value is passed at instantiation")
+              warn(p, s"Parameter ${p.name} in ${name} has a default value which contains references to other parameters. Commenting the value out: execution will crash if no value is passed at instantiation")
               
               p.copy(value = Some(RawScalaExprWrapper(v.tokens,"??? /* %e */", Seq(v), p.kind)))
           }
@@ -90,15 +90,16 @@ class LegalizeParamDefaults(val llOption: Option[logger.LogLevel.Value] = None) 
     }
       
     m.foreachParam(p => knownParams += (p.name))
-    m match {
-      case mod: Module =>
+    (m, options.legalizeParamDefault.legalizeMethod) match {
+      case (mod: Module, LegalizeParamDefaultOptions.LegalizeMethod.overrideOption) =>
         // SINGLE PASS
-        mod.mapParam(processParam(_, mod.name)).copy(body = (mod.body, stmts.toSeq) match {
+        mod.mapParam(legalizeParam(_, mod.name)).copy(body = (mod.body, stmts.toSeq) match {
           case (b: Statement, Seq()) => b
           case (s: Block, st) => s.prependStmts(st)
           case (s: Statement, st) => SimpleBlock(s.tokens, st ++ Seq(s))
         })
-      case e: ExtModule => e.mapParam(processExtParam(_, e.name))
+      case (_:Module, _) => m.mapParam(commentParam(_, s"module ${m.name}"))
+      case (_:ExtModule, _) => m.mapParam(commentParam(_, s"blackbox ${m.name}"))
     }
   }
 }

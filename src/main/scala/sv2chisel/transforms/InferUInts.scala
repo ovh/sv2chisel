@@ -9,7 +9,7 @@ import sv2chisel.ir._
 
 import collection.mutable.{HashMap}
 
-class InferUInts(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
+class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransform {
   
   class UsageStore() {
     private val arithmeticUsageCount = new HashMap[String, Int]()

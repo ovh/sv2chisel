@@ -66,7 +66,7 @@ class Project(name: String) extends EasyLogging {
   def runTimed(t: Transform): Unit = {
     struct(s"   ####### ${t.getClass.getName} #######")
     val (timeT, _) = time {
-      t.run(this)
+      t.execute(this)
     }
     trace("Transform result: " + this.serialize)
     struct(s"   # Elapsed time : $timeT ms")

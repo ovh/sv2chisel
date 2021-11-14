@@ -14,22 +14,10 @@ import scala.collection.JavaConverters._
 import collection.mutable.{HashMap, ArrayBuffer}
 
 abstract class Transform extends LazyLogging {
+  def options: TranslationOptions
+  
   // To be implemented depending on needs 
-  protected def execute(project: Project): Unit
-  
-  val llOption : Option[LogLevel.Value]
-  
-  def run(project: Project): Unit = {
-    llOption match {
-      case Some(ll) if ll != Logger.getGlobalLevel => 
-        val prev = Logger.getGlobalLevel
-        Logger.setLevel(ll)
-        execute(project)
-        Logger.setLevel(prev)
-      
-      case _ => execute(project) 
-    }
-  }
+  def execute(project: Project): Unit
   
   case class Rename(from: String, to: String, includePorts: Boolean = false)
   class RenameMap(){
@@ -309,7 +297,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
     }
   }
   
-  protected def execute(project: Project): Unit = {
+  def execute(project: Project): Unit = {
     currentProject = Some(project)
     def processEntry(e: ProjectEntry, f: Description => Description): ProjectEntry = {
       importedPackages.clear()

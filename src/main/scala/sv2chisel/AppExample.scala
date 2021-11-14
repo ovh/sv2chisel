@@ -18,6 +18,6 @@ object SV2ChiselAppExample extends App {
   )
   val project = Project("project", basePath, files)
   
-  Driver.emitChisel(project, "chisel_gen")
+  Driver.emitChisel(project, TranslationOptions(), "chisel_gen")
 
 }

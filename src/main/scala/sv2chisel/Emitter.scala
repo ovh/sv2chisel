@@ -106,7 +106,7 @@ object ScalaStyleEmission {
 
 object Emitter extends EasyLogging {
 
-  def emitChisel(ctx: ChiselEmissionContext): String = {
+  def emitChisel(ctx: ChiselEmissionContext, noFileIO: Boolean = false): String = {
     ctx.project.getEntries.map(e => {
       struct(s"######### CHISELIZING ${e.src.path} #########")
       val (timeChiselize, chisel) = time {
@@ -116,20 +116,24 @@ object Emitter extends EasyLogging {
       
       val emissionPath = ctx.emissionBasePath + "/" + e.src.path.split('.').dropRight(1).mkString("",".",".scala")
       
-      struct(s"######### EMITTING to ${emissionPath} #########")
+      val dry = if(noFileIO) s" [DRY RUN]" else ""
+      
+      struct(s"#########$dry EMITTING to ${emissionPath} #########")
       val (timeEmit, chiselTxt) = time {
         val chiselTxt = emit(ctx, chisel, e.stream)
         trace(chiselTxt)
-        emissionPath.split("/").dropRight(1) match {
-          case Array() => 
-          case a => 
+        if(!noFileIO){          
+          emissionPath.split("/").dropRight(1) match {
+            case Array() => 
+            case a => 
             val dirs = new File(a.mkString("","/",""))
             dirs.mkdirs()
+          }
+          
+          val writer = new FileWriter(emissionPath)
+          writer.write(chiselTxt)
+          writer.close()
         }
-        
-        val writer = new FileWriter(emissionPath)
-        writer.write(chiselTxt)
-        writer.close()
         chiselTxt
       }
       struct(s"# Elapsed time : $timeEmit ms")

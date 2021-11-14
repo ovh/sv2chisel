@@ -54,7 +54,7 @@ import sv2chisel.Utils._
 import collection.mutable.{HashMap, HashSet, ArrayBuffer, LinkedHashMap}
 
 class FlowReferences(
-    val llOption: Option[logger.LogLevel.Value] = None, 
+    val options: TranslationOptions, 
     val assumeValidVerilog: Boolean = true) extends DescriptionBasedTransform {
   private val ui = UndefinedInterval
   

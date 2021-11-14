@@ -12,7 +12,7 @@ import sv2chisel.ir._
   *   > input reg raise [fatal] (non-sense) (resolved as input wire port)
   *   > output reg are resolved with the generation of an intermediate reg and wire
   */
-class CheckBlockingAssignments(val llOption: Option[logger.LogLevel.Value] = None) extends DefModuleBasedTransform {
+class CheckBlockingAssignments(val options: TranslationOptions) extends DefModuleBasedTransform {
   
   
   def processModule(m: DefModule): DefModule = {

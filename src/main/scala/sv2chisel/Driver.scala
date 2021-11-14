@@ -11,47 +11,52 @@ import logger._
 
 object Driver extends EasyLogging {
   
-  def lintVerilog(project: Project): Unit = {
+  def lintVerilog(project: Project, options: TranslationOptions): Unit = {
     val transforms = Seq(
       // to do : unused signals, ... ?
-      new CheckUseBeforeDecl,
-      new CheckScopes,
-      new InferDefLogicClocks,
-      new TypeReferences, // warn about undeclared references
-      new LegalizeParamDefaults // To adapt just to warn about usage ??? "time to switch to chisel "
+      new CheckUseBeforeDecl(options),
+      new CheckScopes(options),
+      new InferDefLogicClocks(options),
+      new TypeReferences(options), // warn about undeclared references
+      new LegalizeParamDefaults(options) // To adapt just to warn about usage ??? "time to switch to chisel "
     )
     struct(s"######### Executing ${transforms.size} transforms #########")
     val (timeTransforms, _) = time { project.run(transforms) }
     struct(s"# Total Elapsed time running transforms : $timeTransforms ms")
   }
   
-  def emitChisel(project: Project, emissionBasePath: String = "chisel_gen"): String = {
+  def emitChisel(
+    project: Project, 
+    options: TranslationOptions, 
+    emissionBasePath: String = "chisel_gen", 
+    noFileIO: Boolean = false
+  ): String = {
     val transforms = Seq(
       // Core transforms 
-      new CheckUseBeforeDecl,
-      new CheckScopes,
-      new CheckBlockingAssignments,
-      new InferDefLogicClocks,
-      new PropagateClocks,
-      new FlowReferences,
-      new InferUInts, //Some(LogLevel.Trace)), // requires flows
-      new TypeReferences, // should run after InferUInts for infered UInt type propagation
-      new LegalizeExpressions, // TO DO - requires TypedReferences; no more concats
+      new CheckUseBeforeDecl(options),
+      new CheckScopes(options),
+      new CheckBlockingAssignments(options),
+      new InferDefLogicClocks(options),
+      new PropagateClocks(options),
+      new FlowReferences(options),
+      new InferUInts(options), // requires flows
+      new TypeReferences(options), // should run after InferUInts for infered UInt type propagation
+      new LegalizeExpressions(options), // TO DO - requires TypedReferences; no more concats
       
       // Emission Oriented Transforms
-      new FixFunctionImplicitReturns,
-      new NameInstancePorts,
-      new RemovePatterns,
-      new RemoveConcats,
-      new InferParamTypes,
-      new LegalizeParamDefaults // needs param types
+      new FixFunctionImplicitReturns(options),
+      new NameInstancePorts(options),
+      new RemovePatterns(options),
+      new RemoveConcats(options),
+      new InferParamTypes(options),
+      new LegalizeParamDefaults(options) // needs param types
     )
     struct(s"######### Executing ${transforms.size} transforms #########")
     val (timeTransforms, _) = time { project.run(transforms) }
     struct(s"# Total Elapsed time running transforms : $timeTransforms ms")
     
     struct(s"######### EMISSION #########")
-    Emitter.emitChisel(ScalaStyleEmission(project, emissionBasePath))
+    Emitter.emitChisel(ScalaStyleEmission(project, emissionBasePath), noFileIO)
   }
 
 }

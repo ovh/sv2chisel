@@ -14,7 +14,7 @@ import collection.mutable.{HashMap, HashSet, ArrayBuffer}
   *   > input reg raise [fatal] (non-sense) (resolved as input wire port)
   *   > output reg are resolved with the generation of an intermediate reg and wire
   */
-class InferDefLogicClocks(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
+class InferDefLogicClocks(val options: TranslationOptions) extends DescriptionBasedTransform {
   
   val seenModules = new HashMap[String, DefModule]()
   

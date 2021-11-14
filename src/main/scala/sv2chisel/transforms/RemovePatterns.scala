@@ -12,7 +12,7 @@ import sv2chisel.ir.widthExpressionType._
 
 import collection.mutable.{HashMap, ArrayBuffer}
 
-class RemovePatterns(val llOption: Option[logger.LogLevel.Value] = None) extends DescriptionBasedTransform {
+class RemovePatterns(val options: TranslationOptions) extends DescriptionBasedTransform {
   private val ui = UndefinedInterval
   private val ut = UnknownType()
   private val uw = UnknownWidth()

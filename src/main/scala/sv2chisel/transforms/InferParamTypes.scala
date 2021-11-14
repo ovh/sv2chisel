@@ -9,7 +9,7 @@ import sv2chisel.ir._
 
 import collection.mutable.{HashMap}
 
-class InferParamTypes(val llOption: Option[logger.LogLevel.Value] = None) extends DefModuleBasedTransform {
+class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTransform {
   
   class UsageStore() {
     private val intUsageCount = new HashMap[String, Int]()
