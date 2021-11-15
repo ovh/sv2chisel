@@ -1270,10 +1270,17 @@ class ChiselDoCast(e: DoCast){
       case (_, _, TypeOf(_, expr), _) if(expr == e.expr) => e.expr.chiselize(uctx)
       
       // asTypeOf(TypeOf(x)) => asTypeOf(x)
-      case (true, _, TypeOf(_, expr), _) => 
+      case (true, SwExpressionKind, TypeOf(_, expr), _) => 
+        e.expr.chiselize(uctx) ++ ChiselTxtS(e, ctx, ".S.asTypeOf(") ++
+        expr.chiselize(uctx) ++ ChiselTxtS(")")
+      case (false, SwExpressionKind, TypeOf(_, expr), _) => 
+        ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(").S.asTypeOf(") ++
+        expr.chiselize(uctx) ++ ChiselTxtS(")")
+        
+      case (true, HwExpressionKind, TypeOf(_, expr), _) => 
         e.expr.chiselize(uctx) ++ ChiselTxtS(e, ctx, ".asTypeOf(") ++
         expr.chiselize(uctx) ++ ChiselTxtS(")")
-      case (false, _, TypeOf(_, expr), _) => 
+      case (false, HwExpressionKind, TypeOf(_, expr), _) => 
         ChiselTxtS(e, ctx, "(") ++ e.expr.chiselize(uctx) ++ ChiselTxtS(").asTypeOf(") ++
         expr.chiselize(uctx) ++ ChiselTxtS(")")
         
