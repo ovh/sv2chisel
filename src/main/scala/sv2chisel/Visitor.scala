@@ -1572,18 +1572,39 @@ class Visitor(
       case c => Some(getParamExpression(c.param_expression))
     }
     
+    def dropLastVecTypeRec(v: VecType, value: Option[Expression]): (Type, ExpressionKind) = {
+      // NOTE: not sure to cover all cases here ...
+      (v.bound.evalBigIntOption, value, v.tpe) match {
+        case (_,_, Seq(ivt: VecType)) => 
+          val updatedVal = value match {
+            case Some(r: ReplicatePattern) => Some(r.pattern)
+            case Some(p: FillingBitPattern) => Some(p) // not useful here...?
+            case Some(AssignPattern(_,Seq((_:DefaultAssignPattern, p)),_,_)) => Some(p) 
+            case _ => None
+          }
+          val (tpe, k) = dropLastVecTypeRec(ivt, updatedVal)
+          (v.mapType(_ => tpe), k)
+        
+        case (_,_, s) if (s.length != 1) =>
+          critical(ctx, "Unsupported mixed Vec")
+          (v, UnknownExpressionKind)
+        
+        case (Some(bg), _, _) if (bg == 0) => (BoolType(v.bound.tokens), SwExpressionKind) // special case [0:0]
+        case (Some(bg), _, _) => (UIntType(v.bound.tokens, Width(bg+1), NumberDecimal), HwExpressionKind)
+        case (_, Some(_:Number), _) => (v.asUIntType(), HwExpressionKind)
+        case (_, Some(_:UIntLiteral), _) => (v.asUIntType(), HwExpressionKind)
+        
+        case (_,_, Seq(_:BoolType)) => (v.asUIntType(), HwExpressionKind)
+        
+        // this HwExpressionKind might be a bit restrictive in usage ...
+        // should depends on inner kind and rely on InferUInt & LegalizeExpression Transforms for further interpretation
+        case _ => (v, HwExpressionKind)
+      }
+    }
+    
     val (updatedTpe, kind) = (t, value) match {
-      case (v: VecType, _) => 
-        // NOTE: not sure to cover all cases here ...
-        (v.bound.evalBigIntOption, value) match {
-          case (Some(bg), _) if (bg == 0) => (BoolType(v.bound.tokens), SwExpressionKind)
-          case (Some(bg), _) => (UIntType(v.bound.tokens, Width(bg+1), NumberDecimal), HwExpressionKind)
-          case (_, Some(_:Number)) => (v.asUIntType(), HwExpressionKind)
-          case (_, Some(_:UIntLiteral)) => (v.asUIntType(), HwExpressionKind)
-          // this HwExpressionKind might be a bit restrictive in usage ...
-          // should depends on inner kind and rely on InferUInt & LegalizeExpression Transforms for further interpretation
-          case _ => (t, HwExpressionKind)
-        }
+      case (v: VecType, _) => dropLastVecTypeRec(v, value)
+
       case (_, Some(u:UIntLiteral)) =>(u.tpe, HwExpressionKind)
       case (_, Some(n:Number)) if(n.width != UnknownWidth()) => (UIntType(n.tokens, n.width, n.base), HwExpressionKind)
       case (_:UnknownType, Some(n:Number)) => (IntType(n.tokens, n.base), SwExpressionKind)

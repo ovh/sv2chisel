@@ -180,4 +180,23 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     )
   }
 
+  it should "properly manage arithmetic operators on Vec[Bool]" in {
+    val result = emitInModule("""
+      |wire [7:0] a;
+      |wire [7:0] b;
+      |wire [7:0] c;
+      |// useless assign to preserve Vec[Bool] type
+      |assign a[3:0] = '0;
+      |assign b[3:0] = '0;
+      |assign c = a + b;
+      """.stripMargin
+    )
+    debug(result)
+    result should contain ("val a = Wire(Vec(8, Bool()))")
+    result should contain ("val b = Wire(Vec(8, Bool()))")
+    result should contain ("val c = Wire(UInt(8.W))")
+
+    result should contain ("c := a.asUInt+b.asUInt")
+
+  }
 }

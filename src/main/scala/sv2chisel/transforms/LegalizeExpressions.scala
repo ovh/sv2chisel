@@ -459,14 +459,20 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
               args.foreach(e => trace(e, s"${e.serialize} -- $e"))
               val cast = args.map(a => { (a.tpe, kind) match {
                 case (_:BoolType, HwExpressionKind) => doCast(a, kind, UIntType(UndefinedInterval, UnknownWidth(),NumberDecimal))
+                case (_:VecType, HwExpressionKind) => doCast(a, kind, UIntType(UndefinedInterval, UnknownWidth(),NumberDecimal))
                 case (_:BoolType, SwExpressionKind) => doCast(a, kind, IntType(UndefinedInterval, NumberDecimal))
                 case _ => a
               }})
               
+              val updatedTpe = (commonType(cast), commonKind(cast)) match {
+                case (Some(t), (_, Some(HwExpressionKind))) => t
+                case _ => tpe // do not mess up with SwKinds
+              }
+              
               trace(p, s"Processing NumOp $o (after cast)")
               cast.foreach(e => trace(p, s"${e.serialize} -- $e"))
               
-              p.copy(args = cast, kind = kind, tpe = tpe)
+              p.copy(args = cast, kind = kind, tpe = updatedTpe)
               
             case (o: PrimOps.ShiftOp, _) => 
               val (e: Expression, shft: Expression) = p.args match {

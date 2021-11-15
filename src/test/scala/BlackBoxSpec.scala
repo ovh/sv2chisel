@@ -218,7 +218,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
       "package object test_p {",
         "",
         "val WIDTH = 5",
-        "val INIT_VALUE: Vec[Bool] = 0.U.asTypeOf(Vec(WIDTH, Bool()))",
+        "val INIT_VALUE: UInt = 0.U",
         "",
       "}"
     )
@@ -227,7 +227,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
 
     result should contain (
       "class my_module(",
-          "val INIT_VALUE: Vec[Bool] = 0.U.asTypeOf(Vec(WIDTH, Bool())),", // probably not the best style but compilable
+          "val INIT_VALUE: UInt = 0.U,", // probably not the best style but compilable
           "val TEST: Int",
         ") extends BlackBox(Map(",
                   "\"INIT_VALUE\" -> INIT_VALUE.litValue,", // thanks to litValue
@@ -241,7 +241,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
     
     result should contain (
       "val inst = Module(new my_module(",
-          "INIT_VALUE = 0.U.asTypeOf(Vec(WIDTH, Bool())),",
+          "INIT_VALUE = 0.U,",
           "TEST = 0",
       "))",
       "inst.io.a := a",

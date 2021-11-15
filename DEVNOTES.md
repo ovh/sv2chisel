@@ -6,7 +6,7 @@
 
 #### URGENT
 
-- fix cast of Sw Types
+- proper boolean/int inference for params
 
 - LegalizeParamDefault: propagate override_auto_computed_ to defInstances
 

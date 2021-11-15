@@ -126,7 +126,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     result should contain ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
     
     result should contain ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
-    result should contain ("val en: Vec[Bool] = 0.U.asTypeOf(Vec(DBLW, Bool()))")
+    result should contain ("val en: UInt = 0.U")
     result should contain ("val cnt: Vec[UInt] = 0.U.asTypeOf(Vec(DBLW, UInt(65.W)))")
   }
   
@@ -150,15 +150,17 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     result should contain ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
     
     result should contain ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
-    result should contain ("val en: Vec[Bool] = 0.U.asTypeOf(Vec(DBLW, Bool()))")
-    // no InferUInt in package params
-    result should contain ("val cnt: Vec[Vec[Bool]] = 0.U.asTypeOf(Vec(DBLW, Vec(65, Bool())))")
+    result should contain ("val en: UInt = 0.U")
+    result should contain ("val cnt: Vec[UInt] = 0.U.asTypeOf(Vec(DBLW, UInt(65.W)))")
   }
   
   it should "support explicit hardware parameters in instances" in {
     val p = wrapInPackage(s"""
           |localparam WIDTH = 5;
+          |localparam logic [1:0] SEQ_VALUE [2:0] = '{2'd3, 2'd2, 2'd1};
+          |
           |localparam logic [WIDTH-1:0] INIT_VALUE = '0;
+          |localparam logic [1:0] SEQ_UINT [2:0];
       """.stripMargin, "test_p"
     )
     val inner = """
@@ -167,6 +169,10 @@ class ComplexParamSpec extends Sv2ChiselSpec {
           |
           |module my_module #(
           |  parameter logic [WIDTH-1:0] INIT_VALUE = '0,
+          |  parameter logic [1:0] SEQ_UINT [2:0],
+          |  parameter LABELS,
+          |  parameter logic [WIDTH-1:0] LABEL_SEQ [LABELS-1:0],
+          |  parameter logic [WIDTH-1:0] LABEL_SEQ2 [WIDTH-1:0],
           |  parameter TEST
           |)(
           |  input a,
@@ -180,7 +186,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
           |input  a;
           |input  b;
           |
-          |my_module #(.INIT_VALUE('0), .TEST(0)) inst(
+          |my_module #(.INIT_VALUE('0), .SEQ_UINT(test_p::SEQ_VALUE), .TEST(0)) inst(
           |  .a(a),
           |  .b(b)
           |);
@@ -194,7 +200,10 @@ class ComplexParamSpec extends Sv2ChiselSpec {
       "package object test_p {",
         "",
         "val WIDTH = 5",
-        "val INIT_VALUE: Vec[Bool] = 0.U.asTypeOf(Vec(WIDTH, Bool()))",
+        "val SEQ_VALUE: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))",
+        "",
+        "val INIT_VALUE: UInt = 0.U",
+        "val SEQ_UINT: Seq[UInt]",
         "",
       "}"
     )
@@ -203,7 +212,11 @@ class ComplexParamSpec extends Sv2ChiselSpec {
 
     result should contain (
       "class my_module(",
-          "val INIT_VALUE: Vec[Bool] = 0.U.asTypeOf(Vec(WIDTH, Bool())),",
+          "val INIT_VALUE: UInt = 0.U,",
+          "val SEQ_UINT: Seq[UInt],",
+          "val LABELS: Int,",
+          "val LABEL_SEQ: Seq[UInt],",
+          "val LABEL_SEQ2: Seq[UInt],",
           "val TEST: Int",
         ") extends MultiIOModule {",
         "val a = IO(Input(Bool()))",
@@ -212,12 +225,12 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     
     result should contain (
       "val inst = Module(new my_module(",
-          "INIT_VALUE = 0.U.asTypeOf(Vec(WIDTH, Bool())),",
-          "TEST = 0",
+        "INIT_VALUE = 0.U,",
+        "SEQ_UINT = test_p.SEQ_VALUE,",
+        "TEST = 0",
       "))",
       "inst.a := a",
       "b := inst.b"
     )
-
   }
 }
