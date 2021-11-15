@@ -749,47 +749,53 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
         case i: DefInstance =>  
           val ports = i.portMap.zipWithIndex.map(t => t._1 match {
             
-            case na@NamedAssign(_,_,_, SourceFlow, _, _, _) => 
-              trace(na, s"Processing port ${na.name} (#${t._2}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(na.tpe).serialize}")
-              na.mapExpr(processExpression(_, HwExpressionKind, na.remoteType.getOrElse(na.tpe)))
-            case na@NoNameAssign(_,_, SourceFlow, _, _, _, _) => 
+            // SourceFlow Assign <=> remote input port (assign is a local source feeding the remote sink port)
+            // all NamedAssign + NoNameAssign with remoteName defined
+            case r:RemoteLinked if(r.flow == SourceFlow && r.remoteName.isDefined) => 
+              trace(r, s"Processing port ${r.remoteName.get} (#${t._2}) of instance ${i.name} of module ${i.module.serialize} : ${r.remoteType.getOrElse(r.tpe).serialize}")
+              
+              // need to use a reference to avoid cast to remote type which might contain references out of scope
+              val ref = Reference(
+                UndefinedInterval, 
+                r.remoteName.get, 
+                if(i.ioBundleConnect) Seq(i.name, "io") else Seq(i.name),
+                r.remoteType.getOrElse(r.tpe),
+                r.remoteKind.getOrElse(r.kind),
+                SourceFlow // local source
+              ) 
+
+              r.mapExpr(processExpression(_, HwExpressionKind, TypeOf(UndefinedInterval, ref)))
+            
+            // remaining NoNameassign
+            case na@NoNameAssign(_,_, SourceFlow, _, _, _, _) =>
               trace(na, s"Processing port #${t._2} (${na.remoteName.getOrElse("<unknown>")}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(na.tpe).serialize}")
+              warn(na, s"Port #${t._2} of instance ${i.name} of module ${i.module.serialize} is unnamed, this might result in a cast containing remote references unknown in instantiation scope.")
               na.mapExpr(processExpression(_, HwExpressionKind, na.remoteType.getOrElse(na.tpe)))
-              
-            case na@NamedAssign(_,_,_, SinkFlow, _, _, _) => 
-              trace(na, s"Processing port ${na.name} (#${t._2}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(UnknownType()).serialize}")
-              val expr = processExpression(na.expr, HwExpressionKind, UnknownType())
-              na.remoteType match {
+            
+            // SinkFlow Assign <=> remote output port (assign is a local sink fed by the remote source port)
+            case r:RemoteLinked if(r.flow == SinkFlow) => 
+              val remoteName = r.remoteName.getOrElse("<???>")
+              trace(r, s"Processing port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize} : ${r.remoteType.getOrElse(UnknownType()).serialize}")
+              val updated = r.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
+              r.remoteType match {
                 case Some(remoteTpe) => 
                   // Create assignExpr with cast if necessary
-                  val refExpr = Reference(na.tokens, na.name, Seq(i.name), remoteTpe, HwExpressionKind, SourceFlow)
-                  val refCast = processExpression(refExpr, HwExpressionKind, expr.tpe)
-                  if(refExpr != refCast){
-                    na.copy(expr = expr, assignExpr = Some(refCast))
-                  } else {
-                    na.copy(expr = expr)
-                  }
-                case None => na.copy(expr = expr)
-              }
-              
-            case na@NoNameAssign(_,_, SinkFlow, _, _, _, _) => 
-              val remoteName = na.remoteName.getOrElse("<???>")
-              trace(na, s"Processing port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(UnknownType()).serialize}")
-              val expr = processExpression(na.expr, HwExpressionKind, UnknownType())
-              na.remoteType match {
-                case Some(remoteTpe) => 
-                  // Create assignExpr with cast if necessary
-                  val refExpr = Reference(na.tokens, remoteName, Seq(i.name), remoteTpe, HwExpressionKind, SourceFlow)
-                  val refCast = processExpression(refExpr, HwExpressionKind, expr.tpe)
+                  val path = if(i.ioBundleConnect) Seq(i.name, "io") else Seq(i.name)
+                  val refExpr = Reference(r.tokens, remoteName, path, remoteTpe, HwExpressionKind, SourceFlow)
+                  val refCast = processExpression(refExpr, HwExpressionKind, updated.tpe)
                   if(refExpr != refCast){
                     if (remoteName == "<???>") {
-                      critical(na, s"Unknown remote ref for port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize} : ${remoteTpe.serialize}")
+                      critical(r, s"Unknown remote ref for port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize} : ${remoteTpe.serialize}")
                     }
-                    na.copy(expr = expr, assignExpr = Some(refCast))
+                    updated match {
+                      case na:NamedAssign => na.copy(assignExpr = Some(refCast))
+                      case na:NoNameAssign => na.copy(assignExpr = Some(refCast))
+                      // NB: no other case as RemoteLLinked is sealed => we will get warning if extended later
+                    }
                   } else {
-                    na.copy(expr = expr)
+                    updated
                   }
-                case _ => na.copy(expr = expr)
+                case _ => updated
               }
               
             case p => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))

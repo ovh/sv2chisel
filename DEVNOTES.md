@@ -6,7 +6,7 @@
 
 #### URGENT
 
-- fix raw access to enumeration values (either import or explicit)
+- fix cast of Sw Types
 
 - LegalizeParamDefault: propagate override_auto_computed_ to defInstances
 

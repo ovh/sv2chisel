@@ -423,6 +423,7 @@ sealed abstract class Assign extends Expression {
 }
 
 sealed trait RemoteLinked {
+  this: Expression =>
   def remoteKind : Option[ExpressionKind]
   def remoteType : Option[Type]
   def remoteName : Option[String]
