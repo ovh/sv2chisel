@@ -469,6 +469,19 @@ class ChiselEnumField(val f: EnumField) extends Chiselized {
   }
 }
 
+object getUserDefinedTypeInst {
+  def apply(ctx: ChiselEmissionContext, p: SVNode, tpe: Type, name: String, scalaTypeOnly: Boolean): Seq[ChiselTxt] = {
+    tpe match {
+      case _: BundleType if(scalaTypeOnly) => ChiselTxtS(p.tokens, name)
+      case _: BundleType => ChiselTxtS(p.tokens, "new " + name)
+      case _ if(scalaTypeOnly) => 
+        rwarn(ctx, p, s"cannot use Enum/TypeAlias `${name}` as scala type (simple object convienience on top of underlying Data implementation)")
+        ChiselTxtS(p.tokens, "UInt")
+      case _ => ChiselTxtS(p.tokens, name + "()") // apply object for Enum & type alias
+    }
+  }
+}
+
 class ChiselType(val t: Type) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = chiselize(ctx, false)
   
@@ -533,16 +546,8 @@ class ChiselType(val t: Type) extends Chiselized {
       case b: BoolType if(ctx.isHardware && scalaTypeOnly) => ChiselTxtS(b.tokens, "Bool")
       case b: BoolType if(ctx.isHardware) => ChiselTxtS(b.tokens, "Bool()")
       case b: BoolType => ChiselTxtS(b.tokens, "Boolean")
-      case u: UserRefType => 
-        u.tpe match {
-          case _: BundleType if(scalaTypeOnly) => ChiselTxtS(u.tokens, u.serialize)
-          case _: BundleType => ChiselTxtS(u.tokens, "new " + u.serialize)
-          case _: EnumType if(scalaTypeOnly) => 
-            rwarn(ctx,t, s"cannot use Enum `${u.serialize}` as scala type (simple object convienience on top of underlying UInt implementation)")
-            ChiselTxtS(u.tokens, "UInt")
-          case _: EnumType => ChiselTxtS(u.tokens, u.serialize + "()") // apply object
-          case _ => ChiselTxtS(u.tokens, u.serialize)
-        }
+      case u: UserRefType => getUserDefinedTypeInst(ctx, u, u.tpe, u.serialize, scalaTypeOnly)
+
         
       case r: RawScalaType => ChiselTxtS(r.tokens, r.str)
       case s: StringType => ChiselTxtS(s.tokens, "String")
@@ -719,7 +724,7 @@ class ChiselExpression(val e: Expression) extends Chiselized {
 class ChiselTypeInst(t: TypeInst){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     (t.name) match {
-      case Some(n) => ChiselTxtS(t.tokens, "new " + (t.path :+ n).mkString("."))
+      case Some(n) => getUserDefinedTypeInst(ctx, t, t.tpe, (t.path :+ n).mkString("."), scalaTypeOnly = false)
       case None => t.tpe.chiselize(ctx)
     }
   }
