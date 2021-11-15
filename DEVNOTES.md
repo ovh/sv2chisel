@@ -13,6 +13,7 @@
 - infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)
 - Improve behavior of inlineif: should be emitted as sw as soon as pred is sw 
 - fix behavior of emission with path relative to ~ (~ considered as standard name)
+- front-end: crash on unknown/illegal parameters (to help with syntax: do not assume they are applied when it runs)
 
 - add true regression tests based on actual sv files (internal repo and CI ?) down to 
   - scala compilation

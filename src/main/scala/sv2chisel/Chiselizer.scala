@@ -619,17 +619,32 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
     }
     
     // to do : proper management of clock & reset for non trivial cases
-    val decl = (s.tpe, s.init) match {
-      case (u: UnpackedVecType, _) => 
-        u.tpe match {
-          case Seq(t) => Seq(ChiselLine(s, ctx, s"val ${s.name} = Mem(")) ++ u.getWidth().chiselize(ctx) ++
+    import ChiselizerOptions.UnpackedEmissionStyle.{Reg, Mem, SyncReadMem}
+    val decl = (s.tpe, s.init, ctx.options.chiselizer.unpackedEmissionStyle) match {
+      case (u: UnpackedVecType, _:UndefinedExpression, Reg) => 
+        Seq(ChiselLine(s, ctx, s"val ${s.name} = Reg(")) ++ u.chiselize(hCtxt)
+      case (u: UnpackedVecType, _, Reg) => 
+        Seq(ChiselLine(s, ctx, s"val ${s.name} = RegInit(")) ++ u.chiselize(hCtxt)
+        
+      case (u: UnpackedVecType, _, style) => 
+        val txt = style match {
+          case Mem => "Mem"
+          case SyncReadMem => "SyncReadMem"
+          case _ => "Reg"
+        }
+        
+        (u.tpe, s.init) match {
+          case (Seq(t), _:UndefinedExpression) => Seq(ChiselLine(s, ctx, s"val ${s.name} = $txt(")) ++ u.getWidth().chiselize(ctx) ++
             ChiselTxtS(",") ++ t.chiselize(hCtxt)
+          case (Seq(_), _) => 
+            rcritical(ctx, s, s"Cannot emit ${s.name} as Mem because it has an init value, using RegInit instead")
+            Seq(ChiselLine(s, ctx, s"val ${s.name} = RegInit(")) ++ u.chiselize(hCtxt)
           case _ => unsupportedChisel(ctx, s, "MixedVecType")
         }
-      case (UserRefType(_,_,_,_:EnumType), _:UndefinedExpression) => // standard 
+      case (UserRefType(_,_,_,_:EnumType), _:UndefinedExpression, _) => // standard 
         Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) ++ s.tpe.chiselize(hCtxt)
         
-      case (UserRefType(_,_,_,_:EnumType), _) => Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) // avoid type
+      case (UserRefType(_,_,_,_:EnumType), _, _) => Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) // avoid type
       
       case _ => Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) ++ s.tpe.chiselize(hCtxt)
     }

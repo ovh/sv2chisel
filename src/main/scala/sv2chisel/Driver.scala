@@ -56,7 +56,7 @@ object Driver extends EasyLogging {
     struct(s"# Total Elapsed time running transforms : $timeTransforms ms")
     
     struct(s"######### EMISSION #########")
-    Emitter.emitChisel(ScalaStyleEmission(project, emissionBasePath), noFileIO)
+    Emitter.emitChisel(ScalaStyleEmission(project, emissionBasePath, options), noFileIO)
   }
 
 }

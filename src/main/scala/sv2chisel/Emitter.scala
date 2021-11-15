@@ -18,6 +18,7 @@ import java.io.{File, FileWriter}
 
 trait ChiselEmissionContext {
   val project: Project
+  val options: TranslationOptions
   val stream: CommonTokenStream
   val src: SourceFile
   val srcBasePath: String
@@ -43,6 +44,7 @@ trait ChiselEmissionContext {
 
 case class ScalaStyleEmission(
   project: Project, 
+  options: TranslationOptions,
   emissionBasePath: String,
   indent: String,
   indentLevel: Int,
@@ -88,10 +90,11 @@ case class ScalaStyleEmission(
 }
 
 object ScalaStyleEmission {
-  def apply(project: Project, emissionBasePath: String): ScalaStyleEmission = {
+  def apply(project: Project, emissionBasePath: String, options: TranslationOptions): ScalaStyleEmission = {
     val pe = project.getEntries.head
     new ScalaStyleEmission(
       project = project,
+      options = options,
       emissionBasePath = emissionBasePath,
       indent = "  ", 
       indentLevel = 0,
