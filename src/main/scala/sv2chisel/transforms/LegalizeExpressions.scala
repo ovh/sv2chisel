@@ -236,9 +236,17 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
         case ((false, None), _, _) => (UnknownExpressionKind, UnknownType(), s)
         // > no casts required for all SW
         case ((_, Some(SwExpressionKind)), _, _) => (SwExpressionKind, UnknownType(), s) 
-        case ((_, Some(UnknownExpressionKind)), _, _) => 
-          warn(s.head, s"Unable to infer common expression kind for ${s.map(_.serialize).mkString("(",", ",")")}")
-          (UnknownExpressionKind, UnknownType(), s)
+        case ((_, Some(UnknownExpressionKind)), ct, _) => 
+          (required, ct) match {
+            case (Some(k), Some(t)) => (k, t, s.map(doCast(_, k, t)))
+            case (Some(k@SwExpressionKind), None) => (k, UnknownType(), s.map(doCast(_, k, UnknownType())))
+            case (Some(HwExpressionKind), None) => 
+              val (tpe, se) = defaultToHw(s, baseHwType)
+              (HwExpressionKind, tpe, se)
+            case _ =>
+              warn(s.head, s"Unable to infer common type & kind for ${s.map(_.serialize).mkString("(",", ",")")}")
+              (UnknownExpressionKind, UnknownType(), s)
+          }
         
         // Rules based on types
         // > do nothing for even types 
@@ -806,7 +814,16 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
               
             case p => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
           })
-          val params = i.paramMap.map(_.mapExpr(processExpression(_, SwExpressionKind, UnknownType())))
+          // param types have been infered earlier
+          val params = i.paramMap.map(a => a match {
+            case r: RemoteLinked =>
+              val castTpe = r.remoteType.getOrElse(UnknownType())
+              a.mapExpr(processExpression(_, r.remoteKind.getOrElse(SwExpressionKind), castTpe))
+              
+            case _ =>
+              warn(a, s"Cannot ensure proper type legalization of parameter map of instance ${i.name}")
+              a
+          })
           i.copy(portMap = ports, paramMap = params)
         case p: DefParam => p.mapExpr(processExpression(_, p.kind, p.tpe))
         case f: ForGen => f.mapExpr(processExpression(_, SwExpressionKind, UnknownType()))
@@ -816,7 +833,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
     }
     
     d.mapStmt(processStatement(_)) match {
-      case m: Module => m.mapParam(p => p.mapExpr(processExpression(_, p.kind, p.tpe)))
+      case m: DefModule => m.mapParam(p => p.mapExpr(processExpression(_, p.kind, p.tpe)))
       case d => d
     }
   }

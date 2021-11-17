@@ -60,14 +60,14 @@ trait InfoLogger extends EasyLogger {
   def currentSourceFile : Option[SourceFile]
   def currentStream : Option[CommonTokenStream]
   
-  def getInfo(n: SVNode): String = getInfo(n.tokens)
-  def getInfo(i: Interval): String = {
+  def getAtInfo(n: SVNode): String = getAtInfo(n.tokens)
+  def getAtInfo(i: Interval): String = {
     val path = currentSourceFile match {
-      case Some(src) => src.path
-      case None => "???" 
+      case Some(src) => s"at ${src.path}"
+      case None => ""
     }
     (currentStream, i) match {
-      case (_, UndefinedInterval) => s"${path}:???"
+      case (_, UndefinedInterval) => path
       case (Some(stream), _) => 
         val tokens = stream.getTokens(i.a, i.b)
         val sl = tokens.asScala.head.getLine()
@@ -80,7 +80,7 @@ trait InfoLogger extends EasyLogger {
         } else {
           s"${path}:$sl>>$stl"
         }
-      case (None, _) => s"${path}:???"
+      case (None, _) => path
     }
   }
   
@@ -89,42 +89,42 @@ trait InfoLogger extends EasyLogger {
     * @param msg msg generator to be invoked if level is right
     */
   def fatal(n: SVNode, msg: => String): Unit = {
-    fatal(s"$msg at ${getInfo(n)}")
+    fatal(s"$msg ${getAtInfo(n)}")
   }
   /**
     * Log msg at Error level
     * @param msg msg generator to be invoked if level is right
     */
   def critical(n: SVNode, msg: => String): Unit = {
-    critical(s"$msg at ${getInfo(n)}")
+    critical(s"$msg ${getAtInfo(n)}")
   }
   /**
     * Log msg at Warn level
     * @param msg msg generator to be invoked if level is right
     */
   def warn(n: SVNode, msg: => String): Unit = {
-    warn(s"$msg at ${getInfo(n)}")
+    warn(s"$msg ${getAtInfo(n)}")
   }
   /**
     * Log msg at Info level
     * @param msg msg generator to be invoked if level is right
     */
   def info(n: SVNode, msg: => String): Unit = {
-    info(s"$msg at ${getInfo(n)}")
+    info(s"$msg ${getAtInfo(n)}")
   }
   /**
     * Log msg at Debug level
     * @param msg msg generator to be invoked if level is right
     */
   def debug(n: SVNode, msg: => String): Unit = {
-    debug(s"$msg at ${getInfo(n)}")
+    debug(s"$msg ${getAtInfo(n)}")
   }
   /**
     * Log msg at Trace level
     * @param msg msg generator to be invoked if level is right
     */
   def trace(n: SVNode, msg: => String): Unit = {
-    trace(s"$msg at ${getInfo(n)}")
+    trace(s"$msg ${getAtInfo(n)}")
   }
 }
 

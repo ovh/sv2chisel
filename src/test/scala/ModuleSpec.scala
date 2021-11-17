@@ -89,11 +89,11 @@ class ModuleSpec extends Sv2ChiselSpec {
     )
     debug(result)
     result should contain ("class CustomModule(" )
-    result should contain ("val TEST: Int" )
+    result should contain ("val TEST: Boolean" )
     result should contain (") extends MultiIOModule {")
     result should contain ("val a = IO(Input(Bool()))")
     result should contain ("val b = IO(Output(Bool()))")
-    result should contain ("b := Mux((TEST != 0).B, a, false.B)")
+    result should contain ("b := Mux(TEST.B, a, false.B)")
   }
   
   // Instances
@@ -120,7 +120,7 @@ class ModuleSpec extends Sv2ChiselSpec {
     )
     debug(result)
     result should contain ("class mod(" )
-    result should contain ("val TEST: Int = 1" )
+    result should contain ("val TEST: Boolean = true" )
     
     result should contain ("class Main(" )
     result should contain ("val OPT: Int" )
@@ -129,7 +129,7 @@ class ModuleSpec extends Sv2ChiselSpec {
     result should contain ("val o = IO(Output(Bool()))")
 
     result should contain ("val instA = Module(new mod(")
-    result should contain ("TEST = OPT")
+    result should contain ("TEST = (OPT != 0)")
     result should contain ("))")
     result should contain ("instA.a := i")
     result should contain ("o := instA.b")

@@ -327,12 +327,12 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       s += ChiselClosingLine(e.params.last, mCtxt, s") extends BlackBox(Map(")
       // additional named mapping for blackboxes
       s ++= e.params.map(p => {
-        val lv = p.tpe match {
-          case _:StringType => "" 
-          case _:IntType => ""
-          case _ => ".litValue"
+        val (wL, wR) = (p.kind, p.tpe) match {
+          case (HwExpressionKind, _) => ("", ".litValue")
+          case (SwExpressionKind, _:BoolType) => ("(if(", ") 1 else 0)") // such a shame ...
+          case _ => ("","")
         }
-        ChiselLine(p, pCtxt.incr(5), s"$dq${p.name}$dq -> ${p.name}$lv") +: comma
+        ChiselLine(p, pCtxt.incr(5), s"$dq${p.name}$dq -> $wL${p.name}$wR") +: comma
       }).flatten.dropRight(1)
       s += ChiselLine(mCtxt, s"))$resource {")
     } else {

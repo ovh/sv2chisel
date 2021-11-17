@@ -40,16 +40,16 @@ object Driver extends EasyLogging {
       new PropagateClocks(options),
       new FlowReferences(options),
       new InferUInts(options), // requires flows
-      new TypeReferences(options), // should run after InferUInts for infered UInt type propagation
-      new LegalizeExpressions(options), // TO DO - requires TypedReferences; no more concats
+      new InferParamTypes(options),
+      new TypeReferences(options), // should run after InferUInts & InferParamTypes for proper type propagation to refs
+      new LegalizeExpressions(options), // Requires TypedReferences
       
       // Emission Oriented Transforms
       new FixFunctionImplicitReturns(options),
       new NameInstancePorts(options),
       new RemovePatterns(options),
       new RemoveConcats(options),
-      new InferParamTypes(options),
-      new LegalizeParamDefaults(options) // needs param types
+      new LegalizeParamDefaults(options) // needs typed parameters
     )
     struct(s"######### Executing ${transforms.size} transforms #########")
     val (timeTransforms, _) = time { project.run(transforms) }

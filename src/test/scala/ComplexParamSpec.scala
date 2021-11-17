@@ -217,7 +217,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
           "val LABELS: Int,",
           "val LABEL_SEQ: Seq[UInt],",
           "val LABEL_SEQ2: Seq[UInt],",
-          "val TEST: Int",
+          "val TEST: Boolean",
         ") extends MultiIOModule {",
         "val a = IO(Input(Bool()))",
         "val b = IO(Output(Bool()))"
@@ -227,7 +227,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
       "val inst = Module(new my_module(",
         "INIT_VALUE = 0.U,",
         "SEQ_UINT = test_p.SEQ_VALUE,",
-        "TEST = 0",
+        "TEST = false",
       "))",
       "inst.a := a",
       "b := inst.b"

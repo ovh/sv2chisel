@@ -6,8 +6,11 @@
 
 #### URGENT
 
-- proper boolean/int inference for params
-
+- add string legalization at emission:
+  - scala keywords
+  - chisel keywords?
+  - Chisel Data methods for Bundle fields
+  
 - LegalizeParamDefault: propagate override_auto_computed_ to defInstances
 
 - infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)

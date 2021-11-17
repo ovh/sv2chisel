@@ -209,7 +209,9 @@ case class DesignAttribute(tokens: Interval, attributes: VerilogAttributes) exte
   * See [[PrimOps]]
   */
 abstract class PrimOp extends SVNode {
+  this: PrimOps.OpKind with PrimOps.ArgsKind => // ensure OpKind & ArgsKind are fully covering
   type T <: PrimOp
+  
   def expectedArgs: Int
   
   def serialize: String = this.toString
@@ -424,6 +426,8 @@ sealed abstract class Assign extends Expression {
 
 sealed trait RemoteLinked {
   this: Expression =>
+  def expr: Expression // local expression
+  
   def remoteKind : Option[ExpressionKind]
   def remoteType : Option[Type]
   def remoteName : Option[String]

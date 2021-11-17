@@ -186,7 +186,7 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
         // let's fetch remote module if known
         currentProject.get.findModule(i.module.serialize) match {
           case Some(m) => 
-            val ctx = s"for instance `${i.name}` of module `${i.module}`"
+            val ctx = s"for instance `${i.name}` of module `${i.module.serialize}`"
             val portMap = processAssignSeq(i.portMap, m.ports.map(p => (p.name, FullType(p.tpe,HwExpressionKind))),ctx)
             val paramMap = processAssignSeq(i.paramMap, m.params.map(p => (p.name, FullType(p.tpe, p.kind))), ctx)
             val isBlackbox = m match {
