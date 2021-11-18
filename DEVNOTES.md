@@ -71,6 +71,21 @@
    - with package blackboxes
    - NOTE: same emission as Module for IOs, only the param changes
 
+#### Global cross-module renaming transform
+**use-case to be defined**: not required for all context-independent rename (such as emission legalization) 
+
+- Overview: 
+  1. pre-processing pass: record all required renames accross the circuit  
+  2. processing pass : apply all renames locally
+
+- Need to build a real notion of TargetReference, including at least:
+  - remote path (packages)
+  - subfields
+  - instances with nb: easier as verilog do not provide access to instance port/param by name
+    - param map
+    - port map 
+    
+- NB: need to take into account that the legalized name might conflict with existing names
 
 *ERRATUM* : the following will not work well with param defaults in verilog let's hence keep the version with isBlackbox in DefInstance
 

@@ -339,7 +339,7 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       s += ChiselTxt(mCtxt, s") extends BlackBox$resource {")
     }
     s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
-    s ++= e.ports.flatMap(_.chiselize(pCtxt, withIO = false))
+    s ++= e.ports.flatMap(_.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false))
     s += ChiselClosingLine(e.body, mCtxt, s"})")
     // NEED ADD RESSOURCE HERE !!
     e.resourcePath match {
@@ -430,7 +430,7 @@ class ChiselPort(val p: Port) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext, withIO: Boolean): Seq[ChiselTxt] = {
     val io = if(withIO) "IO(" else ""
     val cb = if(withIO) ")" else ""
-    Seq(ChiselLine(p, ctx, s"val ${p.name} = $io${p.direction.serialize}(")) ++
+    Seq(ChiselLine(p, ctx, s"val ${ctx.safe(p.name)} = $io${p.direction.serialize}(")) ++
       p.tpe.chiselize(ctx.hw()) ++ 
       Seq(ChiselTxt(ctx, s"$cb)"))
   }
@@ -441,7 +441,7 @@ class ChiselPort(val p: Port) extends Chiselized {
 
 class ChiselField(val f: Field) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    val decl = s"val ${f.name} ="
+    val decl = s"val ${ctx.safe(f.name)} ="
     f.flip match {
       case Flip => 
         Seq(ChiselLine(f, ctx, s"$decl Flipped(")) ++
@@ -517,7 +517,7 @@ class ChiselType(val t: Type) extends Chiselized {
       case b: BundleType if(scalaTypeOnly) => unsupportedChisel(ctx,b, "cannot refer to anonymous Bundle as scalaType")
       case b: BundleType =>
         Seq(ChiselTxt(t, ctx, s"new Bundle { ")) ++
-          b.fields.map(_.chiselize(iCtxt)).flatten ++
+          b.fields.map(_.chiselize(iCtxt.legal(Utils.legalBundleField))).flatten ++
           Seq(ChiselClosingLine(b, ctx, "}"))
 
       case u: UnknownType => 
@@ -670,7 +670,7 @@ class ChiselDefType(val t: DefType) extends Chiselized {
     t.tpe match {
       case b: BundleType => 
         Seq(ChiselLine(t, ctx, s"class ${t.name} extends Bundle {")) ++
-          b.fields.flatMap(_.chiselize(ctx.hw().incr())) ++
+          b.fields.flatMap(_.chiselize(ctx.hw().incr().legal(Utils.legalBundleField))) ++
           Seq(ChiselClosingLine(t, ctx, "} "))
           
       case e: EnumType if(e.isGeneric) => 
@@ -710,7 +710,7 @@ class ChiselExpression(val e: Expression) extends Chiselized {
       case x: DoCast => x.chiselize(ctx)
       case x: DoCall => x.chiselize(ctx)
       case x: Concat => x.chiselize(ctx)
-      case x: SubField => x.chiselize(ctx)
+      case x: SubField => x.chiselize(ctx.legal(Utils.legalBundleField))
       case x: SubIndex => x.chiselize(ctx)
       case x: SubRange => x.chiselize(ctx)
       case x: Number => x.chiselize(ctx)
@@ -857,7 +857,7 @@ class ChiselNoNameAssign(e: NoNameAssign){
 
 class ChiselSubField(e: SubField){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    e.expr.chiselize(ctx) ++ Seq(ChiselTxt(e, ctx, s".${e.name}"))
+    e.expr.chiselize(ctx) ++ Seq(ChiselTxt(e, ctx, s".${ctx.safe(e.name)}"))
   }
 }
 

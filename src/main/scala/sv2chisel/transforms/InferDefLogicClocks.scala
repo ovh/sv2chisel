@@ -330,7 +330,7 @@ class InferDefLogicClocks(val options: TranslationOptions) extends DescriptionBa
         processed
     }
     currentProject.get.clearDescriptionCache() // clock & reset have been modified
-    val res = renameReferences(updatedModule, renameMap)
+    val res = renameLocalReferences(updatedModule, renameMap)
     seenModules += ((m.name, res))
     res
   }

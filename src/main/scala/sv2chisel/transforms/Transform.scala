@@ -31,14 +31,18 @@ abstract class Transform extends LazyLogging {
   }
   
   // private stuff
-  private[transforms] def renameReferences(module: DefModule, renameMap: RenameMap): DefModule = {
+  private[transforms] def renameLocalReferences[T <: Description](des: T, renameMap: RenameMap): des.T = {
+    
+    def processType(t: Type): Type = {
+      t.mapWidth(_.mapExpr(processExpression))
+    }
     
     def processExpression(e: Expression): Expression = {
       val expr = e match {
         case r: Reference => renameMap.update(r)
         case _ => e
       }
-      expr.mapExpr(processExpression)
+      expr.mapExpr(processExpression).mapType(processType)
     }
     
     def processStatement(s: Statement): Statement = {
@@ -46,13 +50,10 @@ abstract class Transform extends LazyLogging {
         case p: Port => renameMap.update(p)
         case st => st
       }
-      updated.mapExpr(processExpression).mapStmt(processStatement)
+      updated.mapExpr(processExpression).mapType(processType).mapStmt(processStatement)
     }
     
-    module match {
-      case m: Module => m.copy(body = processStatement(m.body))
-      case m => m
-    }
+    des.mapStmt(processStatement)
   }
 }
 

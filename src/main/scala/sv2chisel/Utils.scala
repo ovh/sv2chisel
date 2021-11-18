@@ -12,9 +12,6 @@ import sv2chisel.transforms.InfoLogger
 import logger.{LazyLogging}
 import org.antlr.v4.runtime.{CommonTokenStream}
 
-import scala.collection.mutable
-import scala.util.matching.Regex
-
 object Utils extends LazyLogging with InfoLogger {
   var currentSourceFile : Option[SourceFile] = None
   var currentStream : Option[CommonTokenStream] = None
@@ -175,142 +172,30 @@ object Utils extends LazyLogging with InfoLogger {
   
   
   // TO DO : adapat this logic for scala keywords
-  val v_keywords = Set(
-    "alias", "always", "always_comb", "always_ff", "always_latch",
-    "and", "assert", "assign", "assume", "attribute", "automatic",
-
-    "before", "begin", "bind", "bins", "binsof", "bit", "break",
-    "buf", "bufif0", "bufif1", "byte",
-
-    "case", "casex", "casez", "cell", "chandle", "checker", "class", "clocking",
-    "cmos", "config", "const", "constraint", "context", "continue",
-    "cover", "covergroup", "coverpoint", "cross",
-
-    "deassign", "default", "defparam", "design", "disable", "dist", "do",
-
-    "edge", "else", "end", "endattribute", "endcase", "endclass",
-    "endclocking", "endconfig", "endfunction", "endgenerate",
-    "endgroup", "endinterface", "endmodule", "endpackage",
-    "endprimitive", "endprogram", "endproperty", "endspecify",
-    "endsequence", "endtable", "endtask",
-    "enum", "event", "expect", "export", "extends", "extern",
-
-    "final", "first_match", "for", "force", "foreach", "forever",
-    "fork", "forkjoin", "function",
-    "generate", "genvar",
-    "highz0", "highz1",
-    "if", "iff", "ifnone", "ignore_bins", "illegal_bins", "import",
-    "incdir", "include", "initial", "initvar", "inout", "input",
-    "inside", "instance", "int", "integer", "interconnect",
-    "interface", "intersect",
-
-    "join", "join_any", "join_none", "large", "liblist", "library",
-    "local", "localparam", "logic", "longint",
-
-    "macromodule", "matches", "medium", "modport", "module",
-
-    "nand", "negedge", "new", "nmos", "nor", "noshowcancelled",
-    "not", "notif0", "notif1", "null",
-
-    "or", "output",
-
-    "package", "packed", "parameter", "pmos", "posedge",
-    "primitive", "priority", "program", "property", "protected",
-    "pull0", "pull1", "pulldown", "pullup",
-    "pulsestyle_onevent", "pulsestyle_ondetect", "pure",
-
-    "rand", "randc", "randcase", "randsequence", "rcmos",
-    "real", "realtime", "ref", "reg", "release", "repeat",
-    "return", "rnmos", "rpmos", "rtran", "rtranif0", "rtranif1",
-
-    "scalared", "sequence", "shortint", "shortreal", "showcancelled",
-    "signed", "small", "solve", "specify", "specparam", "static",
-    "strength", "string", "strong0", "strong1", "struct", "super",
-    "supply0", "supply1",
-
-    "table", "tagged", "task", "this", "throughout", "time", "timeprecision",
-    "timeunit", "tran", "tranif0", "tranif1", "tri", "tri0", "tri1", "triand",
-    "trior", "trireg", "type","typedef",
-
-    "union", "unique", "unsigned", "use",
-
-    "var", "vectored", "virtual", "void",
-
-    "wait", "wait_order", "wand", "weak0", "weak1", "while",
-    "wildcard", "wire", "with", "within", "wor",
-
-    "xnor", "xor",
-
-    "SYNTHESIS",
-    "PRINTF_COND",
-    "VCS")
-
-  /** Expand a name into its prefixes, e.g., 'foo_bar__baz' becomes 'Seq[foo_, foo_bar__, foo_bar__baz]'. This can be used
-    * to produce better names when generating prefix unique names.
-    * @param name a signal name
-    * @param prefixDelim a prefix delimiter (default is "_")
-    * @return the signal name and any prefixes
-    */
-  def expandPrefixes(name: String, prefixDelim: String = "_"): Seq[String] = {
-    val regex = ("(" + Regex.quote(prefixDelim) + ")+[A-Za-z0-9$]").r
-
-    name +: regex
-      .findAllMatchIn(name)
-      .map(_.end - 1)
-      .toSeq
-      .foldLeft(Seq[String]()){ case (seq, id) => seq :+ name.splitAt(id)._1 }
+  val bundleFieldsReservedNames = Seq(
+    // public reserved names
+    ":=", "<>", "asTypeOf", "asUInt", "autoSeed", "className", "cloneType", 
+    "computeName", "equals", "getElements", "getWidth", "hasSeed", "hashCode", 
+    "ignoreSeq", "instanceName", "isLit", "isWidthKnown", "litOption", "litValue", 
+    "parentModName", "parentPathName", "pathName", "suggestName", "toAbsoluteTarget", 
+    "toNamed", "toPrintable", "toString", "toTarget", "widthOption", "litArg",
+    // private reserved names from Record
+    "setElementRefs", "_makeLit", "toPrintableHelper",
+    // private reserved name from Bundle
+    "getBundleField", "_usingPlugin", "_outerInst", "_containingModule", "_containingBundles",
+    "checkClone", "_cloneTypeImpl", 
+    // private reserved name from Data
+    "flatten", "_specifiedDirection", "specifiedDirection", "specifiedDirection_=",
+    "_assignCompatibilityExplicitDirection", "_binding", "binding", "binding_=",
+    "isSynthesizable", "topBindingOpt", "topBinding", "bind", "_direction", "direction", "direction_=",
+    "bindingToString", "badConnect", "connect", "bulkConnect", "typeEquivalent", "requireVisible",
+    "lref", "ref", "width", "legacyConnect", "allElements", "cloneTypeFull", "connectFromBits"
+  )
+  
+  def legalBundleField(name: String): String = {
+    if(bundleFieldsReservedNames.contains(name)) s"${name}_" else name
   }
 }
 
-/**
-  * Maintains a one to many graph of each modules instantiated child module.
-  * This graph can be searched for a path from a child module back to one of
-  * it's parents.  If one is found a recursive loop has happened
-  * The graph is a map between the name of a node to set of names of that nodes children
-  */
-class ModuleGraph {
-  val nodes = mutable.HashMap[String, mutable.HashSet[String]]()
 
-  /**
-    * Add a child to a parent node
-    * A parent node is created if it does not already exist
-    *
-    * @param parent module that instantiates another module
-    * @param child  module instantiated by parent
-    * @return a list indicating a path from child to parent, empty if no such path
-    */
-  def add(parent: String, child: String): List[String] = {
-    val childSet = nodes.getOrElseUpdate(parent, new mutable.HashSet[String])
-    childSet += child
-    pathExists(child, parent, List(child, parent))
-  }
 
-  /**
-    * Starting at the name of a given child explore the tree of all children in depth first manner.
-    * Return the first path (a list of strings) that goes from child to parent,
-    * or an empty list of no such path is found.
-    *
-    * @param child  starting name
-    * @param parent name to find in children (recursively)
-    * @param path   path being investigated as possible route
-    * @return
-    */
-  def pathExists(child: String, parent: String, path: List[String] = Nil): List[String] = {
-    nodes.get(child) match {
-      case Some(children) =>
-        if(children(parent)) {
-          parent :: path
-        }
-        else {
-          children.foreach { grandchild =>
-            val newPath = pathExists(grandchild, parent, grandchild :: path)
-            if(newPath.nonEmpty) {
-              return newPath
-            }
-          }
-          Nil
-        }
-      case _ => Nil
-    }
-  }
-}

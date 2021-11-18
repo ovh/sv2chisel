@@ -28,6 +28,8 @@ trait ChiselEmissionContext {
   val indentLevel : Int
   val indent : String
   val toCamelCase : Boolean
+  def legal(f: String => String): ChiselEmissionContext
+  def safe(s: String): String
   def incr(n: Int = 1): ChiselEmissionContext 
   def decr(n: Int = 1): ChiselEmissionContext
   def raw(): ChiselEmissionContext
@@ -52,9 +54,12 @@ case class ScalaStyleEmission(
   isRawConnect: Boolean,
   stream: CommonTokenStream,
   src: SourceFile,
-  srcBasePath: String
+  srcBasePath: String,
+  nameLegalizer: String => String
 ) extends ChiselEmissionContext {
   val toCamelCase = true
+  def legal(f: String => String): ChiselEmissionContext = this.copy(nameLegalizer = f)
+  def safe(s: String): String = nameLegalizer(s)
   def incr(n: Int = 1): ChiselEmissionContext = {
     this.copy(indentLevel = indentLevel + n)
   }
@@ -102,7 +107,8 @@ object ScalaStyleEmission {
       isRawConnect = false,
       stream = pe.stream,
       src = pe.src,
-      srcBasePath = pe.basePath
+      srcBasePath = pe.basePath,
+      nameLegalizer = s => s
     )
   }
 }
