@@ -10,7 +10,8 @@ import logger._
 class BasicSpecs extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "BasicSpecs" should "be properly emitted" in {
+  behavior of "BasicSpecs"
+  it should "be properly emitted" in {
     val result = emitInModule(s"""
       |localparam A = 5;
       |localparam B = $$clog2(A + 8);
@@ -70,7 +71,6 @@ class BasicSpecs extends Sv2ChiselSpec {
     result should contain ("val ascii = Wire(UInt(64.W))")
     result should contain ("ascii := \"test\".V.asTypeOf(UInt(64.W))")
 
-    
   }
   
   it should "deal with verilog literal tricks" in {

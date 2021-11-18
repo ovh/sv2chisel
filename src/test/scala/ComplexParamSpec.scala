@@ -9,6 +9,7 @@ import logger._
 
 class ComplexParamSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
+  // Logger.setLevel("sv2chisel.transforms.InferParamTypes", LogLevel.Debug)
   
   behavior of "ComplexParam"
   

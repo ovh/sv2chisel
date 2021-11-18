@@ -209,8 +209,16 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
         
         case ((_, Some(HwExpressionKind)), _) => (HwExpressionKind, legalizeHwKinds(s, baseHwType, selfLegalizeHw))
         case ((_, Some(UnknownExpressionKind)), _) => 
-          warn(s.head, s"Unable to infer common expression kind for ${s.map(_.serialize).mkString("(",", ",")")}")
-          (UnknownExpressionKind, s)
+          required match {
+            case Some(k@SwExpressionKind) => (k, s)
+            case Some(HwExpressionKind) => 
+              val (_, se) = defaultToHw(s, baseHwType)
+              (HwExpressionKind, se)
+            case _ =>
+              warn(s.head, s"Unable to infer common kind for ${s.map(_.serialize).mkString("(",", ",")")}")
+              (UnknownExpressionKind, s)
+          }
+          
         case ((true, None), _) => (HwExpressionKind, defaultToHw(s, baseHwType, selfLegalizeHw)._2)
 
         case ((false, None), _) => (UnknownExpressionKind, s) // nothing to do 

@@ -22,8 +22,6 @@ package object vecconvert {
   implicit def stringToHwString(s: String): HwString = new HwString(s)
 }
 
-import vecconvert._
-
 /** Vec-based representation of a String in Hardware (using ASCII codes for characters)
  *
  *  This can be used to initialize some Vectors for example:
@@ -88,7 +86,7 @@ class HwString(s: String) {
  *    low index of the slice (included)
  */
 case class SubWords[T <: Data](v: Vec[T], high: Int, low: Int) {
-  require(high >= low)
+  require(high >= low, s"Subrange are expected with downto ranges: from high to low. Got high:$high & low:$low")
   val length = high - low + 1
 
   // Seq where first element is LSB (as everywhere else in chisel)

@@ -27,9 +27,9 @@ class IfElseGenSpec extends Sv2ChiselSpec {
     )
     result should contain ("class Test() extends MultiIOModule {")
     
-    result should contain ( "if(( !(a != 0)) || (b != 0)) {",
+    result should contain ( "if(( !a) || b) {",
                                "res := 0.U",
-                             "} else if((c != 0)) {",
+                             "} else if(c) {",
                                "res := 1.U",
                              "} else {",
                                "res := 2.U",
@@ -56,9 +56,9 @@ class IfElseGenSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     result should contain ("class Test() extends MultiIOModule {")
-    result should contain ( "if(( !(a != 0)) || (b != 0)) {",
+    result should contain ( "if(( !a) || b) {",
                                "res := 0.U",
-                             "} else if((c != 0)) {",
+                             "} else if(c) {",
                                "res := 1.U",
                              "} else {",
                                "res := 2.U",
@@ -85,10 +85,10 @@ class IfElseGenSpec extends Sv2ChiselSpec {
     )
     debug(result)
     result should contain ("class Test() extends MultiIOModule {")
-    result should contain ( "if(( !(a != 0)) || (b != 0)) {",
+    result should contain ( "if(( !a) || b) {",
                                "res := 0.U",
                              "} else {",
-                                "if((c != 0)) {",
+                                "if(c) {",
                                   "res := 1.U",
                                 "} else {",
                                   "res := 2.U",
@@ -119,10 +119,10 @@ class IfElseGenSpec extends Sv2ChiselSpec {
     debug(result)
     result should contain ("class Test() extends MultiIOModule {")
     
-    result should contain ( "if(( !(a != 0)) || (b != 0)) {",
+    result should contain ( "if(( !a) || b) {",
                                "res := 0.U",
                              "} else {",
-                                "if((c != 0)) {",
+                                "if(c) {",
                                   "res := 1.U",
                                 "} else {",
                                   "res := 2.U",

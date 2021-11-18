@@ -134,11 +134,15 @@ case class SnakeString(s: String) {
    * Example:
    *    toCamel("this_is_a_1_test") == "thisIsA1Test"
    */
-  def toCamel(ctx: ChiselEmissionContext) = if (ctx.toCamelCase) {
-    "_([a-z\\d])".r.replaceAllIn(s, {m =>
+  def toCamel(ctx: ChiselEmissionContext): String = if (ctx.toCamelCase) toCamel else s
+  def toCamelCap(ctx: ChiselEmissionContext): String = if (ctx.toCamelCase) toCamelCap else s
+  
+  def toCamel: String = 
+    "_([a-z\\d])".r.replaceAllIn(s.toLowerCase(), {m =>
       m.group(1).toUpperCase()
-    }).capitalize
-  } else { s }
+    })
+  
+  def toCamelCap: String = toCamel.capitalize
 }
 
 case class ChiselTxt(
@@ -294,13 +298,32 @@ class ChiselModule(val m: Module) extends Chiselized {
 
     s += ChiselLine(m, ctx, s"class ${m.name}(")
     if(mod.params.size > 0) {
-      s ++= mod.params.map(_.chiselize(pCtxt, forceType=true) ++ comma).flatten.dropRight(1)
+      s ++= mod.params.map(_.chiselize(pCtxt, forceType=true, assignToValue=false) ++ comma).flatten.dropRight(1)
       s += ChiselClosingLine(mod.params.last, mCtxt, s") extends $kind {")
     } else {
       s += ChiselTxt(mCtxt, s") extends $kind {")
     }
     s ++= mod.body.chiselize(mCtxt)
     s += ChiselClosingLine(m, ctx, "}")
+    ctx.options.chiselizer.addTopLevelChiselGenerator match {
+      case Some(m.name) =>
+        val appName = s"${m.name.toCamelCap}Gen"
+        rinfo(ctx, m, s"Adding top level app generator for module ${m.name} with name $appName")
+        s += ChiselLine(ctx, s"")
+        s += ChiselLine(ctx, s"import chisel3.stage.ChiselStage")
+        s += ChiselLine(ctx, s"object $appName extends App {")
+        s += ChiselLine(mCtxt, s"new ChiselStage().emitVerilog(new ${m.name}(")
+        if(mod.params.size > 0) {
+          s ++= mod.params.map(_.chiselize(pCtxt, forceType=false, assignToValue=true) ++ comma).flatten.dropRight(1)
+          s += ChiselClosingLine(mod.params.last, mCtxt, s"), args)")
+        } else {
+          s += ChiselTxt(mCtxt, s"), args)")
+        }
+        s += ChiselClosingLine(m, ctx, "}")
+        
+      case _ =>
+    }
+    s
   }
 }
 
@@ -323,7 +346,7 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
     s += ChiselLine(e, ctx, s"class ${e.name}(") // NB: not in chisel3.experimental anymore
     if(e.params.size > 0) {
       // usual scala parameters
-      s ++= e.params.map(_.chiselize(pCtxt, forceType=true) ++ comma).flatten.dropRight(1)
+      s ++= e.params.map(_.chiselize(pCtxt, forceType=true, assignToValue=false) ++ comma).flatten.dropRight(1)
       s += ChiselClosingLine(e.params.last, mCtxt, s") extends BlackBox(Map(")
       // additional named mapping for blackboxes
       s ++= e.params.map(p => {
@@ -387,40 +410,55 @@ class ChiselDefFunction(val f: DefFunction) extends Chiselized {
 
 class ChiselDefParam(val p: DefParam) extends Chiselized {
   val eq = ChiselTxtS(" = ")
-  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = ??? // should never happen
-  def chiselize(ctx: ChiselEmissionContext, forceType: Boolean): Seq[ChiselTxt] = {
-    val (value, tpe) = (p.value, p.tpe) match {
-      case (None, _: UnknownType) => (Seq(), Seq(ChiselTxt(ctx, s"Int")))
-      case (None, t: Type) => (Seq(), t.chiselize(ctx, scalaTypeOnly = true))
-      case (Some(e), _: UnknownType) => // TO DO : remove should be done before
-        val tpe = e match {
-          case _: StringLit => "String"
-          case _ => "Int"
+  def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = chiselize(ctx, false, false) // should never happen
+  def chiselize(ctx: ChiselEmissionContext, forceType: Boolean, assignToValue: Boolean): Seq[ChiselTxt] = {
+    
+    def eCtx(e: Expression): ChiselEmissionContext = {
+      (e.kind, p.kind) match {
+        case (HwExpressionKind, HwExpressionKind) => ctx.hw() 
+        case (SwExpressionKind, SwExpressionKind) => ctx.sw()
+        case (UnknownExpressionKind, SwExpressionKind) => ctx.sw()
+        case (UnknownExpressionKind, HwExpressionKind) => ctx.hw()
+        case (SwExpressionKind, UnknownExpressionKind) => ctx.sw()
+        case (HwExpressionKind, UnknownExpressionKind) => ctx.hw()
+        case _ => 
+          rcritical(ctx, p, s"Mismatching kind beetween param ${p.name}@${p.kind.serialize} and value ${e.kind.serialize}")
+          ctx
+      }
+    }
+    
+    def getType(force: Boolean): Seq[ChiselTxt] = (p.value, p.tpe, force) match {
+      case (_, _:UnknownType, false) => Seq()
+      case (None, _:UnknownType, true)  => unsupportedChisel(ctx, p, "Unknown Parameter Type")
+      case (Some(e), _:UnknownType, true) => 
+        e.tpe match {
+          case _:UnknownType => unsupportedChisel(ctx, p, "Unknown Parameter Type")
+          case t =>
+            rwarn(ctx, p, s"UnknownType for parameter ${p.name} - using value type ${t.serialize}")
+            t.chiselize(eCtx(e), scalaTypeOnly = true)
         }
-        (eq ++ e.chiselize(ctx), Seq(ChiselTxt(ctx, tpe)))
-      case (Some(e), t: Type) => 
-        // priority of HwExpressionKind value over ctx hw/sw
-        val eCtx = (e.kind, p.kind) match {
-          case (HwExpressionKind, HwExpressionKind) => ctx.hw() 
-          case (SwExpressionKind, SwExpressionKind) => ctx.sw()
-          case (UnknownExpressionKind, SwExpressionKind) => ctx.sw()
-          case (UnknownExpressionKind, HwExpressionKind) => ctx.hw()
-          case (SwExpressionKind, UnknownExpressionKind) => ctx.sw()
-          case (HwExpressionKind, UnknownExpressionKind) => ctx.hw()
-          case _ => 
-            rcritical(ctx, p, s"Mismatching kind beetween param ${p.name}@${p.kind.serialize} and value ${e.kind.serialize}")
-            ctx
-        }
-        (eq ++ e.chiselize(eCtx), t.chiselize(eCtx, scalaTypeOnly = true))
+      case (Some(e), t, _) => t.chiselize(eCtx(e), scalaTypeOnly = true)
+      case (_, t, _) => t.chiselize(ctx, scalaTypeOnly = true)
+    }
+    val tpe = getType(forceType) 
+    
+    val value = (assignToValue, p.value) match {
+      case (true, None) =>
+        rcritical(ctx, p, s"No default value for parameter ${p.name} - requires manual fix")
+        ChiselTxtS(s" = ??? /* expected type: ") ++ (if(tpe.isEmpty) getType(true) else tpe) ++ ChiselTxtS(" */")
+      case (_, Some(e)) => eq ++ e.chiselize(eCtx(e))
+      case _ => Seq()
     }
 
-    (forceType, value, p.tpe) match {
-      case (true, _, _) => Seq(ChiselLine(p, ctx, s"val ${p.name}: ")) ++ tpe ++ value
-      case (false, Seq(), _) => Seq(ChiselLine(p, ctx, s"val ${p.name}: ")) ++ tpe
-      case (false, s, _: IntType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ s
-      case (false, s, _: StringType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ s
-      case (false, s, _: UnknownType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ s
-      case (false, s, _) => Seq(ChiselLine(p, ctx, s"val ${p.name}: ")) ++ tpe ++ s
+    (assignToValue, tpe, value) match {
+      case (true, _, v) => Seq(ChiselLine(p, ctx, s"${p.name}")) ++ v
+      
+      case (false, Seq(), v) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ v
+      case (false, t, v) =>
+        (forceType, p.tpe) match {
+          case (false, _:IntType | _:StringType | _:UnknownType) => Seq(ChiselLine(p, ctx, s"val ${p.name}")) ++ v
+          case _ => Seq(ChiselLine(p, ctx, s"val ${p.name}: ")) ++ t ++ v
+        }
     }
   }
 }
@@ -565,7 +603,7 @@ class ChiselStatement(val s: Statement) extends Chiselized {
       case l: DefLogic => l.chiselize(ctx)
       case f: DefFunction => f.chiselize(ctx)
       case t: DefType => t.chiselize(ctx)
-      case p: DefParam => p.chiselize(ctx, forceType=false)
+      case p: DefParam => p.chiselize(ctx, forceType=false, assignToValue=false)
       case c: Comment => c.chiselize(ctx)
       case c: Connect => c.chiselize(ctx)
       case i: IfGen => i.chiselize(ctx)

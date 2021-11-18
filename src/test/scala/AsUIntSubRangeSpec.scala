@@ -12,7 +12,7 @@ class AsUIntSubAccessSpec extends Sv2ChiselSpec {
   
   behavior of "AsUIntSubAccess" 
   
-  it should "add parenthesis for asUInt() in subrange" in {
+  it should "add apply for asUInt() in subrange" in {
     val result = emitInModule("""
       |typedef struct packed {
       |  logic       bool;
@@ -31,7 +31,7 @@ class AsUIntSubAccessSpec extends Sv2ChiselSpec {
     result should contain ( "b := a.asUInt.apply(3,0)" )
   }
   
-  it should "add parenthesis for asUInt() in subindex" in {
+  it should "add apply for asUInt() in subindex" in {
     val result = emitInModule("""
       |typedef struct packed {
       |  logic       bool;
@@ -50,14 +50,14 @@ class AsUIntSubAccessSpec extends Sv2ChiselSpec {
     result should contain ( "b := a.asUInt.apply(3)" )
   }
   
-  it should "add parenthesis for literals in subindex" in {
+  it should "add apply for literals in subindex" in {
     val result = emitInModule("""
       |localparam P = 5[2];
       """.stripMargin
     )
     debug(result)
 
-    result should contain ( "val P = 5.U.apply(2)" )
+    result should contain ( "val P: Bool = 5.U.apply(2)" )
   }
 
 }

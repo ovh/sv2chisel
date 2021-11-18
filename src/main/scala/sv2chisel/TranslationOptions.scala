@@ -41,7 +41,8 @@ case class RemoveConcatOptions(
 }
 
 case class ChiselizerOptions(
-  unpackedEmissionStyle: ChiselizerOptions.UnpackedEmissionStyle.Value = ChiselizerOptions.UnpackedEmissionStyle.default
+  unpackedEmissionStyle:ChiselizerOptions.UnpackedEmissionStyle.Value = ChiselizerOptions.UnpackedEmissionStyle.default,
+  addTopLevelChiselGenerator: Option[String] = None
 ){
   /** Decoder for circe parsing from yaml */
   def decode: Decoder[ChiselizerOptions] = Decoder.instance(c => {
@@ -49,8 +50,13 @@ case class ChiselizerOptions(
     implicit val decoder = ChiselizerOptions.UnpackedEmissionStyle.decode
     for {
       unpackedEmissionStyle <- c.getOrElse[ChiselizerOptions.UnpackedEmissionStyle.Value]("unpackedEmissionStyle")(default.unpackedEmissionStyle)
+      addTopLevelChiselGenerator <- c.getOrElse[String]("addTopLevelChiselGenerator")("")
     } yield {
-      ChiselizerOptions(unpackedEmissionStyle)
+      val addTop = addTopLevelChiselGenerator match {
+        case "" => None
+        case s => Some(s) 
+      }
+      ChiselizerOptions(unpackedEmissionStyle, addTop)
     }
   })
 }

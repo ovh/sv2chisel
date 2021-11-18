@@ -332,15 +332,15 @@ class EmitterSpec extends Sv2ChiselSpec {
     
     result should contain ("import chisel3._")
     result should containLineSet (
-      "  val a: Int",
-      "  val b: Int",
-      "  val c: Int // my param",
+      "  val a: Boolean",
+      "  val b: Boolean",
+      "  val c: Boolean // my param",
       "  val res = Wire(UInt(32.W))  // my wire",
       "",
       "  // starting big block  // generate",
-      "  if(( !(a != 0)) || (b != 0)) { // \"if\"",
+      "  if(( !a) || b) { // \"if\"",
       "    res := 0.U // zero",
-      "  } else if((c != 0)) { // \"else if\"",
+      "  } else if(c) { // \"else if\"",
       "    res := 1.U // one",
       "  } else { // \"else\"",
       "    res := 2.U", // BUG: the comment two should be here... 

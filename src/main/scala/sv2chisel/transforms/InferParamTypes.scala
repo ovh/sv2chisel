@@ -151,7 +151,7 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
       case HwExpressionKind => Some(FullType(UIntType(UndefinedInterval, UnknownWidth(), NumberDecimal), kind))
       case _ => Some(FullType(IntType(UndefinedInterval, NumberDecimal), SwExpressionKind))
     }
-     
+    
     e match {
       case r: Reference => 
         r.tpe match {
@@ -213,8 +213,48 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
           case _:UncharOp => None // impossible: InlineIf & Par cases treated above
         }
         
+      case s: SubIndex => 
+        getType(s.expr, kind) match {
+          case Some(ftpe) =>
+            ftpe.tpe match {
+              case _:UIntType => Some(FullType(BoolType(UndefinedInterval), HwExpressionKind)) 
+              // automated conversion to UInt to happen later
+              case _:IntType => Some(FullType(BoolType(UndefinedInterval), HwExpressionKind)) 
+              case v:VecType => 
+                v.tpe match {
+                  case Seq(t) => Some(FullType(t, ftpe.kind))
+                  case _ =>
+                    debug(e, s"Cannot infer type for SubIndex of Vec ${v.serialize} (expression ${s.expr.serialize})")
+                    None  
+                }
+                
+              case t => 
+                debug(e, s"Cannot infer type for SubIndex of ${t.serialize} (expression ${s.expr.serialize})")
+                None
+            }
+            
+          case None => 
+            debug(e, s"Cannot infer type for SubIndex of untyped expression ${s.expr.serialize}")
+            None 
+        }
         
-      case _ =>  None
+      case s: SubRange => 
+        getType(s.expr, kind) match {
+          case Some(ftpe) =>
+            ftpe.tpe match { 
+              // automated conversion to UInt to happen later
+              case _:IntType => Some(FullType(BoolType(UndefinedInterval), HwExpressionKind)) 
+              case t => Some(ftpe)
+            }
+            
+          case None => 
+            debug(e, s"Cannot infer type for SubRange of untyped expression ${s.expr.serialize}")
+            None 
+        }
+      
+      case _ =>  
+        debug(e, s"Cannot infer type for expression ${e.serialize} (${e.getClass.getName})")
+        None
     }
   }
   
@@ -255,6 +295,22 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
     s.foreachExpr(recordExprUsage)
     s.foreachType(recordTypeUsage)
     s.mapStmt(recordStmtUsage) match {
+      
+      case i: IfGen => 
+        i.pred match {
+          case r:Reference => store.localUseSwBoolean(r.name) // if(REF) => REF should be Boolean
+          case _ => 
+        }
+        i
+        
+      case c: Conditionally => 
+        c.pred match {
+          case r:Reference => store.localUseHwBoolean(r.name) // when(REF) => REF should be Bool
+          case _ => 
+        }
+        c
+      
+      
       case p: DefParam => 
         (p.tpe, p.value) match {
           case (_: UnknownType, Some(v)) => 
@@ -319,16 +375,21 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
   
   def processModule(m: DefModule): DefModule = {
     // Single local pass : Take decisions based on local store
-    def processParam(p: DefParam)(implicit store: UsageStore): DefParam = {
+    def processParam(p: DefParam, noDefault: Boolean = false)(implicit store: UsageStore): DefParam = {
       p.tpe match {
         case _: UnknownType => 
           store.computeBestType(p.name) match {
             case (Some(ftpe), s) => 
               if(!s.isEmpty) info(p, s"Type inference for parameter ${p.name} returned: $s")
               p.copy(tpe = ftpe.tpe, kind = ftpe.kind)
-            case (_, s) =>
-              warn(p, s"Unable to retrieve type information for parameter ${p.name}: $s - Defaulting to IntType")
-              p.copy(tpe = IntType(UndefinedInterval, NumberDecimal), kind = SwExpressionKind)
+            case (_, s) => // to do add noDefault here (after bug fix)
+              if (noDefault) {
+                debug(p, s"Unable to retrieve type information for parameter ${p.name}: $s")
+                p
+              } else {
+                warn(p, s"Unable to retrieve type information for parameter ${p.name}: $s - Defaulting to IntType")
+                p.copy(tpe = IntType(UndefinedInterval, NumberDecimal), kind = SwExpressionKind)
+              }
           }
         case _ =>
           // trying it anyway would be interesting ... => converting int to bool for example 
@@ -344,8 +405,16 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
           }
       }
     }
+    
+    def processStatement(s: Statement)(implicit store: UsageStore): Statement = {
+      s match {
+        case p: DefParam => processParam(p, noDefault = true) // explicit inacurate type cast will cause later issues 
+        case _ => s.mapStmt(processStatement)
+      }
+    }
+    
     modParamStore.get(m.name) match {
-      case Some(store) => m.mapParam(processParam(_)(store))
+      case Some(store) => m.mapParam(processParam(_)(store)).mapStmt(processStatement(_)(store))
       case _ => 
         critical(m, s"Cannot found store for module ${m.name}")
         m
