@@ -1688,13 +1688,12 @@ object IntType {
 case class BoolType(tokens: Interval, signed: Boolean = false) extends GroundType {
   type T = BoolType
   val width = BoolWidth()
-  def serialize: String = "Bool()"
+  def serialize: String = "Bool"
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def mapWidth(f: Width => Width) = f(width) match {
-    case BoolWidth() => this
-    case w => Utils.throwInternalError(s"Illegal transformation of BoolType width to $w")
-  }
+  def mapWidth(f: Width => Width) = this
   def foreachWidth(f: Width => Unit): Unit = f(width)
+  
+  def toClock = ClockType(tokens)
 }
 
 case class SIntType(tokens: Interval, width: Width) extends GroundType {

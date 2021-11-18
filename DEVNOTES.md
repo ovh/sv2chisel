@@ -5,7 +5,8 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- manage clock of instance of blackboxes
+- create an equivalent of Subwords for bundle for funky verilog-style field enumeration
+  - generates big warning as it's ugly as hell (should be replaced with proper access by string)
 
 - add string legalization at emission:
   - scala keywords

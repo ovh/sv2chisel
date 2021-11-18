@@ -54,10 +54,14 @@ class Project(name: String) extends EasyLogging {
     */ 
   
   def foreachDescription(f: Description => Unit): Unit = sources.foreach(_.src.foreachDescription(f))
-  def mapDescription(f: Description => Description): Unit =  sources.zipWithIndex.foreach(t => sources(t._2) = t._1.copy(src = t._1.src.mapDescription(f)))
-  
   def foreachEntry(f: ProjectEntry => Unit): Unit = sources.foreach(f)
-  def mapEntry(f: ProjectEntry => ProjectEntry): Unit = sources.zipWithIndex.foreach(t => sources(t._2) = f(t._1))
+  
+  // NB: always refer to latest sources values (do not use zipWithIndex for example)
+  def mapDescription(f: Description => Description): Unit =  
+    (0 until sources.length).foreach(i => sources(i) = sources(i).copy(src = sources(i).src.mapDescription(f)))
+  
+  def mapEntry(f: ProjectEntry => ProjectEntry): Unit = 
+    (0 until sources.length).foreach(i => sources(i) = f(sources(i)))
   
   /** 
     * RUN TRANSFORMS 

@@ -194,7 +194,7 @@ class ModuleSpec extends Sv2ChiselSpec {
 
     result should contain ("val instB = Module(new mod)")
     result should contain ("instB.a := i")
-    result should contain ("o := instB.b.asUInt")
+    result should contain ("o := instB.b.asTypeOf(o)")
   }
 
 }

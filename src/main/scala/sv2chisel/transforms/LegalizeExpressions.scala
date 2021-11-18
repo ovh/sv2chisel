@@ -793,7 +793,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
                 r.remoteKind.getOrElse(r.kind),
                 SourceFlow // local source
               ) 
-
+              // processing local assignor expression whose type must comply with remote input
               r.mapExpr(processExpression(_, HwExpressionKind, TypeOf(UndefinedInterval, ref)))
             
             // remaining NoNameassign
@@ -806,26 +806,46 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
             case r:RemoteLinked if(r.flow == SinkFlow) => 
               val remoteName = r.remoteName.getOrElse("<???>")
               trace(r, s"Processing port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize} : ${r.remoteType.getOrElse(UnknownType()).serialize}")
-              val updated = r.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
+              
+              // processing local assigned expression (which cannot be cast to remain assignable)
+              // remote output type must comply (be cast if required)
+              // resulting whole expression to be 
+              val updatedAssignee = processExpression(r.expr, HwExpressionKind, UnknownType())
+              
+              val path = if(i.ioBundleConnect) Seq(i.name, "io") else Seq(i.name)
+              
               r.remoteType match {
                 case Some(remoteTpe) => 
-                  // Create assignExpr with cast if necessary
-                  val path = if(i.ioBundleConnect) Seq(i.name, "io") else Seq(i.name)
+                  // if assignor type is known let's create the corresponding reference
                   val refExpr = Reference(r.tokens, remoteName, path, remoteTpe, HwExpressionKind, SourceFlow)
-                  val refCast = processExpression(refExpr, HwExpressionKind, updated.tpe)
+                  // cast this reference to the local assignee 
+                  // which might be reference or subfield, subIndex, subRange ...
+                  val refCast = updatedAssignee match {
+                    case _: SubRange => 
+                      // too complex for vecconvert implicits ...
+                      processExpression(refExpr, HwExpressionKind, updatedAssignee.tpe)
+                    case _ => 
+                      processExpression(refExpr, HwExpressionKind, TypeOf(UndefinedInterval, updatedAssignee))
+                  }
+                  
+                  
+                  // Create assignExpr with cast if necessary
                   if(refExpr != refCast){
-                    if (remoteName == "<???>") {
-                      critical(r, s"Unknown remote ref for port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize} : ${remoteTpe.serialize}")
-                    }
-                    updated match {
-                      case na:NamedAssign => na.copy(assignExpr = Some(refCast))
-                      case na:NoNameAssign => na.copy(assignExpr = Some(refCast))
-                      // NB: no other case as RemoteLLinked is sealed => we will get warning if extended later
+                    r match { // NB: full match as RemoteLinked is sealed => we will get warning if extended later
+                      case na:NamedAssign => na.copy(expr = updatedAssignee, assignExpr = Some(refCast))
+                      case na:NoNameAssign => na.copy(expr = updatedAssignee, assignExpr = Some(refCast))
                     }
                   } else {
-                    updated
+                    r.mapExpr(_ => updatedAssignee)
                   }
-                case _ => updated
+                case _ => 
+                  warn(r, s"Unknown remote type for port #${t._2} ($remoteName) of instance ${i.name} of module ${i.module.serialize}: casting by reference by default")
+                  val refExpr = Reference(r.tokens, remoteName, path, UnknownType(), HwExpressionKind, SourceFlow)
+                  val refCast = DoCast(r.tokens, refExpr, HwExpressionKind, TypeOf(UndefinedInterval,updatedAssignee))
+                  r match {
+                    case na:NamedAssign => na.copy(expr = updatedAssignee, assignExpr = Some(refCast))
+                    case na:NoNameAssign => na.copy(expr = updatedAssignee, assignExpr = Some(refCast))
+                  }
               }
               
             case p => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))

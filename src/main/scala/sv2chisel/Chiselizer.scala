@@ -342,6 +342,23 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
         " with HasBlackBoxResource"
       case None => ""
     }
+    
+    // Set proper types for clock & reset ports 
+    val ports = (e.clock, e.reset) match {
+      case (_, Some(r)) => 
+        unsupportedChisel(ctx, e, s"Reset inference ($r) unsupported for now")
+        e.ports
+      case (Some(c), None) => 
+        e.mapPort(p => if(p.name != c) p else {
+            p.tpe match {
+              case b:BoolType => p.copy(tpe = b.toClock)
+              case _ => 
+                rcritical(ctx, p, s"Cannot use parameter ${p.name} with tpe: ${p.tpe.serialize} as Clock")
+                p 
+            }
+        }).ports
+      case (None, None) => e.ports
+    }
 
     s += ChiselLine(e, ctx, s"class ${e.name}(") // NB: not in chisel3.experimental anymore
     if(e.params.size > 0) {
@@ -362,7 +379,7 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       s += ChiselTxt(mCtxt, s") extends BlackBox$resource {")
     }
     s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
-    s ++= e.ports.flatMap(_.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false))
+    s ++= ports.flatMap(_.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false))
     s += ChiselClosingLine(e.body, mCtxt, s"})")
     // NEED ADD RESSOURCE HERE !!
     e.resourcePath match {
@@ -584,6 +601,10 @@ class ChiselType(val t: Type) extends Chiselized {
       case b: BoolType if(ctx.isHardware && scalaTypeOnly) => ChiselTxtS(b.tokens, "Bool")
       case b: BoolType if(ctx.isHardware) => ChiselTxtS(b.tokens, "Bool()")
       case b: BoolType => ChiselTxtS(b.tokens, "Boolean")
+      
+      case b: ClockType if(scalaTypeOnly) => ChiselTxtS(b.tokens, "Clock")
+      case b: ClockType => ChiselTxtS(b.tokens, "Clock()")
+      
       case u: UserRefType => getUserDefinedTypeInst(ctx, u, u.tpe, u.serialize, scalaTypeOnly)
 
         
@@ -1634,15 +1655,15 @@ class ChiselDefInstance(val i: DefInstance) extends Chiselized {
               |// ${i.name}$iob.${na.name} := DontCare
               """.stripMargin
               Seq(ChiselLine(na, ctx, comment))
+              
+            // 2 special case for concat (lhs & rhs)
             case (r@Reference(_,_,_, _: BundleType,_, _), SinkFlow) => 
-                // default: cast with asTypeOf
                 val chi = r.chiselize(hctx)
                 Seq(ChiselLine(na, ctx, "")) ++ chi ++
                   ChiselTxtS(s" := ${i.name}$iob.${na.name}.asTypeOf(") ++
                   chi ++ ChiselTxtS(")")
                   
             case (r@Reference(_,_,_, _: BundleType,_, _), SourceFlow) => 
-                // default: cast with asTypeOf
                 Seq(ChiselLine(na, ctx, s"${i.name}$iob.${na.name} := ")) ++
                   r.chiselize(hctx) ++
                   ChiselTxtS(s".asTypeOf(${i.name}$iob.${na.name})")
