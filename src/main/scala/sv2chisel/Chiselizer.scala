@@ -1186,7 +1186,7 @@ class ChiselDoPrim(e: DoPrim){
         val cd = cond.chiselize(uctx)
         val cs = conseq.chiselize(uctx)
         val al = alt.chiselize(uctx)
-        if(e.kind == HwExpressionKind){
+        if(cond.kind == HwExpressionKind){
           ChiselTxtS(i, ctx, "Mux(") ++ cd ++ ChiselTxtS(", ") ++ cs ++ 
             ChiselTxtS(", ") ++ al ++ ChiselTxtS(")")
         } else {

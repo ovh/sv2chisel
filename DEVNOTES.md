@@ -5,9 +5,7 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- Improve conditions inference
-  - need to convert Conditionally as IfGen as soon as the pred can be interpreted as Sw 
-  - Improve behavior of inlineif: should be emitted as sw as soon as pred is sw 
+- manage clock of instance of blackboxes
 
 - add string legalization at emission:
   - scala keywords

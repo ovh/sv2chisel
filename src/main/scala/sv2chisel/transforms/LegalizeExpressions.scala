@@ -764,7 +764,15 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
           val expr = processExpression(c.expr, HwExpressionKind, loc.tpe, true)
           c.copy(loc = loc, expr = expr)
           
-        case c: Conditionally => c.mapExpr(processExpression(_, HwExpressionKind, BoolType(UndefinedInterval)))
+        case c: Conditionally => 
+          val updatedPred = processExpression(c.pred, UnknownExpressionKind, BoolType(UndefinedInterval)) 
+          updatedPred.kind match {
+            case SwExpressionKind => 
+              info(c, "Converting Initially-infered hardware condition (when) into generative condition (if)")
+              IfGen(c.tokens, c.attributes, updatedPred, c.conseq, c.alt)
+            case _ => c.copy(pred = updatedPred)
+          }
+          
         case p: Print => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
         case t: Stop => t.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
         case d: DefLogic => d.copy(init = processExpression(d.init, HwExpressionKind, d.tpe))
