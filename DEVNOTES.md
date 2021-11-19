@@ -5,8 +5,7 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- create an equivalent of Subwords for bundle for funky verilog-style field enumeration
-  - generates big warning as it's ugly as hell (should be replaced with proper access by string)
+- investigate missing cast on random DefInstance signals...
 
 - add string legalization at emission:
   - scala keywords

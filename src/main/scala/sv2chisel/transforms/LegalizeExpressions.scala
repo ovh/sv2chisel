@@ -13,6 +13,7 @@ import sv2chisel.ir.expressionWidth._
 import sv2chisel.ir.expressionToLiteral._
 
 class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBasedTransform {
+  val baseUInt = UIntType(UndefinedInterval, UnknownWidth(), NumberDecimal)
   
   def processDescription(d: Description): Description = {
     // for refreshedType
@@ -73,7 +74,13 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
               critical(e, s"docast Unknown expression kind for expression ${e.serialize} as ${tpe.serialize}@$kind")
               e
           }
-        
+        // special case for "anyhardware" holder
+        case (_:DataType, HwExpressionKind, HwExpressionKind) => e // nothing to do
+        case (_:DataType, HwExpressionKind, _) => doCastIfCompat(e, HwExpressionKind, baseUInt)
+        case (_:DataType, k, ke) =>
+          critical(e, s"Aborting cast of ${e.serialize}(@$ke) to DataType@$k")
+          e
+          
         case (_: UnknownType, _, _) =>
           (e.kind, kind) match {
             case (SwExpressionKind, HwExpressionKind) => 
@@ -265,8 +272,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
       }
     }
     
-    def processExpressionRec(e: Expression, expected: ExpressionKind, baseTpe: Type, requireWidth: Boolean = false): Expression = {
-      val baseUInt = UIntType(UndefinedInterval, UnknownWidth(), NumberDecimal)
+    def processExpressionRec(e: Expression, expected: ExpressionKind, baseTpe: Type, requireWidth: Boolean = false)(implicit lhs: Boolean): Expression = {
       e match {
         case r: Reference => r // nothing to do yet (done in doCast whenever necessary)
 
@@ -298,6 +304,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
         case s: SubRange =>
           val processedExpr = processExpressionRec(s.expr, expected, s.tpe)
           val expr = processedExpr.tpe match {
+            case _ if(lhs) => processedExpr 
             case UserRefType(_,_,_,_:EnumType) => doCast(processedExpr, expected, baseUInt)
             case UserRefType(_,_,_,_:BundleType) => doCast(processedExpr, expected, baseUInt)
             case _:EnumType => doCast(processedExpr, expected, baseUInt)
@@ -742,14 +749,14 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
       
     }
     
-    def processExpression(e: Expression, kind: ExpressionKind, tpe: Type, requireWidth: Boolean = false): Expression = {
+    def processExpression(e: Expression, kind: ExpressionKind, tpe: Type, requireWidth: Boolean = false)(implicit lhs: Boolean): Expression = {
       // to do : propagate expected type ?
       // handle 0.U => true.B conversion
       trace(e, s"Entering processExpression for ${e.getClass.getName} : ${e.serialize}")
       doCast(processExpressionRec(e.mapType(processType), kind, tpe, requireWidth), kind, tpe)
     }
 
-    def processType(t: Type): Type = {
+    def processType(t: Type)(implicit lhs: Boolean): Type = {
       trace(t, s"Entering processType for ${t.getClass.getName} : ${t.serialize}")
       t.mapWidth(_.mapExpr(processExpression(_, UnknownExpressionKind, UnknownType()))).mapType(processType)
     }
@@ -758,14 +765,14 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
       trace(s, s"Entering processStatement for ${s.getClass.getName}")
       (s match {
         case c: Connect => 
-          val loc = processExpression(c.loc, HwExpressionKind, UnknownType())
+          val loc = processExpression(c.loc, HwExpressionKind, UnknownType())(lhs = true)
           trace(c, s"c.loc ${c.loc.serialize} : ${c.loc.tpe.serialize}")
           trace(c, s"loc tpe  ${loc.serialize} : ${loc.tpe.serialize}")
-          val expr = processExpression(c.expr, HwExpressionKind, loc.tpe, true)
+          val expr = processExpression(c.expr, HwExpressionKind, loc.tpe, true)(lhs = false)
           c.copy(loc = loc, expr = expr)
           
         case c: Conditionally => 
-          val updatedPred = processExpression(c.pred, UnknownExpressionKind, BoolType(UndefinedInterval)) 
+          val updatedPred = processExpression(c.pred, UnknownExpressionKind, BoolType(UndefinedInterval))(lhs = false)
           updatedPred.kind match {
             case SwExpressionKind => 
               info(c, "Converting Initially-infered hardware condition (when) into generative condition (if)")
@@ -773,9 +780,9 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
             case _ => c.copy(pred = updatedPred)
           }
           
-        case p: Print => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
-        case t: Stop => t.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
-        case d: DefLogic => d.copy(init = processExpression(d.init, HwExpressionKind, d.tpe))
+        case p: Print => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType())(lhs = false))
+        case t: Stop => t.mapExpr(processExpression(_, HwExpressionKind, UnknownType())(lhs = false))
+        case d: DefLogic => d.copy(init = processExpression(d.init, HwExpressionKind, d.tpe)(lhs = false))
         case i: DefInstance =>  
           val ports = i.portMap.zipWithIndex.map(t => t._1 match {
             
@@ -794,13 +801,13 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
                 SourceFlow // local source
               ) 
               // processing local assignor expression whose type must comply with remote input
-              r.mapExpr(processExpression(_, HwExpressionKind, TypeOf(UndefinedInterval, ref)))
+              r.mapExpr(processExpression(_, HwExpressionKind, TypeOf(UndefinedInterval, ref))(lhs = false))
             
             // remaining NoNameassign
             case na@NoNameAssign(_,_, SourceFlow, _, _, _, _) =>
               trace(na, s"Processing port #${t._2} (${na.remoteName.getOrElse("<unknown>")}) of instance ${i.name} of module ${i.module.serialize} : ${na.remoteType.getOrElse(na.tpe).serialize}")
               warn(na, s"Port #${t._2} of instance ${i.name} of module ${i.module.serialize} is unnamed, this might result in a cast containing remote references unknown in instantiation scope.")
-              na.mapExpr(processExpression(_, HwExpressionKind, na.remoteType.getOrElse(na.tpe)))
+              na.mapExpr(processExpression(_, HwExpressionKind, na.remoteType.getOrElse(na.tpe))(lhs = false))
             
             // SinkFlow Assign <=> remote output port (assign is a local sink fed by the remote source port)
             case r:RemoteLinked if(r.flow == SinkFlow) => 
@@ -810,7 +817,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
               // processing local assigned expression (which cannot be cast to remain assignable)
               // remote output type must comply (be cast if required)
               // resulting whole expression to be 
-              val updatedAssignee = processExpression(r.expr, HwExpressionKind, UnknownType())
+              val updatedAssignee = processExpression(r.expr, HwExpressionKind, UnknownType())(lhs = true)
               
               val path = if(i.ioBundleConnect) Seq(i.name, "io") else Seq(i.name)
               
@@ -823,9 +830,9 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
                   val refCast = updatedAssignee match {
                     case _: SubRange => 
                       // too complex for vecconvert implicits ...
-                      processExpression(refExpr, HwExpressionKind, updatedAssignee.tpe)
+                      processExpression(refExpr, HwExpressionKind, updatedAssignee.tpe)(lhs = false)
                     case _ => 
-                      processExpression(refExpr, HwExpressionKind, TypeOf(UndefinedInterval, updatedAssignee))
+                      processExpression(refExpr, HwExpressionKind, TypeOf(UndefinedInterval, updatedAssignee))(false)
                   }
                   
                   
@@ -848,28 +855,28 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
                   }
               }
               
-            case p => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType()))
+            case p => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType())(lhs = false))
           })
           // param types have been infered earlier
           val params = i.paramMap.map(a => a match {
             case r: RemoteLinked =>
               val castTpe = r.remoteType.getOrElse(UnknownType())
-              a.mapExpr(processExpression(_, r.remoteKind.getOrElse(SwExpressionKind), castTpe))
+              a.mapExpr(processExpression(_, r.remoteKind.getOrElse(SwExpressionKind), castTpe)(lhs = false))
               
             case _ =>
               warn(a, s"Cannot ensure proper type legalization of parameter map of instance ${i.name}")
               a
           })
           i.copy(portMap = ports, paramMap = params)
-        case p: DefParam => p.mapExpr(processExpression(_, p.kind, p.tpe))
-        case f: ForGen => f.mapExpr(processExpression(_, SwExpressionKind, UnknownType()))
-        case i: IfGen => i.mapExpr(processExpression(_, SwExpressionKind, BoolType(UndefinedInterval)))
+        case p: DefParam => p.mapExpr(processExpression(_, p.kind, p.tpe)(lhs = false))
+        case f: ForGen => f.mapExpr(processExpression(_, SwExpressionKind, UnknownType())(lhs = false))
+        case i: IfGen => i.mapExpr(processExpression(_, SwExpressionKind, BoolType(UndefinedInterval))(lhs = false))
         case _ => s
-      }).mapStmt(processStatement).mapType(processType)
+      }).mapStmt(processStatement).mapType(processType(_)(lhs = false))
     }
     
     d.mapStmt(processStatement(_)) match {
-      case m: DefModule => m.mapParam(p => p.mapExpr(processExpression(_, p.kind, p.tpe)))
+      case m: DefModule => m.mapParam(p => p.mapExpr(processExpression(_, p.kind, p.tpe)(lhs = false)))
       case d => d
     }
   }

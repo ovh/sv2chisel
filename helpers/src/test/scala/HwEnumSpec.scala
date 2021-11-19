@@ -6,7 +6,6 @@ package sv2chiselHelpersTests
 
 import sv2chiselHelpersTests.utils._
 import sv2chisel.helpers.enum._
-import sv2chisel.helpers.vecconvert._
 
 import chisel3._
 import chisel3.stage.ChiselStage

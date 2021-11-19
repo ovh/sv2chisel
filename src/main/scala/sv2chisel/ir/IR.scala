@@ -1602,6 +1602,19 @@ case class VoidType(tokens: Interval) extends Type {
   def serialize: String = "void"
 }
 
+/** any hardware type (working intermediate, cannot be emitted) */
+case class DataType() extends Type {
+  type T = DataType
+  val tokens = UndefinedInterval
+  def mapType(f: Type => Type): T = this
+  def mapWidth(f: Width => Width): T = this
+  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = Unit
+  def widthOption: Option[Width] = None
+  def mapInterval(f: Interval => Interval): T = this
+  def serialize: String = "Data"
+}
+
 case class RawScalaType(str: String) extends Type {
   type T = RawScalaType
   def mapInterval(f: Interval => Interval) = this

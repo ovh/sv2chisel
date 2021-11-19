@@ -67,6 +67,10 @@ class SubRangeRefreshType(s: SubRange) extends LazyLogging with InfoLogger {
         debug(s, s"New type: ${tpe.serialize}")
         s.copy(tpe = tpe, kind = s.expr.kind)
       
+      // will be handled by bundleconvert
+      case UserRefType(_,_,_,_:BundleType) => s.copy(tpe = DataType(), kind = s.expr.kind)
+      case _:BundleType => s.copy(tpe = DataType(), kind = s.expr.kind)
+      
       case u: UserRefType => 
         debug(s, s"Unsupported user-defined type '${u.serialize}' for subrange expression '${s.serialize}' (this should be adressed by LegalizeExpression transform)")
         s.copy(tpe = UnknownType(), kind = s.expr.kind)

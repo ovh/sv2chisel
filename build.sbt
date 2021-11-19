@@ -63,7 +63,7 @@ lazy val helpers = (project in file("helpers"))
     name := "sv2chisel-helpers",
     
     libraryDependencies ++= Seq(
-      "edu.berkeley.cs" %% "chisel3" % "3.3.2"
+      "edu.berkeley.cs" %% "chisel3" % "3.4.3"
     )
   )
 

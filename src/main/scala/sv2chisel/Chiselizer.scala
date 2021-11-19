@@ -945,8 +945,11 @@ class ChiselSubIndex(e: SubIndex){
 class ChiselSubRange(e: SubRange){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     def addVecImpl = ctx.src.addDep(PackageRef(UndefinedInterval, "sv2chisel.helpers.vecconvert", "_"))
+    def addBundleImpl = ctx.src.addDep(PackageRef(UndefinedInterval, "sv2chisel.helpers.bundleconvert", "_"))
     (e.expr.tpe, e.flow) match {
       case (_: VecType, _) => addVecImpl
+      case (UserRefType(_,_,_,_:BundleType), _) => addBundleImpl
+      case (_:BundleType, _) => addBundleImpl
       case (_:UIntType | _: SIntType, SourceFlow) => // implemented in Bits (superclass of UInt & SInt)
       case (_:UIntType | _: SIntType, SinkFlow) => addVecImpl
       case _ => rwarn(ctx, e, s"Probably unsupported subrange of expression ${e.expr.serialize} of type ${e.expr.tpe.serialize} (${e.flow})")
