@@ -5,13 +5,12 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- investigate missing cast on random DefInstance signals...
+- LegalizeParamDefault: propagate override_auto_computed_ to defInstances
+  - add ability to comment if not used instead of override
 
 - add string legalization at emission:
   - scala keywords
   - chisel keywords?
-  
-- LegalizeParamDefault: propagate override_auto_computed_ to defInstances
 
 - infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)
 - fix behavior of emission with path relative to ~ (~ considered as standard name)

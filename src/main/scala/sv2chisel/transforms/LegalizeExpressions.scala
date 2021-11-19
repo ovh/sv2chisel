@@ -28,6 +28,35 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
     // use a docast function to enforce casts
     // Note : explict DoCast are not required for Number (HwExpressionKind is the cast)
     
+    def shouldCastHW(from: Type, to: Type): Boolean = {
+      (from, to) match {
+        case (t1, t2) if (Utils.eq(t1, t2)) => false
+        case (_, _:UnknownType) => 
+          trace(from, s"Aborting cast from ${from.serialize} to UnknownType()")
+          false
+        case (_:UnknownType, _) => 
+          debug(from, s"Aborting cast from UnknownType() to ${to.serialize}")
+          // debug(from, Utils.getStackHere(this.getClass.getName))
+          false
+        case (_, to:TypeOf) if(!shouldCastHW(from, to.expr.tpe)) => 
+          trace(from, s"Aborting cast from ${from.serialize} to ${to.serialize} as underlying TypeOf do not require it")
+          false
+        case (_, to:UserRefType) if(!shouldCastHW(from, to.tpe)) => 
+          trace(from, s"Aborting cast from ${from.serialize} to ${to.serialize} as underlying UserRefType do not require it")
+          false
+
+        case (_: UIntType, _: UIntType) => false
+        case (_: SIntType, _: SIntType) => false // should depend on width ?
+        case (from: VecType, to: VecType) => shouldCastHW(from.tpe.head, to.tpe.head)
+        case (_: BoolType, _: BoolType) => false
+        case (_: BoolType, _: UIntType) => false
+        case (_: EnumType, _: UIntType) => false
+        case (_: UIntType, _: EnumType) => false
+        // checking to.getClass.getSuperclass.isInstance(from) is non-sense given our IR Type structure
+        case _ => true
+      }
+    }
+    
     // returns None <> do not cast
     def doCastIfCompat(e: Expression, toKind: ExpressionKind, toTpe: Type): Expression = {
       trace(e, s"doCastIfCompat ${e.serialize} : ${e.tpe.serialize}/${e.kind} as ${toTpe.serialize} $toKind")
@@ -42,17 +71,8 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
             case (_, _: BoolType) => true
             case _ => false
           }
-        case (HwExpressionKind, HwExpressionKind) => 
-          (e.tpe, toTpe) match {
-            case (t1, t2) if (t1.getClass == t2.getClass) => false
-            case (_: UIntType, _: BoolType) => true
-            case (_: SIntType, _: UIntType) => true
-            case (_: UIntType, _: SIntType) => true
-            case (_, _) if(toTpe.getClass.getSuperclass.isInstance(e.tpe)) => 
-              debug(s"Aborting cast from ${e.tpe.serialize} to ${toTpe.serialize}")
-              false
-            case _ => true
-          }
+        case (HwExpressionKind, HwExpressionKind) => shouldCastHW(e.tpe, toTpe)
+          
         case (SwExpressionKind, HwExpressionKind) => true
         case _ => critical(e, s"Illegal cast attempted from ${e.serialize} to $toKind $toTpe"); false
       }) match {
@@ -181,14 +201,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
           case (_:UIntType, _:BoolType, _) => e // there should be a cast here 
           case (UIntType(_, w1, _), UIntType(_, w2, _), _) if(Utils.cleanTokens(w1) == Utils.cleanTokens(w2)) => e
           case (t1, t2, _) if(Utils.cleanTokens(t1) == Utils.cleanTokens(t2)) => e  
-          case _ => 
-            // allow subclasses not to be casted => much too permissive // MUST BE REFACTORED
-            if(baseHwType.getClass.getSuperclass.isInstance(e.tpe)){
-              debug(e, s"Aborting cast from ${e.tpe.serialize} to ${baseHwType.serialize}")
-              e
-            } else {
-              doCast(e, e.kind, baseHwType)
-            }
+          case _ => if(shouldCastHW(e.tpe, baseHwType)) doCast(e, e.kind, baseHwType) else e
         }
       })
     }
@@ -834,7 +847,6 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
                     case _ => 
                       processExpression(refExpr, HwExpressionKind, TypeOf(UndefinedInterval, updatedAssignee))(false)
                   }
-                  
                   
                   // Create assignExpr with cast if necessary
                   if(refExpr != refCast){
