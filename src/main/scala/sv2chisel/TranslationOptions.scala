@@ -87,8 +87,8 @@ case class LegalizeParamDefaultOptions(
 
 object LegalizeParamDefaultOptions {
   object LegalizeMethod extends Enumeration with EnumDecoder {
-    val comment, overrideOption = Value
-    def default = overrideOption
+    val comment, overrideOption, moveOrComment, moveOrOverride = Value
+    def default = moveOrOverride
     def ctx = "legalizeMethod for LegalizeParamDefaults"
   }
 }

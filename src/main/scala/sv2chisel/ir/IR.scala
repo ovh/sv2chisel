@@ -274,7 +274,8 @@ case class RawScalaExprWrapper(
   tokens: Interval, 
   fmt: String, 
   exprs: Seq[Expression], 
-  kind: ExpressionKind
+  kind: ExpressionKind,
+  tpe: Type
 ) extends Expression {
   type T = RawScalaExprWrapper
   def serialize: String = {
@@ -282,7 +283,6 @@ case class RawScalaExprWrapper(
     exprs.foreach(e => str = str.replaceFirst("%e", e.serialize))
     str
   }
-  def tpe: Type = UnknownType()
   def flow : Flow = UnknownFlow
   def mapExpr(f: Expression => Expression) = this.copy(exprs=exprs.map(f))
   def mapType(f: Type => Type) = this
@@ -1627,6 +1627,19 @@ case class RawScalaType(str: String) extends Type {
   def widthOption: Option[Width] = None
 }
 
+case class OptionType(tpe: Type) extends Type {
+  type T = OptionType
+  def mapInterval(f: Interval => Interval) = this
+  def serialize : String = s"Option[${tpe.serialize}]"
+  val tokens: Interval = tpe.tokens
+  def mapType(f: Type => Type) = this.copy(tpe=f(tpe))
+  def mapWidth(f: Width => Width) = this
+  def foreachType(f: Type => Unit): Unit = f(tpe)
+  def foreachWidth(f: Width => Unit): Unit = Unit
+  def widthOption: Option[Width] = None
+}
+
+
 case class UserRefType(
     tokens: Interval, 
     name: String, 
@@ -2222,7 +2235,9 @@ case class ExtModule(
     body: Statement, // contain only port statements
     resourcePath: Option[String],
     clock : Option[String] = None,
-    reset: Option[String] = None) extends DefModule {
+    reset: Option[String] = None,
+    paramMap: Seq[NamedAssign] = Seq()
+  ) extends DefModule {
   type T = ExtModule
   
   def serialize: String = serializeHeader("extmodule")

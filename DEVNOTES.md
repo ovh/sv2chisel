@@ -5,8 +5,7 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- LegalizeParamDefault: propagate override_auto_computed_ to defInstances
-  - add ability to comment if not used instead of override
+- prefer Seq(UInt..) over VecInit for parameter & forbid it in package to avoid passing hardware as parameter & get complex chisel errors
 
 - add string legalization at emission:
   - scala keywords
@@ -33,6 +32,7 @@
 - add special case for empty string used as hardware => single char at 0 
 
 - front: catch "file not found" exception & terminate properly
+- emission of blackbox => do not emit comment in body (idea: special interval type to increase stram pointer without inserting comments)
 
 #### CRITICAL
 - FIX & USE OR DROP Special Vec of Char Inference for register affected to 

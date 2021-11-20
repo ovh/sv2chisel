@@ -353,7 +353,7 @@ class RemoveConcats(val options: TranslationOptions) extends DescriptionBasedTra
           case _ => critical(e, s"Unsuported conversion to string for expression ${e.serialize}: Ignored")
         }  
       }
-      RawScalaExprWrapper(c.tokens, fmt.mkString(" + "), exprs.toSeq, SwExpressionKind)
+      RawScalaExprWrapper(c.tokens, fmt.mkString(" + "), exprs.toSeq, SwExpressionKind, UnknownType())
     }
     
     def processSwValue(v: Option[Expression]): Option[Expression] = {

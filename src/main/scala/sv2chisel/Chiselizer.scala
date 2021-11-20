@@ -12,7 +12,7 @@ import logger.EasyLogging
 // implicits
 import sv2chisel.ir.evalExpression._
 
-import collection.mutable.{ArrayBuffer}
+import collection.mutable.{ArrayBuffer, HashSet}
 // define all implict chiselize function for all nodes of the IR
 
 package object chiselize extends EasyLogging {
@@ -359,27 +359,74 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
         }).ports
       case (None, None) => e.ports
     }
+    
+    // collect def param (resulting from legalization)
+    def collectDefParam(s: Statement): Seq[DefParam] = {
+      val buffer = ArrayBuffer[DefParam]()
+      s match {
+        case d: DefParam => buffer += d
+        case _ => s.foreachStmt(st => buffer ++= collectDefParam(st))
+      }
+      buffer.toSeq
+    }
+    val defParams = collectDefParam(e.body)
 
     s += ChiselLine(e, ctx, s"class ${e.name}(") // NB: not in chisel3.experimental anymore
     if(e.params.size > 0) {
       // usual scala parameters
       s ++= e.params.map(_.chiselize(pCtxt, forceType=true, assignToValue=false) ++ comma).flatten.dropRight(1)
-      s += ChiselClosingLine(e.params.last, mCtxt, s") extends BlackBox(Map(")
+      s += ChiselClosingLine(e.params.last, mCtxt, s") extends BlackBox(")
+      val ending = defParams.isEmpty match {
+        case true => s += ChiselTxt("Map("); Seq(ChiselLine(mCtxt, s"))$resource {"))
+        case false => 
+        s += ChiselTxt("{")
+        s ++= defParams.map(_.chiselize(pCtxt.incr(1), forceType=false, assignToValue=false)).flatten
+        s += ChiselLine(pCtxt.incr(1), "Map(")
+         Seq(ChiselLine(pCtxt, s")"), ChiselLine(mCtxt, s"})$resource {"))
+      }
+      val paramMap = e.paramMap match {
+        case Seq() => 
+          val ui = UndefinedInterval
+          e.params.map(p => NamedAssign(ui, p.name, Reference(ui, p.name, Seq(), p.tpe, p.kind), SourceFlow))
+        case s => s
+      }
+      
       // additional named mapping for blackboxes
-      s ++= e.params.map(p => {
-        val (wL, wR) = (p.kind, p.tpe) match {
+      s ++= paramMap.map( na => { 
+        val (wL, wR) = (na.expr.kind, na.expr.tpe) match {
           case (HwExpressionKind, _) => ("", ".litValue")
           case (SwExpressionKind, _:BoolType) => ("(if(", ") 1 else 0)") // such a shame ...
           case _ => ("","")
         }
-        ChiselLine(p, pCtxt.incr(5), s"$dq${p.name}$dq -> $wL${p.name}$wR") +: comma
+        ChiselLine(na, pCtxt.incr(2), s"$dq${na.name}$dq -> $wL${na.name}$wR") +: comma
       }).flatten.dropRight(1)
-      s += ChiselLine(mCtxt, s"))$resource {")
+      
+      s ++= ending
     } else {
       s += ChiselTxt(mCtxt, s") extends BlackBox$resource {")
     }
+    // to avoid unused warnings
+    val ioRefUsage = HashSet[String]()
+    def checkUsage(p: Port): Unit ={
+      def checkUsageExpr(e: Expression): Unit = {
+        e match {
+          case r: Reference if(r.path.isEmpty) => ioRefUsage += r.name
+          case _ => e.foreachExpr(checkUsageExpr)
+        }
+      }
+      p.tpe.foreachWidth(w => checkUsageExpr(w.expr))
+    }
+    val portsInBundle = ports.flatMap(p => {
+      checkUsage(p)
+      p.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false)
+    })
+    
+    s ++= defParams.map( p => {
+      if (ioRefUsage.contains(p.name)) p.chiselize(mCtxt, forceType=false, assignToValue=false) else Seq() 
+    }).flatten
+    
     s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
-    s ++= ports.flatMap(_.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false))
+    s ++= portsInBundle
     s += ChiselClosingLine(e.body, mCtxt, s"})")
     // NEED ADD RESSOURCE HERE !!
     e.resourcePath match {
@@ -609,6 +656,10 @@ class ChiselType(val t: Type) extends Chiselized {
 
         
       case r: RawScalaType => ChiselTxtS(r.tokens, r.str)
+      case o: OptionType if(scalaTypeOnly) => 
+        ChiselTxtS(o.tokens, "Option[") ++ o.tpe.chiselize(ctx, scalaTypeOnly=true) ++ ChiselTxtS("]")
+      case o: OptionType => unsupportedChisel(ctx,o, "cannot emit Option as anything else than scalaType")
+        
       case s: StringType => ChiselTxtS(s.tokens, "String")
       
       case _ => unsupportedChisel(ctx,t, "Unsupported Type: " + t)

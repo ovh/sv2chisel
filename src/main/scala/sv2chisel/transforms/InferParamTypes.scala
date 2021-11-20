@@ -244,7 +244,7 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
             ftpe.tpe match { 
               // automated conversion to UInt to happen later
               case _:IntType => Some(FullType(BoolType(UndefinedInterval), HwExpressionKind)) 
-              case t => Some(ftpe)
+              case _ => Some(ftpe)
             }
             
           case None => 
