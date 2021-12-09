@@ -126,7 +126,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     // NB: reverse is expected to preserve the indexes TABLE_STR[0] = "bidule"
     result should contain ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
     
-    result should contain ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
+    result should contain ("val TABLE_CONCAT: Seq[UInt] = Seq(1.U(2.W), 2.U(2.W), 3.U(2.W))")
     result should contain ("val en: UInt = 0.U")
     result should contain ("val cnt: Vec[UInt] = 0.U.asTypeOf(Vec(DBLW, UInt(65.W)))")
   }
@@ -150,7 +150,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     // NB: reverse is expected to preserve the indexes TABLE_STR[0] = "bidule"
     result should contain ("val TABLE_STR: Seq[String] = Seq(\"bidule\", \"truc\", \"test\")")
     
-    result should contain ("val TABLE_CONCAT: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))")
+    result should contain ("val TABLE_CONCAT: Seq[UInt] = Seq(1.U(2.W), 2.U(2.W), 3.U(2.W))")
     result should contain ("val en: UInt = 0.U")
     result should contain ("val cnt: Vec[UInt] = 0.U.asTypeOf(Vec(DBLW, UInt(65.W)))")
   }
@@ -201,7 +201,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
       "package object test_p {",
         "",
         "val WIDTH = 5",
-        "val SEQ_VALUE: Vec[UInt] = VecInit(1.U(2.W), 2.U(2.W), 3.U(2.W))",
+        "val SEQ_VALUE: Seq[UInt] = Seq(1.U(2.W), 2.U(2.W), 3.U(2.W))",
         "",
         "val INIT_VALUE: UInt = 0.U",
         "val SEQ_UINT: Seq[UInt]",

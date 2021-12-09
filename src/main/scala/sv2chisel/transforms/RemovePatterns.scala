@@ -229,7 +229,13 @@ class RemovePatterns(val options: TranslationOptions) extends DescriptionBasedTr
     def processStatement(s: Statement): Statement = {
       s match {
         case c: Connect => c.copy(expr = processExpression(c.expr, FullType(c.loc.tpe, c.loc.kind)))
-        case p: DefParam => p.mapExpr(processExpression(_, FullType(p.tpe, p.kind)))
+        case p: DefParam => p.value.map(processExpression(_, FullType(p.tpe, p.kind))) match {
+          case Some(s:SeqValues) => p.copy(kind = SwExpressionKind, value = Some(s.copy(kind = SwExpressionKind)))
+          case Some(s:MappedValues) => p.copy(kind = SwExpressionKind, value = Some(s.copy(kind = SwExpressionKind)))
+          case Some(v) => p.copy(value = Some(v))
+          case _ => p  
+        }
+        
         case i: DefInstance =>
           // add support for remoteTypes
           val portMap = i.portMap.map(a => {
