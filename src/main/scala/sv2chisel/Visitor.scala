@@ -1576,14 +1576,15 @@ class Visitor(
       // NOTE: not sure to cover all cases here ...
       (v.bound.evalBigIntOption, value, v.tpe) match {
         case (_,_, Seq(ivt: VecType)) => 
-          val updatedVal = value match {
-            case Some(r: ReplicatePattern) => Some(r.pattern)
-            case Some(p: FillingBitPattern) => Some(p) // not useful here...?
-            case Some(AssignPattern(_,Seq((_:DefaultAssignPattern, p)),_,_)) => Some(p) 
-            case _ => None
+          val (updatedVal, kind) = value match {
+            case Some(r: ReplicatePattern) => (Some(r.pattern), Some(SwExpressionKind))
+            case Some(p: FillingBitPattern) => (Some(p), None) // not useful here...?
+            case Some(AssignPattern(_,Seq((_:DefaultAssignPattern, p)),_,_)) => (Some(p), None)
+            case Some(_:AssignPattern) => (None, Some(SwExpressionKind))
+            case _ => (None, Some(SwExpressionKind))
           }
           val (tpe, k) = dropLastVecTypeRec(ivt, updatedVal)
-          (v.mapType(_ => tpe), k)
+          (v.mapType(_ => tpe), kind.getOrElse(k))
         
         case (_,_, s) if (s.length != 1) =>
           critical(ctx, "Unsupported mixed Vec")
@@ -1598,11 +1599,11 @@ class Visitor(
         
         // this HwExpressionKind might be a bit restrictive in usage ...
         // should depends on inner kind and rely on InferUInt & LegalizeExpression Transforms for further interpretation
-        case _ => (v, HwExpressionKind)
+        case _ => (v, SwExpressionKind)
       }
     }
     
-    val (updatedTpe, kind) = (t, value) match {
+    val (updatedTpe, updatedKind) = (t, value) match {
       case (v: VecType, _) => dropLastVecTypeRec(v, value)
 
       case (_, Some(u:UIntLiteral)) =>(u.tpe, HwExpressionKind)
@@ -1611,13 +1612,13 @@ class Visitor(
       case _ => (t, SwExpressionKind)
     }
     
-    val tpe = ctx.unpacked_dimension.asScala match {
-      case Seq() => updatedTpe
-      case s => getFullType(s.map(getUnpackedDim),updatedTpe)
+    val (tpe, kind) = ctx.unpacked_dimension.asScala match {
+      case Seq() => (updatedTpe, updatedKind)
+      case s => (getFullType(s.map(getUnpackedDim),updatedTpe), SwExpressionKind)
     }
     trace(ctx, s"param $name: ${tpe.serialize} $kind = ${value.map(_.serialize).getOrElse("<none>")} (${value.map(_.getClass.getName).getOrElse("<none>")})")
 
-    DefParam(ctx.getSourceInterval(), attr, name, tpe, value, kind)
+    DefParam(ctx.getSourceInterval(), attr, name, tpe, value.map(_.mapKind(_ => kind)), kind)
   }
   
   private def visitParamDeclPrim(ctx: Parameter_declaration_primitiveContext, attr: VerilogAttributes): Seq[DefParam] = {

@@ -28,6 +28,14 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
     // use a docast function to enforce casts
     // Note : explict DoCast are not required for Number (HwExpressionKind is the cast)
     
+    def sameLength(a: VecType, b: VecType): Boolean = {
+      trace(a, s"from: ${a.serialize} - ${a.bound.serialize} to: ${b.serialize} - ${b.bound.serialize}")
+      (a.bound.evalBigIntOption, b.bound.evalBigIntOption) match {
+        case (Some(wa), Some(wb)) => wa == wb
+        case _ => Utils.eqRawExpr(a.bound, b.bound)
+      }
+    }
+    
     def shouldCastHW(from: Type, to: Type): Boolean = {
       (from, to) match {
         case (t1, t2) if (Utils.eq(t1, t2)) => false
@@ -47,7 +55,12 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
 
         case (_: UIntType, _: UIntType) => false
         case (_: SIntType, _: SIntType) => false // should depend on width ?
-        case (from: VecType, to: VecType) => shouldCastHW(from.tpe.head, to.tpe.head)
+        case (from: VecType, to: VecType) => 
+          (from.tpe, to.tpe) match {
+            case (Seq(fromEltTpe), Seq(toEltTpe)) => shouldCastHW(fromEltTpe, toEltTpe) || !sameLength(from, to)
+            case _ => fatal(from, "Unsupported mixed vec - aborting cast"); false
+          }
+          
         case (_: BoolType, _: BoolType) => false
         case (_: BoolType, _: UIntType) => false
         case (_: EnumType, _: UIntType) => false
@@ -747,7 +760,12 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
           }
           trace(a, s"Processing AssignPattern with baseType: ${baseTpe.serialize} -- retrieved innerType ${tpe.serialize}")
           
-          a.copy(assign = assigns.map(_._1).zip(values), kind = kind, tpe = resultingType)
+          val updatedKind = a.kind match {
+            case UnknownExpressionKind => kind
+            case k => k  
+          }
+          
+          a.copy(assign = assigns.map(_._1).zip(values), kind = updatedKind, tpe = resultingType)
         
         case na: NamedAssign => na.mapExpr(processExpressionRec(_, expected, baseTpe))
         

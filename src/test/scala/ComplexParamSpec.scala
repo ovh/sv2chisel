@@ -158,7 +158,8 @@ class ComplexParamSpec extends Sv2ChiselSpec {
   it should "support explicit hardware parameters in instances" in {
     val p = wrapInPackage(s"""
           |localparam WIDTH = 5;
-          |localparam logic [1:0] SEQ_VALUE [2:0] = '{2'd3, 2'd2, 2'd1};
+          |localparam LEN = 2;
+          |localparam logic [1:0] SEQ_VALUE [LEN:0] = '{2'd3, 2'd2, 2'd1};
           |
           |localparam logic [WIDTH-1:0] INIT_VALUE = '0;
           |localparam logic [1:0] SEQ_UINT [2:0];
@@ -179,7 +180,9 @@ class ComplexParamSpec extends Sv2ChiselSpec {
           |  input a,
           |  output b
           |);
-          |assign b = TEST ? a : '0;
+          |wire w;
+          |assign w = a == SEQ_UINT[LABELS] ? a : '0;
+          |assign b = TEST ? w : '0;
           |endmodule
         """.stripMargin
         
@@ -201,6 +204,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
       "package object test_p {",
         "",
         "val WIDTH = 5",
+        "val LEN = 2",
         "val SEQ_VALUE: Seq[UInt] = Seq(1.U(2.W), 2.U(2.W), 3.U(2.W))",
         "",
         "val INIT_VALUE: UInt = 0.U",
@@ -221,7 +225,10 @@ class ComplexParamSpec extends Sv2ChiselSpec {
           "val TEST: Boolean",
         ") extends MultiIOModule {",
         "val a = IO(Input(Bool()))",
-        "val b = IO(Output(Bool()))"
+        "val b = IO(Output(Bool()))",
+        "val w = Wire(Bool())",
+        "w := Mux(a === (SEQ_UINT(LABELS) =/= 0.U), a, false.B)",
+        "b := Mux(TEST.B, w, false.B)"
     )
     
     result should contain (

@@ -72,7 +72,7 @@ class Project(name: String) extends EasyLogging {
     val (timeT, _) = time {
       t.execute(this)
     }
-    trace("Transform result: " + this.serialize)
+    debug("Transform result: " + this.serialize)
     struct(s"   # Elapsed time : $timeT ms")
   }
   

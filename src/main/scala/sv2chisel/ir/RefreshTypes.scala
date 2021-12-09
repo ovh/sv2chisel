@@ -97,7 +97,12 @@ class SubIndexRefreshType(s: SubIndex) extends LazyLogging with InfoLogger {
     s.expr.tpe match {
       case v: VecType => // this is the only one expected here 
         v.tpe match {
-          case Seq(t) => s.copy(tpe = t, kind = s.expr.kind) 
+          case Seq(t) => 
+            val updatedKind = t match {
+              case _:UIntType => HwExpressionKind
+              case _ => s.expr.kind
+            }
+            s.copy(tpe = t, kind = updatedKind) 
           case _ => s // MixedVec unsupported
         }
       case u: SIntType => s.copy(tpe = BoolType(u.tokens)) // index of SInt is bool

@@ -55,6 +55,31 @@ object Utils extends LazyLogging with InfoLogger {
     }
   }
   
+  def eqRawExpr(e1: Expression, e2: Expression): Boolean = {
+    def cleanExpr(e: Expression): Expression = {
+      e.mapType(_ => UnknownType()).mapInterval(_ => UndefinedInterval).mapKind(_ => UnknownExpressionKind)
+    }
+    (cleanExpr(e1), cleanExpr(e2)) match {
+      case (d1: DoPrim, d2: DoPrim) if(d1.args.length != d2.args.length) => false
+      case (d1: DoPrim, d2: DoPrim) => 
+        Utils.eq(d1.op, d2.op) && 
+          d1.args.zip(d2.args).map(t => eqRawExpr(t._1, t._2)).reduceOption(_ && _).getOrElse(false)
+
+      case (e1Raw, e2Raw) => 
+        val e1clean = e1Raw.mapExpr(cleanExpr)
+        val e2clean = e2Raw.mapExpr(cleanExpr)
+        val res = e1clean == e2clean
+        if(!res) {
+          trace(e1, s"Match Failed on")
+          trace(e1, s"$e1clean")
+          trace(e1, s"$e2clean")
+        }
+        res
+    }
+    
+  }
+  
+  
   def cleanTok[T <: SVNode](node: T): T = {
     (node.mapInterval(i => {
       i match {
