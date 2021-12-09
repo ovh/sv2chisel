@@ -90,7 +90,9 @@ case class SubWords[T <: Data](v: Vec[T], high: Int, low: Int) {
   val length = high - low + 1
 
   // Seq where first element is LSB (as everywhere else in chisel)
-  def :=(s: Seq[T]): Unit = {
+  def :=(s: Seq[T]): Unit = do_connect(s)
+   
+  private def do_connect(s: Seq[Data]): Unit = {
     require(
         s.length <= length,
         s"Too many elements given ($s) for connection with ${v.slice(low, high + 1)}"
@@ -102,7 +104,15 @@ case class SubWords[T <: Data](v: Vec[T], high: Int, low: Int) {
     s.zip(v.slice(low, high + 1)).foreach(t => t._2 := t._1)
   }
 
-  def :=(v: Vec[T]): Unit = :=(v.toSeq)
+  def :=(v: Vec[T]): Unit = do_connect(v.toSeq)
+  def :=(u: UInt): Unit = {
+    v.headOption match {
+      case Some(_:Bool) => do_connect(u.asBools)
+      case Some(t) => throw new Exception(s"TODO: Split UInt as bools and group by t.widthOption elements (${t})")
+      case _ => // nothing to do: empty vec
+    }
+    
+  }
   // asUInt
   // Aggregates are recursively packed with the first element appearing in the least-significant bits of the result.
   def asVec: Vec[T]                   = VecInit(v.slice(low, high + 1))

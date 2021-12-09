@@ -5,7 +5,7 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- prefer Seq(UInt..) over VecInit for parameter & forbid it in package to avoid passing hardware as parameter & get complex chisel errors
+- fix cast of Vec of different length (asTypeOf)
 
 - add string legalization at emission:
   - scala keywords
