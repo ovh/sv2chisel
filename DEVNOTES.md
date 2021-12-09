@@ -5,12 +5,12 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- fix clock propagation when remotely connected & not used locally
-- fix literal default cast to UInt
-- use BigInt for shift 1<<SHIFT => BigInt(1) << SHIFT
 - fix proper handling of [A -: W] ranges (off-by-one error) 
 - add DontCare on unconnected remote inputs
 - add a transform to support DefLogic inference depending on parameters (IfGen)
+
+- raise issue on chisel: extmodule port check
+- raise internal issues: wrong parameters (eb) + unused wires
 
 - add string legalization at emission:
   - scala keywords

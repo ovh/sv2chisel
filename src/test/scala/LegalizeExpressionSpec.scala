@@ -39,7 +39,7 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ("val B_TRUE: Boolean = true")
     result should contain ("val B_FALSE: Boolean = false")
     result should contain ("val C_UNKNOWN: Boolean")
@@ -72,7 +72,7 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ("val lhsc = Wire(Vec(32, Bool()))")
     result should contain ("val wu = Wire(Vec(32, Bool()))")
     result should contain ("val auto_concat = Wire(new Bundle {",
@@ -94,7 +94,7 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ("val a = Wire(UInt(17.W))")
     result should contain ("val res = Wire(UInt(32.W))")
     result should contain ("res := (a.asTypeOf(SInt(32.W)) >> 1.U).asUInt")
@@ -111,7 +111,7 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ("val a = Wire(UInt(32.W))")
     result should contain ("val b = Wire(Vec(32, Bool()))")
     result should contain ("val res = Wire(Bool())")
@@ -133,7 +133,7 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ( "w := a^b" )
     result should contain ( "r := w^c" )
     result should contain ( "o := (w&c)|(a&b)" )

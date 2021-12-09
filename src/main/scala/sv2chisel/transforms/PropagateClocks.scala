@@ -19,48 +19,52 @@ class PropagateClocks(val options: TranslationOptions) extends DefModuleBasedTra
     def processInstance(i: DefInstance) = {
       currentProject.get.findModule(i.module.name) match {
         case Some(m: DefModule) =>
+          
+          def updatedPortMap(name: String): Seq[Assign] = {
+            // remove clock from port map
+            val renamedClock = m.ports.collectFirst{
+              case Port(_,_,_,_,_,_,_,_,_,Some(n),_) => n
+            }.getOrElse("<error>")
+            i.portMap.flatMap(p => {
+              p match {
+                case NamedAssign(_, n, _, _, _, _, _) if(n == name || n == renamedClock) => None 
+                case NamedAssign(_, _, r: Reference, _, _, _, _) if(r.serialize == name) => None 
+                case NoNameAssign(_, r: Reference, _, _, _, _, _) if(r.serialize == name) => None
+                case _ => Some(p)
+              }
+            })
+          }
+        
           (m.clock, module.clock) match {
-            case (Some(ci), Some(cm)) if (ci == cm) => 
-              // remove clock from port map
-              val renamedClock = m.ports.collectFirst{
-                case Port(_,_,_,_,_,_,_,_,_,Some(n),_) => n
-              }.getOrElse("<error>")
-              val portMap = i.portMap.flatMap(p => {
-                p match {
-                  case NamedAssign(_, n, _, _, _, _, _) if(n == ci || n == renamedClock) => None 
-                  case NamedAssign(_, _, r: Reference, _, _, _, _) if(r.serialize == ci) => None 
-                  case NoNameAssign(_, r: Reference, _, _, _, _, _) if(r.serialize == ci) => None
-                  case _ => Some(p)
-                }
-              })
-              i.copy(portMap = portMap, clock = Some(ci))
+            case (Some(ci), Some(cm)) if (ci == cm) => i.copy(portMap = updatedPortMap(ci), clock = Some(ci))
 
             case (None, Some(cm)) => 
               // update port map for instance
-              m match {
-                case e: ExtModule =>
-                  // NB: proper Clock() & Reset() types are required for instantiation of ExtModules
-                  safeUpdateDescription(e.name, _ => {
-                    i.portMap.flatMap(p => {
-                      p match {
-                        case NamedAssign(_, n, r: Reference, _, _, _, _) if(r.serialize == cm) => Some(n) 
-                        case NoNameAssign(_, r: Reference, _, _, _, _, _) if(r.serialize == cm) => None // index ?
-                        case _ => None
-                      }
-                    }) match {
-                      case Seq() => 
-                        warn(i, s"Cannot find connected clock `$cm` for instance ${i.name} of module ${e.name}")
-                        e // nothing to do, clock does not seem connected
-                      case Seq(n) => e.copy(clock = Some(n))
-                      case _ =>
-                        warn(i, "Found multiple clock connected - unable to update remote")
-                        e
+              // NB: proper Clock() & Reset() types are required for instantiation of ExtModules
+              safeUpdateDescription(m.name, _ => {
+                i.portMap.flatMap(p => {
+                  p match {
+                    case NamedAssign(_, n, r: Reference, _, _, _, _) if(r.serialize == cm) => Some(n) 
+                    case NoNameAssign(_, r: Reference, _, _, _, _, _) if(r.serialize == cm) => None // index ?
+                    case _ => None
+                  }
+                }) match {
+                  case Seq() => 
+                    warn(i, s"Cannot find connected clock `$cm` for instance ${i.name} of module ${m.name}")
+                    m // nothing to do, clock does not seem connected
+                  case Seq(n) => 
+                    m match {
+                      case e: ExtModule => e.copy(clock = Some(n))
+                      case e: Module => e.copy(clock = Some(n))
                     }
-                  })
-                  i // nothing to update in portmap
-                case _ =>  
-                  critical(i, "TODO? update remote instance clock definition if required?")
-                  i
+                  case _ =>
+                    warn(i, s"Found multiple clock `$cm` for instance ${i.name} of module ${m.name}: aborting update")
+                    m
+                }
+              })
+              m match {
+                case _: ExtModule => i // nothing to update in portmap
+                case _: Module => i.copy(portMap = updatedPortMap(cm), clock = Some(cm))
               }
               
             case (Some(ci), None) => 

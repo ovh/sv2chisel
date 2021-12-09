@@ -31,7 +31,7 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ("val auto_concat = Wire(new Bundle {",
                               "val bool = Bool()",
                               "val packsmall_i_WWW_1_1 = Vec(WWW-1, Bool())",
@@ -63,7 +63,7 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
     result should contain ("import sv2chisel.helpers.vecconvert._")
     result should contain ("import chisel3.util.Cat")
 
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain (
                             "val w = Wire(UInt(WWW.W))",
                             "val y = Wire(Vec(WWW, Bool()))",

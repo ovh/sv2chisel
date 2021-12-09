@@ -37,6 +37,7 @@ class SwitchSpec extends Sv2ChiselSpec {
   
   "SwitchSpec" should "be properly emitted" in {
     val result = emitInModule("""
+      |input clk;
       |wire a, b, c, d, e; 
       |wire [31:0] mem, prev; 
       |reg [31:0] res; 
@@ -69,7 +70,7 @@ class SwitchSpec extends Sv2ChiselSpec {
     result should contain ("when(true.B === a) {",
                               "res := prev",
                             "} .elsewhen (true.B === Cat(b, c).orR()) {",
-                              "res := mem(31,12).asUInt<<12",
+                              "res := mem(31,12).asUInt << 12",
                             "} .elsewhen (true.B === Cat(a, d, e).orR()) {",
                               "res := mem(31,20).asTypeOf(SInt(32.W)).asUInt",
                             "} .elsewhen (true.B === Cat(a, b).andR()) {",

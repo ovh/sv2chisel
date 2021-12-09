@@ -16,6 +16,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
   it should "support assign patterns" in {
     val result = emitInModule(s"""
       |// might contain more than the RAM due to moves
+      |input clk;
       |localparam DBLW = 2;
       |localparam WWW = 16;
       |localparam IT_LEFT = (64 * 2) + (1<<(WWW-2));
@@ -85,7 +86,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     // a bit more obscur however
     // result should contain ("val en = RegInit(VecInit.tabulate(DBLW)(_ => false.B))")
     
-    result should contain ("val cnter = RegInit(Vec(DBLW, UInt(65.W)), ((1.U<<(DBLW*65))-1.U).asTypeOf(Vec(DBLW, UInt(65.W))))")
+    result should contain ("val cnter = RegInit(Vec(DBLW, UInt(65.W)), ((1.U << (DBLW*65))-1.U).asTypeOf(Vec(DBLW, UInt(65.W))))")
     // to do 
     // result should contain ("val cnter = RegInit(VecInit.tabulate(DBLW)(_ => ((1.U<<65)-1.U))")
     
@@ -223,7 +224,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
           "val LABEL_SEQ: Seq[UInt],",
           "val LABEL_SEQ2: Seq[UInt],",
           "val TEST: Boolean",
-        ") extends MultiIOModule {",
+        ") extends RawModule {",
         "val a = IO(Input(Bool()))",
         "val b = IO(Output(Bool()))",
         "val w = Wire(Bool())",

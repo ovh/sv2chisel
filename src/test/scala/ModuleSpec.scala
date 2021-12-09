@@ -19,7 +19,7 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ("val a = Wire(Bool())")
     result should contain ("val b = Wire(Bool())")
     result should contain ("a := b")
@@ -32,7 +32,7 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class MyTest() extends MultiIOModule {")
+    result should contain ("class MyTest() extends RawModule {")
     result should contain ("val a = Wire(Bool())")
     result should contain ("val b = Wire(Bool())")
     result should contain ("a := b")
@@ -51,7 +51,7 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class CustomModule() extends MultiIOModule {")
+    result should contain ("class CustomModule() extends RawModule {")
     result should contain ("val a = IO(Input(Bool()))")
     result should contain ("val b = IO(Output(Bool()))")
     result should contain ("b := a")
@@ -68,7 +68,7 @@ class ModuleSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class CustomModule() extends MultiIOModule {")
+    result should contain ("class CustomModule() extends RawModule {")
     result should contain ("val a = IO(Input(Bool()))")
     result should contain ("val b = IO(Output(Bool()))")
     result should contain ("b := a")
@@ -90,7 +90,7 @@ class ModuleSpec extends Sv2ChiselSpec {
     debug(result)
     result should contain ("class CustomModule(" )
     result should contain ("val TEST: Boolean" )
-    result should contain (") extends MultiIOModule {")
+    result should contain (") extends RawModule {")
     result should contain ("val a = IO(Input(Bool()))")
     result should contain ("val b = IO(Output(Bool()))")
     result should contain ("b := Mux(TEST.B, a, false.B)")
@@ -124,7 +124,7 @@ class ModuleSpec extends Sv2ChiselSpec {
     
     result should contain ("class Main(" )
     result should contain ("val OPT: Int" )
-    result should contain (") extends MultiIOModule {")
+    result should contain (") extends RawModule {")
     result should contain ("val i = IO(Input(Bool()))")
     result should contain ("val o = IO(Output(Bool()))")
 

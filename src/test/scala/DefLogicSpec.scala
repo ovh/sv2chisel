@@ -41,10 +41,10 @@ class DefLogicSpecs extends Sv2ChiselSpec {
     result should contain ("val WWW = 1")
     result should contain ("val change = Wire(Bool())")
     result should contain ("val counter = RegInit(UInt(WW.W), 0.U)")
-    result should contain ("val current = RegInit(UInt(WWW.W), ((1<<WWW)-1).U)")
+    result should contain ("val current = RegInit(UInt(WWW.W), ((1 << WWW)-1).U)")
     
     // TO DO 
-    result should contain ("when(current < ((1<<WWW)-1).U) {")
+    result should contain ("when(current < ((1 << WWW)-1).U) {")
     result should contain ("current := current+1.U")
     
   }

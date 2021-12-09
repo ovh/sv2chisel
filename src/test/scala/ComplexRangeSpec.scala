@@ -32,7 +32,7 @@ class ComplexRangeSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ("val a_vect = Wire(Vec(32, Bool()))")
     result should contain ("val b_vect = Wire(Vec(32, Bool()))")
     result should contain ("val a_res = Wire(UInt(8.W))")

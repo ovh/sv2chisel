@@ -47,7 +47,7 @@ class InstanceFlowSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     
     result should contain ("inst.in := inst_in_u3")
     

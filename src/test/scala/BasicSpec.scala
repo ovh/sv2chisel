@@ -45,7 +45,7 @@ class BasicSpecs extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ("// genvar i, bank;")
     
     result should contain ("val A = 5")
@@ -85,7 +85,7 @@ class BasicSpecs extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should contain ("class Test() extends RawModule {")
     result should contain ("val test = Wire(Vec(32, Bool()))")
     result should contain ("test := ( ~0.U(32.W)).asBools")
     result should contain ("test(5,0) := 0.U.asTypeOf(Vec(6, Bool()))")

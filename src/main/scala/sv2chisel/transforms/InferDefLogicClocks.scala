@@ -197,7 +197,7 @@ class InferDefLogicClocks(val options: TranslationOptions) extends DescriptionBa
     
     val module = clocksUsageCounts.keys.toSeq match {
       // to do add parameter to allow clock rename or not (no rename => rawmodule + withClock)
-      case Seq() => moduleNext.copy(clock = Some("clock"))
+      case Seq() => moduleNext
       case Seq(e) => 
         renameMap.add(Rename(e, "clock", true)) // very important for submodules (and consistency)
         val m = moduleNext.mapPort(p => {

@@ -12,6 +12,7 @@ class IfElseSpec extends Sv2ChiselSpec {
   
   "IfElseSpec" should "be properly emitted without begin end blocks" in {
     val result = emitInModule("""
+      |input clk; 
       |wire a, b, c; 
       |reg [31:0] res; 
       |
@@ -39,6 +40,7 @@ class IfElseSpec extends Sv2ChiselSpec {
   
   it should "be properly emitted with begin end blocks" in {
     val result = emitInModule("""
+      |input clk;
       |wire a, b, c; 
       |reg [31:0] res; 
       |
@@ -65,6 +67,7 @@ class IfElseSpec extends Sv2ChiselSpec {
   
   it should "be properly emitted without elsewhen for blocks" in {
     val result = emitInModule("""
+      |input clk;
       |wire a, b, c; 
       |reg [31:0] res; 
       |
@@ -96,6 +99,7 @@ class IfElseSpec extends Sv2ChiselSpec {
   
   it should "be properly emitted without elsewhen for blocks 2" in {
     val result = emitInModule("""
+      |input clk;
       |wire a, b, c; 
       |reg [31:0] res; 
       |

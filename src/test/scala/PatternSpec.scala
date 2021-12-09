@@ -44,7 +44,7 @@ class PatternSpec extends Sv2ChiselSpec {
     // auto
     result should contain ( 
       "r := Mux(c, a(WA-1,0).asUInt, Cat(0.U((WA-WB).W), a(WB-1,0).asUInt))",
-      "r := Mux(c, a(WA-1,0).asUInt, Cat(((1.U<<(WA-WB))-1.U).asUInt, a(WB-1,0).asUInt))",
+      "r := Mux(c, a(WA-1,0).asUInt, Cat(((1.U << (WA-WB))-1.U).asUInt, a(WB-1,0).asUInt))",
     ) 
 
   }

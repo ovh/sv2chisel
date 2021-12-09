@@ -1224,7 +1224,14 @@ class ChiselDoPrim(e: DoPrim){
           case _ => shTxt
         }
         
-        
+      case (s: Shl, Seq(e1, e2)) => 
+        (e1.kind, e1.evalBigIntOption, e2.evalBigIntOption) match {
+          case (_, Some(one), Some(bg)) if(one == 1 && bg < 32) =>
+          case (SwExpressionKind, _, _) => 
+            rcritical(uctx, s, s"Shift operations on Int shall be checked manually to ensure proper results (wrapping)")
+          case _ => 
+        }
+        safeChiselize(e1, uctx) ++ ChiselTxtS(s, ctx, " << ") ++ safeChiselize(e2, uctx)
 
       /// Incr 
       case (i: Incr, Seq(expr)) => 
