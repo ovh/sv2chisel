@@ -529,7 +529,7 @@ class Visitor(
       .collect {case u: UnpackedVecType => u.asPackedVecType}
     (packed, tpe) match {
       case (Seq(), _) => (tpe, res)
-      case (s, BoolType(_, true)) => (getFullType(s.dropRight(1), s.last.asSIntType()), res) // signed case
+      case (s, BoolType(_, true)) => (getFullType(s.dropRight(1), s.last.asSIntType), res) // signed case
       case (s, _) => (getFullType(s, tpe), res)
     }
   }
@@ -1339,13 +1339,13 @@ class Visitor(
       case Seq() => 
         if(isSigned(ctx.signing)) { err() }
         BoolType(ctx.getSourceInterval())
-      case Seq(t) => if(signed) t.asSIntType() else t
-      case Seq(p, t) => if(signed) p.copy(tpe = Seq(t.asSIntType())) else p.copy(tpe = Seq(t))
+      case Seq(t) => if(signed) t.asSIntType else t
+      case Seq(p, t) => if(signed) p.copy(tpe = Seq(t.asSIntType)) else p.copy(tpe = Seq(t))
       case s     => 
         val ss = if(signed){
           s.last match {
             case v: VecType => 
-              val last = s(s.size-2).copy(tpe = Seq(v.asSIntType()))
+              val last = s(s.size-2).copy(tpe = Seq(v.asSIntType))
               s.dropRight(2) ++ Seq(last)
             case _ => err(); s
           }
@@ -1592,10 +1592,10 @@ class Visitor(
         
         case (Some(bg), _, _) if (bg == 0) => (BoolType(v.bound.tokens), SwExpressionKind) // special case [0:0]
         case (Some(bg), _, _) => (UIntType(v.bound.tokens, Width(bg+1), NumberDecimal), HwExpressionKind)
-        case (_, Some(_:Number), _) => (v.asUIntType(), HwExpressionKind)
-        case (_, Some(_:UIntLiteral), _) => (v.asUIntType(), HwExpressionKind)
+        case (_, Some(_:Number), _) => (v.asUIntType, HwExpressionKind)
+        case (_, Some(_:UIntLiteral), _) => (v.asUIntType, HwExpressionKind)
         
-        case (_,_, Seq(_:BoolType)) => (v.asUIntType(), HwExpressionKind)
+        case (_,_, Seq(_:BoolType)) => (v.asUIntType, HwExpressionKind)
         
         // this HwExpressionKind might be a bit restrictive in usage ...
         // should depends on inner kind and rely on InferUInt & LegalizeExpression Transforms for further interpretation

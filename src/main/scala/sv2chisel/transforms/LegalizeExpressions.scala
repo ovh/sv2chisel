@@ -712,7 +712,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
                     case Seq(t: UIntType) => 
                       t.width.expr.evalBigIntOption match {
                         // nothing pad properly directly here
-                        case Some(i) if i == 8 => sl.copy(width = Width(UndefinedInterval,v.getWidth))
+                        case Some(i) if i == 8 => sl.copy(width = Width(UndefinedInterval,v.getLen))
                         case _ => sl
                       }
                     case _ => sl

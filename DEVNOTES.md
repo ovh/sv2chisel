@@ -9,9 +9,6 @@
 - add DontCare on unconnected remote inputs
 - add a transform to support DefLogic inference depending on parameters (IfGen)
 
-- raise issue on chisel: extmodule port check
-- raise internal issues: wrong parameters (eb) + unused wires
-
 - add string legalization at emission:
   - scala keywords
   - chisel keywords?

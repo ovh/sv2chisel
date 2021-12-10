@@ -111,10 +111,10 @@ class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransf
               // end of recursion let's return an UInt depending on
               if(stringAssignedCount.contains(path)){
                 info(tpe, s"Converting $path to Vec of Char(UInt(8.W)) based on its usage in the module")
-                v.asCharVecType()
+                v.asCharVecType
               } else if (doConvertToUInt(path)) {
                 info(tpe, s"Converting $path to UInt based on its usage in the module")
-                v.asUIntType() 
+                v.asUIntType 
               } else {
                 v
               }

@@ -140,7 +140,7 @@ class RemoveConcats(val options: TranslationOptions) extends DescriptionBasedTra
                 (a.tpe, a)
             }
           case v: VecType =>
-          v.getWidth.evalBigIntOption match {
+          v.getLen.evalBigIntOption match {
             // beware that width = bound + 1 
             case Some(i) => (v.mapBound(_ => Number(UndefinedInterval, (i-1).toString)), a)
             case _ => (v, a)

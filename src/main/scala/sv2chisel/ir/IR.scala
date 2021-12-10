@@ -1532,7 +1532,7 @@ object BoolWidth {
     Width(1)
   }
   def unapply(w: Width): Boolean = {
-    if(w.expr == Width(1).expr) true else false
+    if(Utils.eq(w.expr, Width(1).expr)) true else false
   }
 }
 
@@ -1811,8 +1811,8 @@ abstract class VecType extends AggregateType {
   def asPackedVecType(): PackedVecType = {
     PackedVecType(tokens, tpe, bound, downto)
   }
-
-  def getWidth(): Expression = {
+  
+  def getLen: Expression = {
     // need to do +1 to get actual width
     // in most case there is a -1 in the verilog, let's strip it
     bound match {
@@ -1822,10 +1822,24 @@ abstract class VecType extends AggregateType {
         DoPrim(bound.tokens, PrimOps.Add(UndefinedInterval), Seq(bound, Number(UndefinedInterval,"1", SwExpressionKind)), bound.kind, bound.tpe)
     }
   }
-  def getWidth8(): Expression = {
+
+  def getWidth: Expression = {
+    val len = getLen
+    tpe match {
+      case Seq(t) => 
+        t.widthOption match {
+          case Some(w) if (BoolWidth.unapply(w)) => len
+          case Some(w) => DoPrim(bound.tokens, PrimOps.Mul(UndefinedInterval), Seq(len, w.expr), bound.kind, bound.tpe)
+          case _ => len
+        }
+      case _ => len
+    }
+  }
+  
+  def getWidth8: Expression = {
     // need to do +1 to get actual width
     // in most case there is a -1 in the verilog, let's strip it
-    getWidth() match {
+    getLen match {
       case DoPrim(_, _:PrimOps.Mul, Seq(a, b), _, _) if(b.serialize == "8") => a 
       case DoPrim(_, _:PrimOps.Mul, Seq(a, b), _, _) if(a.serialize == "8") => b
       case n: Number => 
@@ -1844,15 +1858,15 @@ abstract class VecType extends AggregateType {
     }
   }
   
-  def asUIntType(): UIntType = {
+  def asUIntType: UIntType = {
     tpe match {
       case Seq() => UIntType(tokens, Width(0), NumberDecimal)
-      case Seq(_: BoolType) => UIntType(tokens, Width(UndefinedInterval, getWidth()), NumberDecimal)
+      case Seq(_: BoolType) => UIntType(tokens, Width(UndefinedInterval, getLen), NumberDecimal)
       case _ => Utils.throwInternalError("Unable to convert to UInt")
     }
   }
   
-  def asCharVecType(): VecType = {
+  def asCharVecType: VecType = {
     tpe match {
       case Seq() => NoneVecType(tokens)
       case Seq(_: BoolType) => 
@@ -1860,17 +1874,17 @@ abstract class VecType extends AggregateType {
       PackedVecType(
         tokens,
         Seq(UIntType(ui, Width(ui, Number(ui,"8",NumberDecimal)), NumberDecimal)),
-        getWidth8(),
+        getWidth8,
         downto
       )
       case _ => Utils.throwInternalError("Unable to convert to CharVec")
     }
   }
   
-  def asSIntType(): SIntType = {
+  def asSIntType: SIntType = {
     tpe match {
       case Seq() => SIntType(tokens, Width(0))
-      case Seq(_: BoolType) => SIntType(tokens, Width(UndefinedInterval, getWidth()))
+      case Seq(_: BoolType) => SIntType(tokens, Width(UndefinedInterval, getLen))
       case _ => Utils.throwInternalError("Unable to convert to UInt")
     }
   }

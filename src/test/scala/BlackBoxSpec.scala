@@ -125,6 +125,52 @@ class BlackBoxSpec extends Sv2ChiselSpec {
     )
   }
   
+  it should "work with vec ports" in {
+
+    val bb = wrapInModule("""
+        |input  [3:0][7:0] i;
+        |output [3:0][7:0] o;
+        |
+        |assign o = i;
+        """.stripMargin,
+        "my_black_box"
+      )
+        
+    val main = wrapInModule("""
+        |input  [3:0][7:0] i;
+        |output [3:0][7:0] o;
+        |
+        |my_black_box inst(
+        |  .i(i),
+        |  .o(o)
+        |);
+        """.stripMargin
+      )
+
+    val result = emit(bb, main, None)
+      
+    result shouldNot contain ( "import chisel3.util.HasBlackBoxResource")
+    result should contain ( "class my_black_box() extends RawModule {",
+      "",
+      "val io = IO(new Bundle {",
+        "val i = Input(Vec(4, UInt(8.W)))",
+        "val o = Output(Vec(4, UInt(8.W)))",
+      "})"
+    )
+    
+    result should contain ( 
+      "val inst = Module(new my_black_box)",
+      "inst.io.i := i",
+      "o := inst.io.o"
+    )
+    result should contain ( "class my_black_boxBB() extends BlackBox {",
+      "val io = IO(new Bundle {",
+        "val i = Input(UInt((4*8).W))",
+        "val o = Output(UInt((4*8).W))",
+      "})"
+    )
+  }
+  
   it should "work with parameters and ports functional-style" in {
 
     val bb = """

@@ -12,7 +12,7 @@ import logger.EasyLogging
 // implicits
 import sv2chisel.ir.evalExpression._
 
-import collection.mutable.{ArrayBuffer, HashSet}
+import collection.mutable.{ArrayBuffer, HashSet, HashMap}
 // define all implict chiselize function for all nodes of the IR
 
 package object chiselize extends EasyLogging {
@@ -336,11 +336,12 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
     val s = ArrayBuffer[ChiselTxt]()
     val dq = "\""
     
-    val resource = e.resourcePath match {
-      case _:Some[String] => 
+    val (resource, addRessourceTxt) = e.resourcePath match {
+      case Some(path) => 
         ctx.src.addDep(PackageRef(UndefinedInterval, "chisel3.util", "HasBlackBoxResource"))
-        " with HasBlackBoxResource"
-      case None => ""
+        rwarn(ctx, e, s"TODO: copy resource $path in src/main/resource folder (vs src/main/scala for chisel files)")
+        (" with HasBlackBoxResource", Seq(ChiselClosingLine(e.body, mCtxt, s"addResource($dq$path$dq)")))
+      case None => ("", Seq())
     }
     
     // Set proper types for clock & reset ports 
@@ -360,6 +361,8 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       case (None, None) => e.ports
     }
     
+    /**** PRE COMPUTATIONS ON PORTS & PARAMS ***/
+    
     // collect def param (resulting from legalization)
     def collectDefParam(s: Statement): Seq[DefParam] = {
       val buffer = ArrayBuffer[DefParam]()
@@ -370,12 +373,35 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       buffer.toSeq
     }
     val defParams = collectDefParam(e.body)
-
-    s += ChiselLine(e, ctx, s"class ${e.name}(") // NB: not in chisel3.experimental anymore
-    if(e.params.size > 0) {
-      // usual scala parameters
-      s ++= e.params.map(_.chiselize(pCtxt, forceType=true, assignToValue=false) ++ comma).flatten.dropRight(1)
-      s += ChiselClosingLine(e.params.last, mCtxt, s") extends BlackBox(")
+    
+    // to avoid unused warnings
+    val ioRefUsage = HashSet[String]()
+    var requireWrapper = false
+    val innerBBportsW = HashMap[String, Option[Width]]()
+    def checkUsage(p: Port): Unit = {
+      def checkUsageExpr(e: Expression): Unit = {
+        e match {
+          case r: Reference if(r.path.isEmpty) => ioRefUsage += r.name
+          case _ => e.foreachExpr(checkUsageExpr)
+        }
+      }
+      p.tpe.foreachWidth(w => checkUsageExpr(w.expr))
+      p.tpe match {
+        case _:UIntType => innerBBportsW += p.name -> None
+        case _:BoolType => innerBBportsW += p.name -> None
+        case _ => 
+          requireWrapper = true
+          innerBBportsW += p.name -> Some(p.tpe.widthOption.getOrElse(UnknownWidth()))
+      }
+    }
+    ports.foreach(checkUsage)
+    val bbName = if(requireWrapper) s"${e.name}BB" else s"${e.name}"
+    lazy val paramsChisel = e.params.map(_.chiselize(pCtxt, forceType=true, assignToValue=false) ++ comma)
+      .flatten.dropRight(1)
+    
+    // function to get the BlackBox options 
+    def getBBParams(): Seq[ChiselTxt] = {
+      val s = ArrayBuffer[ChiselTxt]()
       val ending = defParams.isEmpty match {
         case true => s += ChiselTxt("Map("); Seq(ChiselLine(mCtxt, s"))$resource {"))
         case false => 
@@ -402,41 +428,86 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       }).flatten.dropRight(1)
       
       s ++= ending
-    } else {
-      s += ChiselTxt(mCtxt, s") extends BlackBox$resource {")
     }
-    // to avoid unused warnings
-    val ioRefUsage = HashSet[String]()
-    def checkUsage(p: Port): Unit ={
-      def checkUsageExpr(e: Expression): Unit = {
-        e match {
-          case r: Reference if(r.path.isEmpty) => ioRefUsage += r.name
-          case _ => e.foreachExpr(checkUsageExpr)
-        }
-      }
-      p.tpe.foreachWidth(w => checkUsageExpr(w.expr))
-    }
-    val portsInBundle = ports.flatMap(p => {
-      checkUsage(p)
-      p.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false)
-    })
+
+    /************* ACTUAL BLACKBOX EMISSION ******************/
     
-    s ++= defParams.map( p => {
+    // NB : we must start with the wrapper to get comment right
+    s += ChiselLine(e, ctx, s"class ${e.name}(")
+    if(e.params.size > 0) s ++= paramsChisel // usual scala parameters
+    if(requireWrapper) {
+      if(e.params.size > 0){
+        s += ChiselClosingLine(e.params.last, mCtxt, s") extends RawModule {")
+      } else {
+        s += ChiselTxt(e, ctx, s") extends RawModule {")
+      }
+    } else {
+      if(e.params.size > 0) {
+        s += ChiselClosingLine(e.params.last, mCtxt, s") extends BlackBox(") // NB: not in chisel3.experimental anymore
+        s ++= getBBParams() // blackbox abstract class param map
+        
+      } else {
+        s += ChiselTxt(mCtxt, s") extends BlackBox$resource {")
+      }
+
+    }
+    val defParamsTxt = defParams.map( p => {
       if (ioRefUsage.contains(p.name)) p.chiselize(mCtxt, forceType=false, assignToValue=false) else Seq() 
     }).flatten
+    s ++= defParamsTxt
     
     s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
-    s ++= portsInBundle
+    s ++= ports.flatMap(_.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false))
     s += ChiselClosingLine(e.body, mCtxt, s"})")
-    // NEED ADD RESSOURCE HERE !!
-    e.resourcePath match {
-      case Some(path) => 
-        rwarn(ctx, e, s"TODO: copy resource $path in src/main/resource folder (vs src/main/scala for chisel files)")
-        s += ChiselClosingLine(e.body, mCtxt, s"addResource($dq$path$dq)")
-      case None => 
+    
+    if(requireWrapper) {
+      // inner inst
+      s += ChiselLine(mCtxt, s"val inst = Module(new $bbName(${e.params.map(_.name).mkString(", ")}))")
+      
+      s ++= ports.flatMap(p => {
+        (p.direction, innerBBportsW(p.name)) match {
+          case (_:Input, None) => Seq(ChiselLine(mCtxt, s"inst.io.${p.name} := io.${p.name}"))
+          case (_:Output, None) => Seq(ChiselLine(mCtxt, s"io.${p.name} := inst.io.${p.name}"))
+          case (_:Input, _) => Seq(ChiselLine(mCtxt, s"inst.io.${p.name} := io.${p.name}.asTypeOf(inst.io.${p.name})"))
+          case (_:Output, _) => Seq(ChiselLine(mCtxt, s"io.${p.name} := inst.io.${p.name}.asTypeOf(io.${p.name})"))
+          case (d, _) => unsupportedChisel(ctx, p, s"Unsupported direction $d for port ${p.name}")
+        }
+      })
+    } else {
+      s ++= addRessourceTxt
     }
       
     s += ChiselClosingLine(e, ctx, "}")
+    
+    // adding dedicated inner if required
+    if (requireWrapper) {
+      // direct emission
+      s += ChiselLine(e, ctx, s"class $bbName(")
+      if(e.params.size > 0) {
+        s ++= paramsChisel
+        s += ChiselClosingLine(e.params.last, mCtxt, s") extends BlackBox(") // NB: not in chisel3.experimental anymore
+        s ++= getBBParams() // blackbox abstract class param map
+        
+      } else {
+        s += ChiselTxt(mCtxt, s") extends BlackBox$resource {")
+      }
+      s ++= defParamsTxt
+      s += ChiselLine(mCtxt, s"val io = IO(new Bundle {") // still using a bundle of ios for compatibility
+      s ++= ports.flatMap(p => {
+          innerBBportsW(p.name) match {
+            case Some(w) => 
+              val tpe = UIntType(UndefinedInterval, w, NumberDecimal)
+              p.copy(tpe = tpe).chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false)
+            case _ => 
+              p.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false)
+          }
+      })
+      s += ChiselLine(mCtxt, s"})")
+      
+      s ++= addRessourceTxt
+      s += ChiselLine(ctx, "}")
+    }
+    s
   }
 }
 
@@ -613,8 +684,8 @@ class ChiselType(val t: Type) extends Chiselized {
           case _ => unsupportedChisel(ctx,t, "MixedVec Type in scala context")
         }
     
-      case p :PackedVecType => getVec(p.tpe, p.getWidth)
-      case u :UnpackedVecType => getVec(u.tpe, u.getWidth)
+      case p :PackedVecType => getVec(p.tpe, p.getLen)
+      case u :UnpackedVecType => getVec(u.tpe, u.getLen)
       
       case b: BundleType if(scalaTypeOnly) => unsupportedChisel(ctx,b, "cannot refer to anonymous Bundle as scalaType")
       case b: BundleType =>
@@ -744,7 +815,7 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
         }
         
         (u.tpe, s.init) match {
-          case (Seq(t), _:UndefinedExpression) => Seq(ChiselLine(s, ctx, s"val ${s.name} = $txt(")) ++ u.getWidth().chiselize(ctx) ++
+          case (Seq(t), _:UndefinedExpression) => Seq(ChiselLine(s, ctx, s"val ${s.name} = $txt(")) ++ u.getLen.chiselize(ctx) ++
             ChiselTxtS(",") ++ t.chiselize(hCtxt)
           case (Seq(_), _) => 
             rcritical(ctx, s, s"Cannot emit ${s.name} as Mem because it has an init value, using RegInit instead")
@@ -1433,7 +1504,7 @@ class ChiselDoCast(e: DoCast){
           case None => None 
         }
         rtrace(ctx, e, s"width: $width ; e.tpe : ${e.expr.tpe.serialize} ; e: ${e.expr.serialize}")
-        val cast = (v.getWidth.evalBigIntOption, width, e.expr.tpe, v.tpe) match {
+        val cast = (v.getLen.evalBigIntOption, width, e.expr.tpe, v.tpe) match {
           case (Some(i1), Some(i2), (_:UIntType | _: SIntType),_) if (i1 == i2 && ctx.isRawConnect) => ChiselTxtS(".asBools")
           case (Some(i), _, _, Seq(t)) => ChiselTxtS(s".asTypeOf(Vec($i, ") ++ t.chiselize(uctx) ++ ChiselTxtS("))") 
           case _ => ChiselTxtS(".asTypeOf(") ++ v.chiselize(uctx) ++ ChiselTxtS(")") 
@@ -1476,7 +1547,7 @@ class ChiselConcat(e: Concat){
     val decl = ChiselTxtS(e, ctx, "Cat(") ++ args ++ ChiselTxtS(")")
     e.tpe match {
       case v: VecType => 
-        (v.getWidth.evalBigIntOption, v.tpe) match {
+        (v.getLen.evalBigIntOption, v.tpe) match {
           case (Some(i), Seq(t)) => decl ++ ChiselTxtS(s".asTypeOf(Vec($i, ") ++ t.chiselize(ctx) ++ ChiselTxtS("))") 
           case _ => decl ++ ChiselTxtS(".asTypeOf(") ++ v.chiselize(ctx) ++ ChiselTxtS(")") 
         }
