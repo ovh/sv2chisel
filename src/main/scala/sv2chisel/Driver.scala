@@ -49,6 +49,7 @@ object Driver extends EasyLogging {
       new NameInstancePorts(options),
       new RemovePatterns(options),
       new RemoveConcats(options),
+      new AddDontCare(options),
       new LegalizeParamDefaults(options) // needs typed parameters
     )
     struct(s"######### Executing ${transforms.size} transforms #########")

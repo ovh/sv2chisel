@@ -6,8 +6,8 @@
 
 #### URGENT
 - fix proper handling of [A -: W] ranges (off-by-one error) 
-- add DontCare on unconnected remote inputs
 - add a transform to support DefLogic inference depending on parameters (IfGen)
+- add options for blackbox: copy to resource (user-provided path) and add resource annotation
 
 - add string legalization at emission:
   - scala keywords
