@@ -60,7 +60,7 @@ libraryDependencies += "com.ovhcloud" %% "sv2chisel" % "0.1.0-SNAPSHOT"
 ```
 
 # Usage
-The process follow the following steps:
+Complete 4-steps process, from (System)Verilog descriptions to upgraded Chisel generators:
 
 1. Translation, *either* [simple](#1-translation-simple) *or* [advanced](#1-translation-advanced)
 2. [Creation of a Chisel main](#2-creation-of-a-chisel-main)
