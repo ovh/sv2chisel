@@ -157,8 +157,8 @@ class RemovePatterns(val options: TranslationOptions) extends DescriptionBasedTr
         
         case d@DoPrim(_, _:PrimOps.BoolOp, args, _, _) =>
           val clean = args match {
-            case Seq(f: FillingBitPattern, e) => Seq(getFilling(f, FullType(tpeW(e), ftpe.kind), f.bit), e)
-            case Seq(e, f: FillingBitPattern) => Seq(e, getFilling(f, FullType(tpeW(e), ftpe.kind), f.bit))
+            case Seq(f: FillingBitPattern, e) => Seq(getFilling(f, FullType(tpeW(e), e.kind), f.bit), e)
+            case Seq(e, f: FillingBitPattern) => Seq(e, getFilling(f, FullType(tpeW(e), e.kind), f.bit))
             case s => s
           }
           d.copy(args = clean)

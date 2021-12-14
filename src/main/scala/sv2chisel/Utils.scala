@@ -55,6 +55,16 @@ object Utils extends LazyLogging with InfoLogger {
     }
   }
   
+  def getDefaultHwZeroesExpr(tpe: Type): Expression = {
+    val ui = UndefinedInterval
+    lazy val uint0 = UIntLiteral(ui, 0, UnknownWidth(), NumberDecimal)
+    tpe match {
+      case _:BoolType => BoolLiteral(ui, false, HwExpressionKind)
+      case _:UIntType => uint0
+      case _ => DoCast(ui, uint0, HwExpressionKind, cleanTok(tpe))
+    }
+  }
+  
   def eqRawExpr(e1: Expression, e2: Expression): Boolean = {
     def cleanExpr(e: Expression): Expression = {
       e.mapType(_ => UnknownType()).mapInterval(_ => UndefinedInterval).mapKind(_ => UnknownExpressionKind)

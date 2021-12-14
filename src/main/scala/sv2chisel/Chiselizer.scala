@@ -789,23 +789,48 @@ class ChiselSimpleBlock(val s: SimpleBlock) extends Chiselized {
 
 class ChiselDefLogic(val s: DefLogic) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
+    val header = s"val ${s.name} = "
+    def getIf(b: LogicBinding, doElse: Boolean = false): Seq[ChiselTxt] = {
+      (if(doElse) Seq(ChiselLine(ctx, " "* header.length + s"else if (")) else ChiselTxtS("if (")) ++
+        b.ctx.chiselize(ctx) ++ ChiselTxtS(") ") ++ chiselizeSimpleResolution(ctx, b.res)
+    }
+      
+    val defS: Seq[ChiselTxt] = s.resolution match {
+      case s: SimpleLogicResolution => chiselizeSimpleResolution(ctx, s)
+      case LogicConditional(bindings) =>
+        bindings match {
+          case Seq() => unsupportedChisel(ctx, s, "Unexpected empty LogicConditional with empty bindings")
+          case Seq(a, b) if(Utils.eq(DoPrim(UndefinedInterval, PrimOps.Not(UndefinedInterval), Seq(a.ctx)), b.ctx)) =>
+            // a bit more idiomatic
+            getIf(a) ++ Seq(ChiselLine(ctx, " "* header.length + s"else ")) ++ chiselizeSimpleResolution(ctx, b.res)
+          case s => getIf(s.head) ++ s.tail.flatMap(getIf(_, doElse = true))
+        }
+    }
+    ChiselLine(s, ctx, header) +: defS
+  }
+  
+  private def chiselizeSimpleResolution(ctx: ChiselEmissionContext, res: SimpleLogicResolution): Seq[ChiselTxt] = {  
     val hCtxt = ctx.hw()
     
-    val kind = (s.resolution, s.init) match {
-      case (LogicRegister, _:UndefinedExpression)=> "Reg" 
-      case (LogicRegister, _) => "RegInit" // optimizations required here 
-      case (LogicWire, _:UndefinedExpression)=> "Wire" 
-      case (LogicWire, _) => "WireDefault" 
-      case _ => unsupportedChisel(ctx,s,s"Unexpected unresolved logic in chiselize step ${s.serialize}"); "Wire"
+    val (kind, value) = res match {
+      case LogicRegister(_, _:UndefinedExpression, _:UndefinedExpression, _: UndefinedExpression) => ("Reg", None)
+      case LogicRegister(_, _:UndefinedExpression, _:UndefinedExpression, p) => ("RegInit", Some(p))
+      case LogicRegister(_, _, i, _:UndefinedExpression) => ("RegInit", Some(i))
+      case l:LogicRegister => 
+        rcritical(ctx, s, s"Cannot emit DefLogic ${s.name} with both reset & preset")
+        ("RegInit", Some(l.preset))
+      case LogicWire(_:UndefinedExpression) => ("Wire", None)
+      case LogicWire(d) => ("WireDefault", Some(d))
+      case r => unsupportedChisel(ctx,s,s"Unexpected unresolved logic in chiselize step ${r.serialize}"); ("Wire", None)
     }
     
     // to do : proper management of clock & reset for non trivial cases
     import ChiselizerOptions.UnpackedEmissionStyle.{Reg, Mem, SyncReadMem}
-    val decl = (s.tpe, s.init, ctx.options.chiselizer.unpackedEmissionStyle) match {
-      case (u: UnpackedVecType, _:UndefinedExpression, Reg) => 
-        Seq(ChiselLine(s, ctx, s"val ${s.name} = Reg(")) ++ u.chiselize(hCtxt)
+    val decl = (s.tpe, value, ctx.options.chiselizer.unpackedEmissionStyle) match {
+      case (u: UnpackedVecType, None, Reg) => 
+        Seq(ChiselLine(s, ctx, s"Reg(")) ++ u.chiselize(hCtxt)
       case (u: UnpackedVecType, _, Reg) => 
-        Seq(ChiselLine(s, ctx, s"val ${s.name} = RegInit(")) ++ u.chiselize(hCtxt)
+        Seq(ChiselLine(s, ctx, s"RegInit(")) ++ u.chiselize(hCtxt)
         
       case (u: UnpackedVecType, _, style) => 
         val txt = style match {
@@ -814,32 +839,32 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
           case _ => "Reg"
         }
         
-        (u.tpe, s.init) match {
-          case (Seq(t), _:UndefinedExpression) => Seq(ChiselLine(s, ctx, s"val ${s.name} = $txt(")) ++ u.getLen.chiselize(ctx) ++
+        (u.tpe, value) match {
+          case (Seq(t), None) => ChiselTxtS(s, ctx, s"$txt(") ++ u.getLen.chiselize(ctx) ++
             ChiselTxtS(",") ++ t.chiselize(hCtxt)
           case (Seq(_), _) => 
             rcritical(ctx, s, s"Cannot emit ${s.name} as Mem because it has an init value, using RegInit instead")
-            Seq(ChiselLine(s, ctx, s"val ${s.name} = RegInit(")) ++ u.chiselize(hCtxt)
+            ChiselTxt(s, ctx, s"RegInit(") +: u.chiselize(hCtxt)
           case _ => unsupportedChisel(ctx, s, "MixedVecType")
         }
-      case (UserRefType(_,_,_,_:EnumType), _:UndefinedExpression, _) => // standard 
-        Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) ++ s.tpe.chiselize(hCtxt)
+      case (UserRefType(_,_,_,_:EnumType), None, _) => // standard 
+        ChiselTxt(s, ctx, s"$kind(") +: s.tpe.chiselize(hCtxt)
         
-      case (UserRefType(_,_,_,_:EnumType), _, _) => Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) // avoid type
+      case (UserRefType(_,_,_,_:EnumType), _, _) => ChiselTxtS(s, ctx, s"$kind(") // avoid type
       
-      case _ => Seq(ChiselLine(s, ctx, s"val ${s.name} = $kind(")) ++ s.tpe.chiselize(hCtxt)
+      case _ => ChiselTxt(s, ctx, s"$kind(") +: s.tpe.chiselize(hCtxt)
     }
     
     val comma = Seq(ChiselTxt(ctx, ", "))
     val rpar = Seq(ChiselTxt(ctx, ") "))
     
-    decl ++ ((s.tpe, s.init) match {
-      case (_, _: UndefinedExpression) => rpar
-      case (UserRefType(_,_,_,_:EnumType), e) => // special case for RegInit & WireDefault with HwEnum
+    decl ++ ((s.tpe, value) match {
+      case (_, None) => rpar
+      case (UserRefType(_,_,_,_:EnumType), Some(e)) => // special case for RegInit & WireDefault with HwEnum
         val baseUInt = UIntType(UndefinedInterval, UnknownWidth(), NumberDecimal)
         DoCast(e.tokens, e, e.kind, baseUInt).chiselize(hCtxt) ++ rpar
         
-      case (_, e) => comma ++ e.chiselize(hCtxt) ++ rpar
+      case (_, Some(e)) => comma ++ e.chiselize(hCtxt) ++ rpar
     })
   }
 }

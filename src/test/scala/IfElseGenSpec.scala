@@ -10,7 +10,8 @@ import logger._
 class IfElseGenSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
-  "IfElseGenSpec" should "be properly emitted without begin end blocks" in {
+  behavior of "IfElseGenSpec"
+  it should "be properly emitted without begin end blocks" in {
     val result = emitInModule("""
       |localparam a, b, c; 
       |wire [31:0] res; 

@@ -285,7 +285,28 @@ class RemoveConcats(val options: TranslationOptions) extends DescriptionBasedTra
     def processDefLogic(d: DefLogic): Statement = {
       val preStmts = ArrayBuffer[Statement]() 
       val loc = Reference(ui, s"${d.name}", Seq(), d.tpe, HwExpressionKind, SourceFlow)
-      val (init, stmt) = processRHS(d.init, loc, true)
+      val (res, stmt) = d.resolution match {
+        case LogicWire(v) => 
+          val (res, stmt) = processRHS(v, loc, true)
+          (LogicWire(res), stmt)
+          
+        case LogicUnresolved(v) => 
+          val (res, stmt) = processRHS(v, loc, true)
+          (LogicUnresolved(res), stmt)
+          
+        case r@LogicRegister(_,_,_:UndefinedExpression, v) => 
+          val (res, stmt) = processRHS(v, loc, true)
+          (r.copy(preset = res), stmt)
+        case r@LogicRegister(_,_, v, _:UndefinedExpression) => 
+          val (res, stmt) = processRHS(v, loc, true)
+          (r.copy(preset = res), stmt)
+        
+        case r =>
+          critical(d, s"TODO error message unable to process the logic elemt")
+          (r, EmptyStmt)
+      }
+      
+        
       appendOption(preStmts, stmt)
       
       if (preStmts.isEmpty) {
@@ -296,7 +317,7 @@ class RemoveConcats(val options: TranslationOptions) extends DescriptionBasedTra
         ))
         // clean any token in the statement to avoid issues with comment re-integration
         val pre = preStmts.map(Utils.cleanTokens)
-        SimpleBlock(UndefinedInterval, pre ++ Seq(d.copy(init = init)))
+        SimpleBlock(UndefinedInterval, pre ++ Seq(d.copy(resolution = res)))
       }
     }
     

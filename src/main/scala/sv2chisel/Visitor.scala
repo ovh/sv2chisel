@@ -86,7 +86,7 @@ class Visitor(
   private def visitData_type_or_void(ctx: Data_type_or_voidContext): (Type, LogicResolution) = {
     (ctx.KW_VOID, ctx.data_type) match {
       case (null, dtp) => getDataType(dtp, true)
-      case (_, null) => (VoidType(ctx.getSourceInterval), LogicUnresolved)
+      case (_, null) => (VoidType(ctx.getSourceInterval), LogicUnresolved(UndefinedExpression()))
       case _ => throwParserError(ctx)
     }
   }
@@ -112,25 +112,25 @@ class Visitor(
       case c => unsupported.raiseIt(p, s"${c.getText} keyword in function port") 
     }
     
-    val ((tpe, resolution), argname) = (p.data_type_or_implicit, p.identifier) match {
+    val (tpe, argname) = (p.data_type_or_implicit, p.identifier) match {
       case (null, null) => 
         unsupported.raiseIt(p, s"Illegal function arg declaration: ${getRawText(p)}")
-        ((BoolType(UndefinedInterval), LogicUnresolved), "???")
-      case (null, name) => ((BoolType(UndefinedInterval), LogicUnresolved), name.getText())
+        (BoolType(UndefinedInterval), "???")
+      case (null, name) => (BoolType(UndefinedInterval), name.getText())
       case (tpe, null) => 
         // weird Parsing case: no identifier is to be understood as identifier is parsed as type 
         // not sure if legal verilog though... so checking if it makes sense...!
         visitData_type_or_implicit(tpe, true) match {
-          case (u: UserRefType, LogicUnresolved) if(u.name == tpe.getText()) => 
+          case (u: UserRefType, _:LogicUnresolved) if(u.name == tpe.getText()) => 
             warn(p, s"Potentially illegal function arg declaration: ${getRawText(p)}: Using ${u.name} as identifier.")
-            ((BoolType(UndefinedInterval), LogicUnresolved), u.name)
+            (BoolType(UndefinedInterval), u.name)
           case _ => 
             unsupported.raiseIt(p, s"Missing identifier in function arg declaration: ${getRawText(p)}.")
-            ((BoolType(UndefinedInterval), LogicUnresolved), "???")
+            (BoolType(UndefinedInterval), "???")
         }
         
       // NB: we assume synthesizable hardware within function while it might be a very restrictive choice ...
-      case (tpe, name) => (visitData_type_or_implicit(tpe, true), name.getText())
+      case (tpe, name) => (visitData_type_or_implicit(tpe, true)._1, name.getText())
     }
     
     val unpacked = p.variable_dimension.asScala.map(getVariableDim)
@@ -138,11 +138,11 @@ class Visitor(
     
     val fullType = getFullType(unpacked, tpe)
     
-    val default = p.expression match {
-      case null => UndefinedExpression()
-      case e => getExpression(e)
+    val resolution = p.expression match {
+      case null => LogicWire(UndefinedExpression())
+      case e => LogicWire(getExpression(e))
     }
-    Port(p.getSourceInterval, attr, argname, direction, fullType, resolution, default)
+    Port(p.getSourceInterval, attr, argname, direction, fullType, resolution)
   }
   
   
@@ -163,9 +163,9 @@ class Visitor(
       case c => unsupported.raiseIt(ctx, s"${c.getText} keyword in function port") 
     }
     
-    val (tpe, resolution) = ctx.data_type_or_implicit match {
-      case null => (BoolType(UndefinedInterval), LogicUnresolved)
-      case cdi => visitData_type_or_implicit(cdi, true) // we assume synthesizable hardware ...
+    val tpe = ctx.data_type_or_implicit match {
+      case null => BoolType(UndefinedInterval)
+      case cdi => visitData_type_or_implicit(cdi, true)._1 // we assume synthesizable hardware ...
     }
     
     ctx.list_of_tf_variable_identifiers.list_of_tf_variable_identifiers_item.asScala.map(item => {
@@ -176,11 +176,11 @@ class Visitor(
         .collect {case u: UnpackedVecType => u}
       val fullType = getFullType(unpacked, tpe)
       
-      val init = item.expression match {
-        case null => UndefinedExpression()
-        case e => getExpression(e)
+      val resolution = item.expression match {
+        case null => LogicWire(UndefinedExpression())
+        case e => LogicWire(getExpression(e))
       }
-      Port(item.getSourceInterval, attr, argname, direction, fullType, resolution, init)
+      Port(item.getSourceInterval, attr, argname, direction, fullType, resolution)
     })
     
   }
@@ -369,9 +369,9 @@ class Visitor(
   
   private def getResolution(ctx: Integer_vector_typeContext) : LogicResolution = {
     (ctx.KW_BIT,ctx.KW_LOGIC,ctx.KW_REG) match {
-      case (_, null, null) => LogicUnresolved
-      case (null, _, null) => LogicUnresolved
-      case (null, null, _) => LogicRegister
+      case (_, null, null) => LogicUnresolved(UndefinedExpression())
+      case (null, _, null) => LogicUnresolved(UndefinedExpression())
+      case (null, null, _) => LogicRegister(UndefinedExpression())
       case _ => throwParserError(ctx)
     }
   }
@@ -411,7 +411,7 @@ class Visitor(
   
   private def getIntegerType(ctx: Integer_typeContext, signed: Boolean, isHw: Boolean): (Type, LogicResolution) = {
     (ctx.integer_atom_type, ctx.integer_vector_type) match {
-      case (a, null) => (getIntegerAtomType(a, signed, isHw), LogicUnresolved)
+      case (a, null) => (getIntegerAtomType(a, signed, isHw), LogicUnresolved(UndefinedExpression()))
       case (null, r) => (getIntegerVectorType(r, signed, isHw), getResolution(r))
       case _ => throwParserError(ctx)
     }
@@ -419,7 +419,7 @@ class Visitor(
   
   private def getNonIntegerType(ctx: Non_integer_typeContext): (Type, LogicResolution) = {
     unsupported.raiseIt(ctx, s"Unsupported type ${getRawText(ctx)}")
-    (UnknownType(ctx.getSourceInterval), LogicUnresolved)
+    (UnknownType(ctx.getSourceInterval), LogicUnresolved(UndefinedExpression()))
   }
   
   
@@ -433,7 +433,7 @@ class Visitor(
   
   private def unsupportedType(ctx: ParserRuleContext, str: String): (Type, LogicResolution) = {
     unsupported.raiseIt(ctx, s"Unsupported type: $str within context ${getRawText(ctx)}")
-    (UnknownType(), LogicUnresolved)
+    (UnknownType(), LogicUnresolved(UndefinedExpression()))
   }
   
   private def getStructUnionMember(ctx: Struct_union_memberContext): Field = {
@@ -458,10 +458,11 @@ class Visitor(
   private def getEnumBaseType(ctx: Enum_base_typeContext, isHw: Boolean): (Type, LogicResolution) = {
     val signed = isSigned(ctx.signing)
     val (t, r) = (ctx.getChild(0)) match {
-      case a:Integer_atom_typeContext => (getIntegerAtomType(a, signed, isHw), LogicUnresolved)
+      case a:Integer_atom_typeContext => (getIntegerAtomType(a, signed, isHw), LogicUnresolved(UndefinedExpression()))
       case v:Integer_vector_typeContext => (getIntegerVectorType(v, signed, isHw), getResolution(v))
-      case i:IdentifierContext => (UserRefType(i.getSourceInterval, i.getText(), Seq()), LogicUnresolved)
-      case p:Packed_dimensionContext => (getPackedDim(p), LogicUnresolved)
+      case i:IdentifierContext => 
+        (UserRefType(i.getSourceInterval, i.getText(), Seq()), LogicUnresolved(UndefinedExpression()))
+      case p:Packed_dimensionContext => (getPackedDim(p), LogicUnresolved(UndefinedExpression()))
       case _ => throwParserError(ctx)
     }
     ctx.variable_dimension match {
@@ -503,7 +504,7 @@ class Visitor(
       case (p, Seq(), null, null) => getDataPrimitiveType(p, isHw)
       case (null, s, null, null) => 
         val (t, r) = ctx.enum_base_type match {
-          case null => (UnknownType(), LogicUnresolved)
+          case null => (UnknownType(), LogicUnresolved(UndefinedExpression()))
           case e => getEnumBaseType(e, isHw)
         }
         
@@ -516,12 +517,12 @@ class Visitor(
             if(ctx.KW_PACKED == null) info(ctx, "All struct declaration are treated as packed")
             if(ctx.signing != null) unsupported.raiseIt(ctx, "Signed typedef")
             val fields = ctx.struct_union_member.asScala.map(getStructUnionMember)
-            (BundleType(ctx.getSourceInterval, fields), LogicUnresolved)
+            (BundleType(ctx.getSourceInterval, fields), LogicUnresolved(UndefinedExpression()))
             
           case "union" => unsupportedType(ctx, "union")
         }
         
-      case (null, Seq(), null, p) => (getPath(p).asUserRefType(), LogicUnresolved)
+      case (null, Seq(), null, p) => (getPath(p).asUserRefType(), LogicUnresolved(UndefinedExpression()))
       case _ => throwParserError(ctx)
     }
     // IMPORTANT NOTE: variable dim is to be applied to any result of this function !!
@@ -539,13 +540,13 @@ class Visitor(
     unsupported.check(ctx)
     (ctx.KW_STRING, ctx.data_type_usual, ctx.type_reference) match {
       case (s   , null, null) => 
-        (StringType(s.getSourceInterval(), UnknownWidth()), LogicUnresolved)
+        (StringType(s.getSourceInterval(), UnknownWidth()), LogicUnresolved(UndefinedExpression()))
         
       case (null, dtp, null) => getDataTypeUsual(dtp, isHw)
       
       case (null, null, tprf) => 
         (tprf.expression, tprf.data_type) match {
-          case (e, null) => (getExpressionType(e), LogicUnresolved)
+          case (e, null) => (getExpressionType(e), LogicUnresolved(UndefinedExpression()))
           case (null, d) => getDataType(d, isHw)
           case _ => throwParserError(ctx)
         }
@@ -1356,10 +1357,10 @@ class Visitor(
   
   private def visitData_type_or_implicit(ctx: Data_type_or_implicitContext, isHw: Boolean): (Type, LogicResolution) = {
     ctx match {
-      case null =>  unsupported.raiseIt(ctx, s"Excepted data type for null context"); (UnknownType(), LogicUnresolved)
+      case null =>  unsupported.raiseIt(ctx, s"Excepted data type for null context"); (UnknownType(), LogicUnresolved(UndefinedExpression()))
       case t => (t.data_type, t.implicit_data_type) match {
         case (d, null) => getDataType(d, isHw)
-        case (null, i) => (getImplicitDataType(i), LogicUnresolved)
+        case (null, i) => (getImplicitDataType(i), LogicUnresolved(UndefinedExpression()))
         case _ => throwParserError(ctx)
       }
     }
@@ -1367,22 +1368,22 @@ class Visitor(
   
   private def visitTypeRes(ctx: Net_or_var_data_typeContext, isHw: Boolean) : (Type, LogicResolution) = {
     ctx match {
-      case null => (BoolType(UndefinedInterval), LogicUnresolved)
+      case null => (BoolType(UndefinedInterval), LogicUnresolved(UndefinedExpression()))
       case c => unsupported.check(ctx) // allow only wire (underlying check net_type)
         c.data_type_or_implicit match {
-          case null => (BoolType(UndefinedInterval), LogicWire)
+          case null => (BoolType(UndefinedInterval), LogicWire(UndefinedExpression()))
           case cdi => visitData_type_or_implicit(cdi, isHw)
         }
     }
   }
   private def visitTypeRes(ctx: Net_port_typeContext, isHw: Boolean) : (Type, LogicResolution) = {
     ctx match {
-      case null => (BoolType(UndefinedInterval), LogicUnresolved)
+      case null => (BoolType(UndefinedInterval), LogicUnresolved(UndefinedExpression()))
       case c => unsupported.check(ctx)
         c.data_type_or_implicit match {
           case null => 
             unsupported.raiseIt(ctx, s"To investigate? weird Net_port_typeContext: `${getRawText(ctx)}`")
-            (BoolType(UndefinedInterval), LogicUnresolved)
+            (BoolType(UndefinedInterval), LogicUnresolved(UndefinedExpression()))
           case cdi => visitData_type_or_implicit(cdi, isHw)
         }
     }
@@ -1477,11 +1478,12 @@ class Visitor(
           }
           previousDirection = Some(direction)
           val (tpe, res) = visitTypeRes(decl.net_or_var_data_type, true)
-          val resolution = res match {
-            case LogicUnresolved => LogicWire // unresolved ports are wire by default
-            // TO DO : remove this logic when inference pass will be implemented
-            // Strategies to choose => warning / error / auto correct ..?
-            case r => r
+          val resolution = (res, decl.constant_expression) match {
+            case (_, null) => res
+            case (u:LogicUnresolved, a) => u.copy(value = getExpression(a.expression))
+            case (w:LogicWire, a) => w.copy(default = getExpression(a.expression))
+            case (r:LogicRegister, a) => r.copy(preset = getExpression(a.expression))
+            case _ => res
           }
           val name = decl.port_identifier.getText()
           
@@ -1490,13 +1492,7 @@ class Visitor(
           
           val fullType = getFullType(unpacked, tpe)
           
-          (resolution, decl.constant_expression) match {
-            case (_, null) => Port(p.getSourceInterval(), attr, name, direction, fullType, resolution)
-            case (LogicRegister, a) => Port(p.getSourceInterval(), attr, name, direction, fullType, resolution, getExpression(a.expression))
-            case _ => 
-              unsupported.raiseIt(ctx, "Unexpected assign on a none register logic")
-              Port(p.getSourceInterval(), attr, name, direction, fullType, resolution)
-          }
+          Port(p.getSourceInterval(), attr, name, direction, fullType, resolution)
         })
         (ports, declaredPortNames)
     }
@@ -1511,7 +1507,7 @@ class Visitor(
       case (null, null, d) => (Inout(d.getSourceInterval()), visitTypeRes(ctx.net_port_type, isHw = true))
       case _ => 
         unsupported.raiseIt(ctx, s"Unsupported port declaration style")
-        (Input(ctx.getSourceInterval()), (BoolType(UndefinedInterval), LogicUnresolved))
+        (Input(ctx.getSourceInterval()), (BoolType(UndefinedInterval), LogicUnresolved(UndefinedExpression())))
     }
     
     // IDs for INPUT and INOUT
@@ -1539,10 +1535,14 @@ class Visitor(
         
         val fullType = getFullType(unpacked, tpe)
         
-        id.expression match {
-          case null => Port(id.getSourceInterval(), attr, name, direction, fullType, resolution)
-          case e => Port(id.getSourceInterval(), attr, name, direction, fullType, resolution, getExpression(e))
+        val res = (id.expression, resolution) match {
+          case (null, r) => r  
+          case (e, u:LogicUnresolved) => u.copy(value = getExpression(e))
+          case (e, w:LogicWire) => w.copy(default = getExpression(e))
+          case (e, r:LogicRegister) => r.copy(preset = getExpression(e))
+          case (_, r) => r
         }
+        Port(id.getSourceInterval(), attr, name, direction, fullType, res)
       })
     }
     
@@ -1640,7 +1640,10 @@ class Visitor(
   }
   
   private def visitLocal_parameter_declaration(ctx: Local_parameter_declarationContext, attr: VerilogAttributes): Seq[DefParam] = {
-    visitParamDeclPrim(ctx.parameter_declaration_primitive, attr)
+    val params = visitParamDeclPrim(ctx.parameter_declaration_primitive, attr)
+    // copy last assignment to all parameters: of the list
+    // possible improvement = handle multiple declaration within the IR (Seq of names) 
+    params.lastOption.map(l => params.map(_.copy(value = l.value))).getOrElse(Seq())
   }
   
   
@@ -1697,13 +1700,12 @@ class Visitor(
     val name = getRefText(ctx.identifier)
     val fullType = getFullType(ctx.unpacked_dimension.asScala.map(getUnpackedDim),tpe)
     
-    val u = UndefinedExpression()
     val init = ctx.expression match {
-      case null => u
+      case null => UndefinedExpression()
       case e    => getExpression(e)
     }
       
-    DefLogic(ctx.getSourceInterval(), attr, name, fullType, u, u, init, LogicWire)
+    DefLogic(ctx.getSourceInterval(), attr, name, fullType, LogicWire(init))
   }
   
   
@@ -1735,13 +1737,15 @@ class Visitor(
       .collect {case u: UnpackedVecType => u}
     val fullType = getFullType(unpacked, tpe)
     
-    val u = UndefinedExpression()  
-    val init = ctx.expression match {
-      case null => u
-      case e => getExpression(e)
+    val resolution = (res, ctx.expression) match {
+      case (_, null) => res
+      case (u:LogicUnresolved, e) => u.copy(value = getExpression(e))
+      case (w:LogicWire, e) => w.copy(default = getExpression(e))
+      case (r:LogicRegister, e) => r.copy(preset = getExpression(e))
+      case _ => res
     }
   
-    DefLogic(ctx.getSourceInterval(), attr, name, fullType, u, u, init, res)
+    DefLogic(ctx.getSourceInterval(), attr, name, fullType, resolution)
   }
   
   private def visitType_declaration(ctx: Type_declarationContext, attr: VerilogAttributes): Statement = {

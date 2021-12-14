@@ -8,7 +8,7 @@ import sv2chisel.ir._
 import sv2chisel.transforms.{Transform}
 import sv2chisel.Utils.{time}
 
-import logger.EasyLogging
+import logger.{EasyLogging, Logger}
 
 import org.antlr.v4.runtime.{CommonTokenStream}
 import collection.mutable.{HashMap, ArrayBuffer}
@@ -68,11 +68,13 @@ class Project(name: String) extends EasyLogging {
     */
   
   def runTimed(t: Transform): Unit = {
+    val log = new Logger(t.getClass.getName)
+    log.trace(this.serialize)
     struct(s"   ####### ${t.getClass.getName} #######")
     val (timeT, _) = time {
       t.execute(this)
     }
-    debug("Transform result: " + this.serialize)
+    log.debug("   ### Transform result:\n" + this.serialize)
     struct(s"   # Elapsed time : $timeT ms")
   }
   

@@ -771,7 +771,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
         
         case t: TypeInst => if(t.name.isDefined) t else t.mapType(processType) // no need to process references
         
-        case u: UIntLiteral => u 
+        case l: Literal => l 
         
         case _ => 
           warn(e, s"unsupported expression: ${e.serialize}")
@@ -813,7 +813,26 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
           
         case p: Print => p.mapExpr(processExpression(_, HwExpressionKind, UnknownType())(lhs = false))
         case t: Stop => t.mapExpr(processExpression(_, HwExpressionKind, UnknownType())(lhs = false))
-        case d: DefLogic => d.copy(init = processExpression(d.init, HwExpressionKind, d.tpe)(lhs = false))
+        case d: DefLogic => 
+          def getSimpleRes(res: SimpleLogicResolution): SimpleLogicResolution = {
+            res match {
+              case r:LogicRegister => 
+                val init = processExpression(r.init, HwExpressionKind, d.tpe)(lhs = false)
+                val preset = processExpression(r.preset, HwExpressionKind, d.tpe)(lhs = false)
+                r.copy(init = init, preset = preset)
+              case LogicWire(v) => 
+                LogicWire(processExpression(v, HwExpressionKind, d.tpe)(lhs = false))
+              case LogicUnresolved(v) => 
+                LogicUnresolved(processExpression(v, HwExpressionKind, d.tpe)(lhs = false))
+            }
+          }
+          val res = d.resolution match {
+            case s:SimpleLogicResolution => getSimpleRes(s)
+            case c:LogicConditional => c.copy(bindings = c.bindings.map(b => b.copy(res = getSimpleRes(b.res))))
+          }
+          d.copy(resolution = res)
+          
+          
         case i: DefInstance =>  
           val ports = i.portMap.zipWithIndex.map(t => t._1 match {
             

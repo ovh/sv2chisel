@@ -852,7 +852,11 @@ case class DoPrim(
   ) extends Expression {
   type T = DoPrim
   def flow: Flow = SourceFlow
-  def serialize: String =  s"${op.serialize}${args.map(_.serialize).mkString("(",", ",")")}"
+  def serialize: String =  (op, args)match {
+    case(_:PrimOps.BinaryOp, Seq(a,b)) => s"(${a.serialize}) ${op.serialize} (${b.serialize})"
+    case _ => s"${op.serialize}${args.map(_.serialize).mkString("(",", ",")")}"
+  }
+  
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapExpr(f: Expression => Expression) = this.copy(args = args map f)
   def mapType(f: Type => Type) = this
@@ -1058,18 +1062,59 @@ case class DefMemory(tokens: Interval,
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 
+
+
 // State Used to record SVerilog's Logic resolution as reg or wire depdending on usage
-trait LogicResolution {
+sealed trait LogicResolution {
   def serialize : String
+  def mapExpr(f: Expression => Expression): LogicResolution = this match {
+    case s:SimpleLogicResolution => s.mapExpr(f) 
+    case LogicConditional(bindings) => LogicConditional(bindings.map(b => b.copy(f(b.ctx), b.res.mapExpr(f))))
+    case _ => this
+  }
+  def foreachExpr(f: Expression => Unit): Unit = this match {
+    case s:SimpleLogicResolution => s.foreachExpr(f) 
+    case LogicConditional(bindings) => bindings.foreach(b => {f(b.ctx) ; b.res.foreachExpr(f)})
+    case _ => 
+  }
 }
-case object LogicUnresolved extends LogicResolution {
-  def serialize : String = "logic(unresolved)"
+sealed trait SimpleLogicResolution extends LogicResolution {
+  override def mapExpr(f: Expression => Expression): SimpleLogicResolution = this match {
+    case LogicRegister(clock, reset, init, preset) => LogicRegister(f(clock), f(reset), f(init), f(preset))
+    case LogicWire(default) => LogicWire(f(default))
+    case LogicUnresolved(default) => LogicUnresolved(f(default))
+  }
+  override def foreachExpr(f: Expression => Unit): Unit = this match {
+    case LogicRegister(clock, reset, init, preset) => {f(clock) ; f(reset) ; f(init) ; f(preset)}
+    case LogicWire(default) => f(default)
+    case LogicUnresolved(default) => f(default)
+  }
 }
-case object LogicWire extends LogicResolution {
-  def serialize : String = "logic(wire)"
+
+case class LogicUnresolved(value: Expression) extends SimpleLogicResolution {
+  def serialize : String = "logic<unresolved>"
 }
-case object LogicRegister extends LogicResolution {
-  def serialize : String = "logic(reg)"
+case class LogicWire(default: Expression) extends SimpleLogicResolution {
+  def serialize : String = "logic<wire>"
+}
+case class LogicRegister(
+  clock: Expression, 
+  reset: Expression, 
+  init: Expression, 
+  preset: Expression
+) extends SimpleLogicResolution {
+  def serialize : String = s"logic<reg@${clock.serialize}>"
+}
+object LogicRegister {
+  def apply(preset: Expression): LogicRegister = {
+    LogicRegister(UndefinedExpression(), UndefinedExpression(), UndefinedExpression(), preset)
+  }
+}
+
+case class LogicBinding(ctx: Expression, res: SimpleLogicResolution)
+
+case class LogicConditional(bindings: Seq[LogicBinding]) extends LogicResolution {
+  def serialize : String = s"logic<" + bindings.map(b => s"[${b.ctx.serialize}]->${b.res.serialize}").mkString("\n     ") + ">"
 }
 
 case class DefLogic(
@@ -1077,27 +1122,29 @@ case class DefLogic(
     attributes: VerilogAttributes, 
     name: String,
     tpe: Type,
-    clock: Expression,
-    reset: Expression,
-    init: Expression,
-    resolution : LogicResolution = LogicUnresolved
+    resolution : LogicResolution
   ) extends Statement with IsDeclaration {
   type T = DefLogic
   def serialize: String = {
     val header = s"${resolution.serialize} $name : <${tpe.serialize}>"
     resolution match {
-      case LogicRegister => header + s", clock => ${clock.serialize} ; reset => (${reset.serialize}, ${init.serialize})" + attributes.serialize
-      case _             => header
+      case LogicRegister(clock, reset, init, preset) => 
+        header + s",@${clock.serialize} ; preset => ${preset.serialize} ; reset => (${reset.serialize}, ${init.serialize})" + attributes.serialize
+      case LogicWire(_:UndefinedExpression) => header 
+      case LogicWire(default) => s"$header = ${default.serialize}" 
+      case LogicUnresolved(_:UndefinedExpression) => header 
+      case LogicUnresolved(value) => s"$header = ${value.serialize}" 
+      case _:LogicConditional => s"logic<cond> $name : <${tpe.serialize}>"
     }
   }
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   def mapStmt(f: Statement => Statement) = this
-  def mapExpr(f: Expression => Expression) = this.copy(clock = f(clock), reset = f(reset), init = f(init))
+  def mapExpr(f: Expression => Expression) = this.copy(resolution = resolution.mapExpr(f))
   def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
   def mapString(f: String => String) = this.copy(name = f(name))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
   def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachExpr(f: Expression => Unit): Unit = {f(clock) ; f(reset) ; f(init)}
+  def foreachExpr(f: Expression => Unit): Unit = resolution.foreachExpr(f)
   def foreachType(f: Type => Unit): Unit = f(tpe)
   def foreachString(f: String => Unit): Unit = f(name)
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
@@ -1108,8 +1155,7 @@ object DefWire {
             a: VerilogAttributes, 
             n: String,
             tpe: Type): DefLogic = {
-    val u = UndefinedExpression()
-    DefLogic(t, a, n, tpe, u, u, u, LogicWire)
+    DefLogic(t, a, n, tpe, LogicWire(UndefinedExpression()))
   }
   def apply(n: String, tpe: Type): DefLogic = {
     apply(UndefinedInterval, NoVerilogAttribute, n, tpe)
@@ -2000,54 +2046,28 @@ case class Port(
     direction: Direction,
     tpe: Type,
     resolution: LogicResolution,
-    init: Expression,
-    clock: Expression,
-    reset: Expression,
     // contains original port name if modified
     isDefaultClock: Option[String] = None,
     isDefaultReset: Option[String] = None
   ) extends Statement with IsDeclaration {
   type T = Port
-  private def serial_init : String = init match {
-    case _: UndefinedExpression => ""
-    case e => s"= ${e.serialize}"
+  private def serial_init : String = resolution match {
+    case LogicWire(e) => s"= ${e.serialize}"
+    case _ => ""
   }
   def serialize: String = attributes.serialize + s"${direction.serialize} ${resolution.serialize} $name : <${tpe.serialize}> ${serial_init}" 
 
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   def mapStmt(f: Statement => Statement): T = this
-  def mapExpr(f: Expression => Expression): T = this.copy(init=f(init), clock=f(clock), reset=f(reset))
+  def mapExpr(f: Expression => Expression): T = this.copy(resolution=resolution.mapExpr(f))
   def mapType(f: Type => Type): T = this.copy(tpe=f(tpe))
   def mapString(f: String => String): T = this.copy(name = f(name))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes): T = this.copy(attributes = f(attributes))
   def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachExpr(f: Expression => Unit): Unit = {f(init); f(clock); f(reset)}
+  def foreachExpr(f: Expression => Unit): Unit = resolution.foreachExpr(f)
   def foreachType(f: Type => Unit): Unit = f(tpe)
   def foreachString(f: String => Unit): Unit = f(name)
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
-}
-object Port {
-  def apply(
-    tokens: Interval, 
-    attributes: VerilogAttributes,
-    name: String,
-    direction: Direction,
-    tpe: Type,
-    resolution: LogicResolution
-  ): Port = {
-    Port(tokens, attributes,name, direction, tpe, resolution, UndefinedExpression(), UndefinedExpression(), UndefinedExpression())
-  }
-  def apply(
-    tokens: Interval, 
-    attributes: VerilogAttributes,
-    name: String,
-    direction: Direction,
-    tpe: Type,
-    resolution: LogicResolution,
-    init: Expression
-  ): Port = {
-    Port(tokens, attributes,name, direction, tpe, resolution, init, UndefinedExpression(), UndefinedExpression())
-  }
 }
 
 /** Parameters for modules */

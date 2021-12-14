@@ -46,7 +46,7 @@ class FixFunctionImplicitReturns(val options: TranslationOptions) extends Descri
       f.mapStmt(removeLastImplicit)
     } else {
       val ue = UndefinedExpression()
-      val returnValueDef = DefLogic(UndefinedInterval, NoVerilogAttribute, f.name, f.tpe, ue, ue, ue, LogicWire)
+      val returnValueDef = DefLogic(UndefinedInterval, NoVerilogAttribute, f.name, f.tpe, LogicWire(ue))
       val finalReturn = ExpressionStatement(Reference(UndefinedInterval, f.name, Seq(), f.tpe, f.kind, SourceFlow))
         
       val body = f.body match {

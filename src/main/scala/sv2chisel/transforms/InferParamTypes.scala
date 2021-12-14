@@ -84,6 +84,9 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
         case ((Some(_), sa), (None, sb)) => (None, s"$sa$sb")
         case ((Some(fta), sa), (Some(ftb), sb)) =>
           val kind = (fta.kind, ftb.kind) match {
+            case (UnknownExpressionKind, UnknownExpressionKind) => SwExpressionKind
+            case (UnknownExpressionKind, SwExpressionKind) => SwExpressionKind
+            case (SwExpressionKind, UnknownExpressionKind) => SwExpressionKind
             case (SwExpressionKind, SwExpressionKind) => SwExpressionKind
             case _ => HwExpressionKind // mixed will require proper cast into Hw 
           }
