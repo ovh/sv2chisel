@@ -6,6 +6,7 @@ package sv2chiselTests
 
 import sv2chiselTests.utils._
 import logger._
+import sv2chisel.{TranslationOptions, ChiselizerOptions}
 
 class BlackBoxSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
@@ -44,8 +45,10 @@ class BlackBoxSpec extends Sv2ChiselSpec {
         |);
         """.stripMargin
       )
-
-    val result = emit(bb, main, Some("raw"))
+    val options = TranslationOptions().copy(
+      chiselizer = ChiselizerOptions().copy(baseBlackboxRessourcePath = Some("./ressources/"))
+    )
+    val result = emit(bb, main, Some("src/main/resources/project/hdl/my_module.sv"), options)
       
     result should contain ( "import chisel3.util.HasBlackBoxResource")
     result should contain ( "class my_black_box() extends BlackBox with HasBlackBoxResource {")
@@ -101,7 +104,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    val result = emit(bb, main, None)
+    val result = emit(bb, main, None, TranslationOptions())
       
     result shouldNot contain ( "import chisel3.util.HasBlackBoxResource")
     result should contain ( "class my_black_box() extends BlackBox {")
@@ -147,7 +150,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    val result = emit(bb, main, None)
+    val result = emit(bb, main, None, TranslationOptions())
       
     result shouldNot contain ( "import chisel3.util.HasBlackBoxResource")
     result should contain ( "class my_black_box() extends RawModule {",
@@ -197,7 +200,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    val result = emit(bb, main, None)
+    val result = emit(bb, main, None, TranslationOptions())
     val q = "\""
     result should contain ( 
        "class my_black_box(",
@@ -256,7 +259,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
           |);
         """.stripMargin)
     
-    val result = emit(inner, p + main, None)
+    val result = emit(inner, p + main, None, TranslationOptions())
     debug(result)
     result should contain ("import chisel3._")
     

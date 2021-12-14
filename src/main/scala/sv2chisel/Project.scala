@@ -189,9 +189,9 @@ object Project {
   def apply(name: String, rawBlackboxes: String, rawVerilog: String, path: Option[String]) = {
     val p = new Project(name)
     val (srcB, streamB) = Parser.parseString(rawBlackboxes, path, blackboxes = true)
-    p.addEntry(ProjectEntry("raw", srcB, streamB, blackboxes = true))
+    p.addEntry(ProjectEntry(".", srcB, streamB, blackboxes = true))
     val (src, stream) = Parser.parseString(rawVerilog, path)
-    p.addEntry(ProjectEntry("raw", src, stream, blackboxes = false))
+    p.addEntry(ProjectEntry(".", src, stream, blackboxes = false))
     p
   }
 }

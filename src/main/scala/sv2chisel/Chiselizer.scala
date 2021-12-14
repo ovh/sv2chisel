@@ -336,12 +336,28 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
     val s = ArrayBuffer[ChiselTxt]()
     val dq = "\""
     
-    val (resource, addRessourceTxt) = e.resourcePath match {
-      case Some(path) => 
+    val (resource, addRessourceTxt) = (e.resourcePath, ctx.options.chiselizer.baseBlackboxRessourcePath) match {
+      case (Some(from), Some(to)) => 
         ctx.src.addDep(PackageRef(UndefinedInterval, "chisel3.util", "HasBlackBoxResource"))
-        rwarn(ctx, e, s"TODO: copy resource $path in src/main/resource folder (vs src/main/scala for chisel files)")
-        (" with HasBlackBoxResource", Seq(ChiselClosingLine(e.body, mCtxt, s"addResource($dq$path$dq)")))
-      case None => ("", Seq())
+
+        import java.io.{File, FileInputStream, FileOutputStream}
+        val originPath = s"${ctx.srcBasePath}/$from"
+        val destPath = s"$to/${from.split('/').lastOption.getOrElse(from)}"
+        rinfo(ctx, e, s"Copying blackbox from $originPath to $destPath")
+        try { 
+          val src = new File(originPath)
+          val dest = new File(destPath)
+          dest.getCanonicalFile.getParentFile.mkdirs
+          dest.createNewFile
+          new FileOutputStream(dest).getChannel().transferFrom(new FileInputStream(src).getChannel, 0, Long.MaxValue)
+          val resource = destPath.split("/resources/").last
+          (" with HasBlackBoxResource", Seq(ChiselClosingLine(e.body, mCtxt, s"addResource($dq/$resource$dq)")))
+        } catch {
+          case exp: Exception => 
+            rcritical(ctx, e, s"Unable to copy blackbox from $originPath to $destPath. Details: ${exp.getMessage}")
+            ("", Seq())
+        }
+      case _ => ("", Seq())
     }
     
     // Set proper types for clock & reset ports 

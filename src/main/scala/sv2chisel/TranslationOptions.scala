@@ -5,6 +5,7 @@
 package sv2chisel
 
 import io.circe._
+import logger.EasyLogging
 
 // helpers for enum
 trait EnumDecoder {
@@ -42,8 +43,9 @@ case class RemoveConcatOptions(
 
 case class ChiselizerOptions(
   unpackedEmissionStyle:ChiselizerOptions.UnpackedEmissionStyle.Value = ChiselizerOptions.UnpackedEmissionStyle.default,
-  addTopLevelChiselGenerator: Option[String] = None
-){
+  addTopLevelChiselGenerator: Option[String] = None,
+  baseBlackboxRessourcePath: Option[String] = None
+) extends EasyLogging {
   /** Decoder for circe parsing from yaml */
   def decode: Decoder[ChiselizerOptions] = Decoder.instance(c => {
     val default = ChiselizerOptions()
@@ -51,12 +53,21 @@ case class ChiselizerOptions(
     for {
       unpackedEmissionStyle <- c.getOrElse[ChiselizerOptions.UnpackedEmissionStyle.Value]("unpackedEmissionStyle")(default.unpackedEmissionStyle)
       addTopLevelChiselGenerator <- c.getOrElse[String]("addTopLevelChiselGenerator")("")
+      baseBlackboxRessourcePath <- c.getOrElse[String]("baseBlackboxRessourcePath")("")
     } yield {
       val addTop = addTopLevelChiselGenerator match {
         case "" => None
         case s => Some(s) 
       }
-      ChiselizerOptions(unpackedEmissionStyle, addTop)
+      val bbPath = baseBlackboxRessourcePath match {
+        case "" => None
+        case s if(s.contains("/resources/")) => Some(s)
+        case _ => 
+          critical(s"Ignoring non-compliant baseBlackboxRessourcePath $baseBlackboxRessourcePath (must contain /resources/)")
+          None
+          
+      }
+      ChiselizerOptions(unpackedEmissionStyle, addTop, bbPath)
     }
   })
 }

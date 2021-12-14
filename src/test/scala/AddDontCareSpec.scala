@@ -7,6 +7,8 @@ package sv2chiselTests
 import sv2chiselTests.utils._
 import logger._
 
+import sv2chisel.TranslationOptions
+
 class AddDontCareSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
   
@@ -70,9 +72,9 @@ class AddDontCareSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    val result = emit(bb, main, Some("raw"))
+    val result = emit(bb, main, Some("raw"), TranslationOptions())
       
-    result should contain ( "class my_black_box() extends BlackBox with HasBlackBoxResource {")
+    result should contain ( "class my_black_box() extends BlackBox {")
     
     result should contain ( 
       "val inst = Module(new my_black_box)",

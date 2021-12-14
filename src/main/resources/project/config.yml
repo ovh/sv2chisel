@@ -9,6 +9,19 @@
   files: #list of files to be translated into chisel, at least one file is required
     - my_package.sv
     - my_module.sv
+    
+  translationOptions:
+    LegalizeParamDefaults:
+      legalizeMethod: moveOrComment # comment|overrideOption|moveOrComment|moveOrOverride
+    RemoveConcats:
+      useChiselCat: true
+    Chiselizer:
+      unpackedEmissionStyle: Reg # Reg|Mem|SyncReadMem
+      addTopLevelChiselGenerator: "my_module" # name of top
+      # baseBlackboxRessourcePath must contains /resources/ to be valid
+      # - sv files are copied there
+      # - blackboxes are mixed with HasBlackBoxResource trait and features a addRessource("path")
+      baseBlackboxRessourcePath: "" 
   
 # - name: MyProjectB
 #   base_in_path: ""
