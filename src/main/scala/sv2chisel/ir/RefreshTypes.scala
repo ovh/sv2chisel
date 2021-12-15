@@ -5,7 +5,6 @@
 package sv2chisel
 package ir
 
-import ir.PrimOps._
 import logger.{LazyLogging}
 import sv2chisel.transforms.InfoLogger
 import org.antlr.v4.runtime.{CommonTokenStream}

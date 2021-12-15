@@ -12,7 +12,7 @@ trait ChiselMatchers extends Matchers {
   import matchers._
   /** Checks that the emitted circuit has the expected lines in order */
   def containLineSet(expectedLines: String*) = new ChiselStrictStringsMatcher(expectedLines)
-  def contain(expectedLines: String*) = new ChiselFlexStringsMatcher(expectedLines)
+  def containStr(expectedLines: String*) = new ChiselFlexStringsMatcher(expectedLines)
 
   def findFaillingLine(data: Seq[String], expected: Seq[String]): String = {
     val msg = ArrayBuffer[String]()

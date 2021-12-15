@@ -624,7 +624,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
             case _ => None
           }
           val baseWidth = baseWOption match {
-            case Some(w) => w.expr.evalBigIntOption()
+            case Some(w) => w.expr.evalBigIntOption
             case None => None 
           }
           
@@ -663,7 +663,7 @@ class LegalizeExpressions(val options: TranslationOptions) extends DescriptionBa
               // 2nd then try to evaluate this expression if it is only made of numbers
               c.copy(args = args).getWidthOption match {
                 case Some(e) =>
-                  val w = e.evalBigIntOption() match {
+                  val w = e.evalBigIntOption match {
                     case Some(bg) => Width(bg)
                     case None => Width(e)
                   }

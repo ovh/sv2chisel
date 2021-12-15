@@ -46,13 +46,13 @@ class BlackBoxSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
     val options = TranslationOptions().copy(
-      chiselizer = ChiselizerOptions().copy(baseBlackboxRessourcePath = Some("./ressources/"))
+      chiselizer = ChiselizerOptions().copy(baseBlackboxRessourcePath = Some("./test_run_dir/resources/"))
     )
     val result = emit(bb, main, Some("src/main/resources/project/hdl/my_module.sv"), options)
       
-    result should contain ( "import chisel3.util.HasBlackBoxResource")
-    result should contain ( "class my_black_box() extends BlackBox with HasBlackBoxResource {")
-    result should contain ( 
+    result should containStr ( "import chisel3.util.HasBlackBoxResource")
+    result should containStr ( "class my_black_box() extends BlackBox with HasBlackBoxResource {")
+    result should containStr ( 
       "val io = IO(new Bundle {",
         "val i_a = Input(UInt(8.W))",
         "val i_b = Input(UInt(8.W))",
@@ -62,7 +62,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
       "})"
     )
     
-    result should contain ( 
+    result should containStr ( 
       "val inst = Module(new my_black_box)",
       "inst.io.i_a := i_a",
       "inst.io.i_b := i_b",
@@ -106,9 +106,9 @@ class BlackBoxSpec extends Sv2ChiselSpec {
 
     val result = emit(bb, main, None, TranslationOptions())
       
-    result shouldNot contain ( "import chisel3.util.HasBlackBoxResource")
-    result should contain ( "class my_black_box() extends BlackBox {")
-    result should contain ( 
+    result shouldNot containStr ( "import chisel3.util.HasBlackBoxResource")
+    result should containStr ( "class my_black_box() extends BlackBox {")
+    result should containStr ( 
       "val io = IO(new Bundle {",
         "val i_a = Input(UInt(8.W))",
         "val i_b = Input(UInt(8.W))",
@@ -118,7 +118,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
       "})"
     )
     
-    result should contain ( 
+    result should containStr ( 
       "val inst = Module(new my_black_box)",
       "inst.io.i_a := i_a",
       "inst.io.i_b := i_b",
@@ -152,8 +152,8 @@ class BlackBoxSpec extends Sv2ChiselSpec {
 
     val result = emit(bb, main, None, TranslationOptions())
       
-    result shouldNot contain ( "import chisel3.util.HasBlackBoxResource")
-    result should contain ( "class my_black_box() extends RawModule {",
+    result shouldNot containStr ( "import chisel3.util.HasBlackBoxResource")
+    result should containStr ( "class my_black_box() extends RawModule {",
       "",
       "val io = IO(new Bundle {",
         "val i = Input(Vec(4, UInt(8.W)))",
@@ -161,12 +161,12 @@ class BlackBoxSpec extends Sv2ChiselSpec {
       "})"
     )
     
-    result should contain ( 
+    result should containStr ( 
       "val inst = Module(new my_black_box)",
       "inst.io.i := i",
       "o := inst.io.o"
     )
-    result should contain ( "class my_black_boxBB() extends BlackBox {",
+    result should containStr ( "class my_black_boxBB() extends BlackBox {",
       "val io = IO(new Bundle {",
         "val i = Input(UInt((4*8).W))",
         "val o = Output(UInt((4*8).W))",
@@ -202,7 +202,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
 
     val result = emit(bb, main, None, TranslationOptions())
     val q = "\""
-    result should contain ( 
+    result should containStr ( 
        "class my_black_box(",
            "val TESTI: Int = 1,",
           s"val TESTS: String = ${q}TRUE$q,",
@@ -219,7 +219,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
        "}"
     )
     
-    result should contain ( 
+    result should containStr ( 
       "val inst = Module(new my_black_box(",
           "TEST = 1",
       "))",
@@ -261,9 +261,9 @@ class BlackBoxSpec extends Sv2ChiselSpec {
     
     val result = emit(inner, p + main, None, TranslationOptions())
     debug(result)
-    result should contain ("import chisel3._")
+    result should containStr ("import chisel3._")
     
-    result should contain (
+    result should containStr (
       "package object test_p {",
         "",
         "val WIDTH = 5",
@@ -272,9 +272,9 @@ class BlackBoxSpec extends Sv2ChiselSpec {
       "}"
     )
     
-    result should contain ("import test_p.WIDTH")
+    result should containStr ("import test_p.WIDTH")
 
-    result should contain (
+    result should containStr (
       "class my_module(",
           "val INIT_VALUE: UInt = 0.U,", // probably not the best style but compilable
           "val TEST: Int",
@@ -288,7 +288,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
         "})"
     )
     
-    result should contain (
+    result should containStr (
       "val inst = Module(new my_module(",
           "INIT_VALUE = 0.U,",
           "TEST = 0",

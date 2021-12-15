@@ -30,19 +30,19 @@ class PatternSpec extends Sv2ChiselSpec {
     )
     debug(result)
     // def
-    result should contain ( 
+    result should containStr ( 
       "val a = Wire(Vec(WA, Bool()))",
       "val r = Wire(UInt(WA.W))"
     )
     
     // manual
-    result should contain ( 
+    result should containStr ( 
       "r := Mux(c, a(WA-1,0).asUInt, Cat((VecInit.tabulate(PADDING)(_ => false.B)).asUInt, a(WB-1,0).asUInt))",
       "r := Mux(c, a(WA-1,0).asUInt, Cat((VecInit.tabulate(PADDING)(_ => true.B)).asUInt, a(WB-1,0).asUInt))" 
     )
 
     // auto
-    result should contain ( 
+    result should containStr ( 
       "r := Mux(c, a(WA-1,0).asUInt, Cat(0.U((WA-WB).W), a(WB-1,0).asUInt))",
       "r := Mux(c, a(WA-1,0).asUInt, Cat(((1.U << (WA-WB))-1.U).asUInt, a(WB-1,0).asUInt))",
     ) 

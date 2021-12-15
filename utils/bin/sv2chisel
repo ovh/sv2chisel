@@ -1,0 +1,5 @@
+#!/bin/bash
+
+path=`dirname "$0"`
+cmd="java -cp ${path}/sv2chisel.jar sv2chisel.Main ${@:1}"
+eval $cmd

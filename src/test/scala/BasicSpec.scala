@@ -45,31 +45,31 @@ class BasicSpecs extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends RawModule {")
-    result should contain ("// genvar i, bank;")
+    result should containStr ("class Test() extends RawModule {")
+    result should containStr ("// genvar i, bank;")
     
-    result should contain ("val A = 5")
-    result should contain ("val B = util.log2Ceil(A+8)")
-    result should contain ("val C = if(A == 64) 1 else B")
-    result should contain ("val D = \"test\" + A") // no need for generic handling ... 
-    result should contain ("val E = 1 << A")
+    result should containStr ("val A = 5")
+    result should containStr ("val B = util.log2Ceil(A+8)")
+    result should containStr ("val C = if(A == 64) 1 else B")
+    result should containStr ("val D = \"test\" + A") // no need for generic handling ... 
+    result should containStr ("val E = 1 << A")
     
-    result should contain ("val w = Wire(Bool())")
-    result should contain ("val r = Wire(Bool())")
-    result should contain ("val z = Wire(Bool())")
+    result should containStr ("val w = Wire(Bool())")
+    result should containStr ("val r = Wire(Bool())")
+    result should containStr ("val z = Wire(Bool())")
     
     // this conversion is another challenge :
-    result should contain ("r := Mux(A.U === 64.U, true.B, false.B)")
-    result should contain ("w := Mux(A.U === 5.U, true.B, (A != 0).B)")
-    result should contain ("z := Mux(state === hw, r, w)")
+    result should containStr ("r := Mux(A.U === 64.U, true.B, false.B)")
+    result should containStr ("w := Mux(A.U === 5.U, true.B, (A != 0).B)")
+    result should containStr ("z := Mux(state === hw, r, w)")
     
-    result should contain ("c := (a === 63.U) && b")
-    result should contain ("c := (aa.asUInt === 63.U) && b")
+    result should containStr ("c := (a === 63.U) && b")
+    result should containStr ("c := (aa.asUInt === 63.U) && b")
     // TO DO : leverage implicits ???
-    // result should contain ("c := a === Ones && b")
+    // result should containStr ("c := a === Ones && b")
     
-    result should contain ("val ascii = Wire(UInt(64.W))")
-    result should contain ("ascii := \"test\".V.asTypeOf(UInt(64.W))")
+    result should containStr ("val ascii = Wire(UInt(64.W))")
+    result should containStr ("ascii := \"test\".V.asTypeOf(UInt(64.W))")
 
   }
   
@@ -85,14 +85,14 @@ class BasicSpecs extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends RawModule {")
-    result should contain ("val test = Wire(Vec(32, Bool()))")
-    result should contain ("test := ( ~0.U(32.W)).asBools")
-    result should contain ("test(5,0) := 0.U.asTypeOf(Vec(6, Bool()))")
-    result should contain ("val test2 = Wire(UInt(32.W))")
-    result should contain ("test2 :=  ~0.U(32.W)")
-    result should contain ("val test3 = Wire(UInt(32.W))")
-    result should contain ("test3 :=  ~(0+0).U(32.W)")
+    result should containStr ("class Test() extends RawModule {")
+    result should containStr ("val test = Wire(Vec(32, Bool()))")
+    result should containStr ("test := ( ~0.U(32.W)).asBools")
+    result should containStr ("test(5,0) := 0.U.asTypeOf(Vec(6, Bool()))")
+    result should containStr ("val test2 = Wire(UInt(32.W))")
+    result should containStr ("test2 :=  ~0.U(32.W)")
+    result should containStr ("val test3 = Wire(UInt(32.W))")
+    result should containStr ("test3 :=  ~(0+0).U(32.W)")
   }
 
 }

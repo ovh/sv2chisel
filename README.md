@@ -206,7 +206,29 @@ Continuous integration system including such automated functional testing is und
 
 ## Sharing your modifications
 Have a look in [CONTRIBUTING.md](https://github.com/ovh/sv2chisel/blob/master/CONTRIBUTING.md) and feel free to submit a pull-request on this repository.
- 
+
+## Release to Maven Central
+### Setup
+- NB: Based on `sbt-pgp` & `sbt-sonatype` plug-ins
+- Add Credentials in `~/.sbt/1.0/sonatype.sbt`
+```sbt
+credentials += Credentials("Sonatype Nexus Repository Manager",
+        "s01.oss.sonatype.org", // created after 2021
+        "<sonatypeUserName>",
+        "<sonatypePwd>")
+```
+- Add PGP private key in your/CI keyring
+
+
+### Release options
+1. *SNAPSHOTS*
+```
+sbt:sv2chisel> publishSigned
+sbt:sv2chisel> helpers/publishSigned
+```
+
+2. *RELEASE:* Based on sbt-release plugin, just follow the instruction of `sbt 'release'`
+
  
 # Related links
  * Contribute: https://github.com/ovh/sv2chisel/blob/master/CONTRIBUTING.md

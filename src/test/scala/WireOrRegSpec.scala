@@ -30,7 +30,7 @@ class WireOrRegSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    result should contain ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends MultiIOModule {")
     result should containLineSet (
       "  val c = if (A) Wire(Bool()) ",
       "          else Reg(Bool()) ",
@@ -58,9 +58,9 @@ class WireOrRegSpec extends Sv2ChiselSpec {
     
     val stdout = out.toString
     Logger.reset()
-    stdout should contain ( "[critical] Unable to guarantee complete scope definition for logic c resolved as wire without user-provided default value => adding default 0.U.asTypeOf(Bool) & ignoring A condition at sv2chiselTests.WireOrRegSpec:5" )
+    stdout should containStr ( "[critical] Unable to guarantee complete scope definition for logic c resolved as wire without user-provided default value => adding default 0.U.asTypeOf(Bool) & ignoring A condition at sv2chiselTests.WireOrRegSpec:5" )
     
-    result should contain ("class Test() extends RawModule {") // no clock
+    result should containStr ("class Test() extends RawModule {") // no clock
     result should containLineSet (
       "  val c = WireDefault(Bool(), false.B) ",
       "  if(A) {",
@@ -84,7 +84,7 @@ class WireOrRegSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    result should contain ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends MultiIOModule {")
     result should containLineSet (
       "  val c = Reg(Bool()) ",
       "  if(A) {",
@@ -109,7 +109,7 @@ class WireOrRegSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    result should contain ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends MultiIOModule {")
     result should containLineSet (
       "  val c = if (A) WireDefault(Bool(), false.B) ",
       "          else RegInit(Bool(), false.B) ",
@@ -144,7 +144,7 @@ class WireOrRegSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    result should contain ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends MultiIOModule {")
     result should containLineSet (
       "  val c = if (A || (( !A) && ( !B))) Wire(Bool()) ",
       "          else if (( !A) && B) Reg(Bool()) ",

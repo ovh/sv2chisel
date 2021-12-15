@@ -2,20 +2,23 @@
 // license that can be found in the LICENSE file.
 // Copyright 2020 The sv2chisel Authors. All rights reserved.
 
-lazy val ScalaVersion     = "2.12.10"
-lazy val ChiselVersion    = "3.4.3"
+lazy val ScalaVersion       = "2.12.15"
+lazy val CrossScalaVersions = Seq("2.13.6", "2.12.15")
+lazy val ChiselVersions     = Map("12" -> "3.4.4", "13" -> "3.5.0-RC1")
 
-lazy val ScalaTestVersion = "3.2.2"
-lazy val AntlrVersion     = "4.7.1"
-lazy val CirceVersion     = "0.14.1"
+lazy val ScalaTestVersion   = "3.2.2"
+lazy val AntlrVersion       = "4.7.1"
+lazy val CirceVersion       = "0.14.1"
 
 lazy val commonSettings = Seq (
   // identity
+  versionScheme := Some("early-semver"),
   organization := "com.ovhcloud",
   organizationName := "ovhcloud",
   organizationHomepage := Some(url("https://ovhcloud.com/")),
   // versions
   scalaVersion := ScalaVersion,
+  crossScalaVersions := CrossScalaVersions,
   // dependencies
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % ScalaTestVersion % Test,
@@ -32,13 +35,22 @@ lazy val commonSettings = Seq (
     "-language:implicitConversions"
   ),
   // documentation compile options 
-  scalacOptions in Compile in doc ++= Seq(
+  Compile / doc / scalacOptions ++= Seq(
     "-feature",
     "-diagrams",
     "-diagrams-max-classes", "250",
     "-doc-version", version.value,
     "-doc-title", name.value,
-    "-sourcepath", (baseDirectory in ThisBuild).value.toString
+    "-sourcepath", (ThisBuild / baseDirectory).value.toString,
+    "-doc-source-url", {
+      val branch =
+        if (version.value.endsWith("-SNAPSHOT")) {
+          "master"
+        } else {
+          s"v${version.value}"
+        }
+      s"https://github.com/ovh/sv2chisel/tree/$branch€{FILE_PATH_EXT}#L€{FILE_LINE}"
+    }
   ),
   // publication (see sonatype.sbt for further details)
   sonatypeCredentialHost := "s01.oss.sonatype.org",
@@ -85,12 +97,15 @@ lazy val root = (project in file("."))
       // Arg parsing
       "org.sellmerfud" %% "optparse" % "2.2"
     ),
-    antlr4GenListener in Antlr4 := false,
-    antlr4GenVisitor in Antlr4 := true,
-    antlr4PackageName in Antlr4 := Option("sv2chisel.antlr")
+    Antlr4 / antlr4GenListener := false,
+    Antlr4 / antlr4GenVisitor := true,
+    Antlr4 / antlr4PackageName := Option("sv2chisel.antlr")
   )
+  // SBT-RELEASE SETTINGS
   .settings(
     releaseIgnoreUntrackedFiles := true,
+    releaseVcsSign := true,
+    releaseVcsSignOff := true,
     releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,
       inquireVersions,
@@ -99,16 +114,26 @@ lazy val root = (project in file("."))
       setReleaseVersion,
       commitReleaseVersion,
       tagRelease,
-      // For cross-build projects, use releaseStepCommandAndRemaining("+publishSigned")
-      releaseStepCommand("publishSigned"),
+      // For non cross-build projects, use releaseStepCommand("publishSigned")
+      releaseStepCommandAndRemaining("+publishSigned"),
       releaseStepCommand("sonatypeBundleRelease"),
-      releaseStepCommand("project helpers"), // need to change project to make sonatypeBundleRelease to work
-      releaseStepCommand("publishSigned"),
+      releaseStepCommand("project helpers"), // need to change project to make sonatypeBundleRelease available
+      releaseStepCommand("sonatypeBundleClean"), // avoid confusion with previous publishSigned files, bug?
+      releaseStepCommandAndRemaining("+publishSigned"),
       releaseStepCommand("sonatypeBundleRelease"),
+      releaseStepCommand("sonatypeBundleClean"),
+      releaseStepCommand("project root"), // back to work
       setNextVersion,
       commitNextVersion,
       pushChanges
     )
+  )
+  // SBT-ASSEMBLY SETTINGS 
+  .settings(
+    assembly / mainClass := Some("com.ovhcloud.sv2chisel.Main"),
+    assembly / assemblyJarName := "sv2chisel.jar",
+    assembly / test := {},
+    assembly / assemblyOutputPath := file("./utils/bin/sv2chisel.jar")
   )
   
 lazy val helpers = (project in file("helpers"))
@@ -117,7 +142,7 @@ lazy val helpers = (project in file("helpers"))
     name := "sv2chisel-helpers",
     
     libraryDependencies ++= Seq(
-      "edu.berkeley.cs" %% "chisel3" % ChiselVersion
+      "edu.berkeley.cs" %% "chisel3" % ChiselVersions(scalaVersion.value.split('.')(1))
     )
   )
 

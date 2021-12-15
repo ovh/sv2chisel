@@ -192,7 +192,6 @@ object Utils extends LazyLogging with InfoLogger {
 
   def error(str: String, cause: Throwable = null) = throw new SV2ChiselInternalException(str, cause)
 
-  /** Indent the results of [[ir.FirrtlNode.serialize]] */
   def indent(str: String) = str replaceAllLiterally ("\n", "\n  ")
   
   def getSIntWidth(s: BigInt): Int = s.bitLength + 1

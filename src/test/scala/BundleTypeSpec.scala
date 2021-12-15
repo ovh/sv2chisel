@@ -47,33 +47,33 @@ class BundleTypeSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends MultiIOModule {")
       
-    result should contain ("class t1_t extends Bundle {",
+    result should containStr ("class t1_t extends Bundle {",
                               "val bool = Bool()",
                               "val uint = Vec(B, Bool())",
                               "val matrix = Vec(A, Vec(B, Bool()))",
                             "}")
                             
-    result should contain ("val W = (new t1_t).getWidth")
-    result should contain ("class t2_t extends Bundle {",
+    result should containStr ("val W = (new t1_t).getWidth")
+    result should containStr ("class t2_t extends Bundle {",
                               "val bool = Bool()",
                               "val uint = Vec(W, Bool())",
                               "val vec = Vec(B, new t1_t)",
                               "val tpe = new t1_t",
                             "}")
-    result should contain ("val test_wire = Wire(Vec(A, new t2_t))")
-    result should contain ("val test_reg = Reg(Vec(A, new t2_t))")
+    result should containStr ("val test_wire = Wire(Vec(A, new t2_t))")
+    result should containStr ("val test_reg = Reg(Vec(A, new t2_t))")
     
-    result should contain ("test_reg(0).bool := true.B")
-    result should contain ("test_reg(0).uint := 0.U.asTypeOf(Vec(W, Bool()))")
-    result should contain ("test_reg(0).vec := 0.U.asTypeOf(Vec(B, new t1_t))")
-    result should contain ("test_reg(0).vec(0) := 0.U.asTypeOf(new t1_t)")
-    result should contain ("test_reg(0).vec(0).uint := 0.U.asTypeOf(Vec(B, Bool()))")
-    result should contain ("test_reg(0).tpe.uint := 0.U.asTypeOf(Vec(B, Bool()))")
+    result should containStr ("test_reg(0).bool := true.B")
+    result should containStr ("test_reg(0).uint := 0.U.asTypeOf(Vec(W, Bool()))")
+    result should containStr ("test_reg(0).vec := 0.U.asTypeOf(Vec(B, new t1_t))")
+    result should containStr ("test_reg(0).vec(0) := 0.U.asTypeOf(new t1_t)")
+    result should containStr ("test_reg(0).vec(0).uint := 0.U.asTypeOf(Vec(B, Bool()))")
+    result should containStr ("test_reg(0).tpe.uint := 0.U.asTypeOf(Vec(B, Bool()))")
     
-    result should contain ("test_wire := 0.U.asTypeOf(Vec(A, new t2_t))")
-    result should contain ("test_wire := ((1.U << (A*(new t2_t).getWidth))-1.U).asTypeOf(Vec(A, new t2_t))")
+    result should containStr ("test_wire := 0.U.asTypeOf(Vec(A, new t2_t))")
+    result should containStr ("test_wire := ((1.U << (A*(new t2_t).getWidth))-1.U).asTypeOf(Vec(A, new t2_t))")
     
   }
 

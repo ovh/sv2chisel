@@ -82,9 +82,9 @@ class HwEnumSpec extends AnyFlatSpec with VerilogMatchers {
     // warning: this type aliasing might hide bugs: confusing literal value (MyEnum.Value) with hardware type (UInt)
     // type MyEnum = UInt // GenericHwEnum are simple UInt but provide syntax convenience
     object MyEnum extends CustomHwEnum {
-      val stateA = Val(0.U)
-      val stateB = Val(12.U)
-      val stateC = Val(5.U)
+      val stateA = V(0.U)
+      val stateB = V(12.U)
+      val stateC = V(5.U)
     }
     
     class Example extends MultiIOModule {

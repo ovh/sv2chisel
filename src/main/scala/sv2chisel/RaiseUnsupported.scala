@@ -206,15 +206,15 @@ class RaiseUnsupported(
   }
   
   def checkCondExpression(ctx: Cond_predicateContext): Unit = {
-    ctx.KW_MATCHES.asScala match {
+    ctx.KW_MATCHES.asScala.toSeq match {
       case Seq() =>
       case _ => raiseIt(ctx, s"Unsupported keyword match within context ${ctx.getText()}")
     }
-    ctx.TRIPLE_AND.asScala match {
+    ctx.TRIPLE_AND.asScala.toSeq match {
       case Seq() =>
       case _ => raiseIt(ctx, s"Unsupported keyword within context ${ctx.getText()}")
     }
-    ctx.pattern.asScala match {
+    ctx.pattern.asScala.toSeq match {
       case Seq() =>
       case _ => raiseIt(ctx, s"Unsupported pattern within context ${ctx.getText()}")
     }
@@ -250,7 +250,7 @@ class RaiseUnsupported(
       case k => raiseIt(ctx, s"Unsupported context ${k.getText()}")
     }
     // weird grammar ...
-    ctx.identifier.asScala match {
+    ctx.identifier.asScala.toSeq match {
       case Seq() =>
       case Seq(id@_) =>
       case _ => raiseIt(ctx, s"Unsupported identifier within context ${ctx.getText()}")
@@ -324,7 +324,7 @@ class RaiseUnsupported(
   
   def checkModuleHeader(ctx: Module_header_commonContext): Unit = {
     checkLifetime(ctx.lifetime)
-    ctx.package_import_declaration.asScala match {
+    ctx.package_import_declaration.asScala.toSeq match {
       case Seq() =>
       case _ => raiseIt(ctx, s"Unsupported package_import_declaration within context ${ctx.getText()}")
     }

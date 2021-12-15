@@ -39,29 +39,29 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends RawModule {")
-    result should contain ("val B_TRUE: Boolean = true")
-    result should contain ("val B_FALSE: Boolean = false")
-    result should contain ("val C_UNKNOWN: Boolean")
-    result should contain ("val INTP = (if(B_TRUE) 5 else 4)+((if(C_UNKNOWN) 1 else 0)*(if(B_FALSE) 1 else 0))")
-    result should contain ("val a = Wire(Bool())")
-    result should contain ("val b = Wire(Bool())")
-    result should contain ("val c = Wire(Bool())")
-    result should contain ("c := Cat(B_TRUE.B && a, (B_TRUE.B || B_FALSE.B) && b, C_UNKNOWN.B && b).orR()")
+    result should containStr ("class Test() extends RawModule {")
+    result should containStr ("val B_TRUE: Boolean = true")
+    result should containStr ("val B_FALSE: Boolean = false")
+    result should containStr ("val C_UNKNOWN: Boolean")
+    result should containStr ("val INTP = (if(B_TRUE) 5 else 4)+((if(C_UNKNOWN) 1 else 0)*(if(B_FALSE) 1 else 0))")
+    result should containStr ("val a = Wire(Bool())")
+    result should containStr ("val b = Wire(Bool())")
+    result should containStr ("val c = Wire(Bool())")
+    result should containStr ("c := Cat(B_TRUE.B && a, (B_TRUE.B || B_FALSE.B) && b, C_UNKNOWN.B && b).orR()")
     
-    result should contain ("val w = Wire(Vec(32, Bool()))")
-    result should contain ("val z = Wire(UInt(32.W))")
-    result should contain ("w(14,12) := \"b000\".U(3.W).asBools")
+    result should containStr ("val w = Wire(Vec(32, Bool()))")
+    result should containStr ("val z = Wire(UInt(32.W))")
+    result should containStr ("w(14,12) := \"b000\".U(3.W).asBools")
     /// padding (bit extension is done properly)
-    result should contain ("w(31,16) := w(10,0).asTypeOf(SInt(16.W)).asBools") 
-    result should contain ("w(15,0) := z(10,0).asTypeOf(SInt(16.W)).asBools") 
-    result should contain ("w(14,0) := Cat(z(5,0), z(7,6)).asTypeOf(SInt(15.W)).asBools")
-    result should contain ("wu := w.asTypeOf(SInt(32.W)).asUInt") 
-    result should contain ("w := (((z*z)+z)+1.U).asTypeOf(Vec(32, Bool()))")
+    result should containStr ("w(31,16) := w(10,0).asTypeOf(SInt(16.W)).asBools") 
+    result should containStr ("w(15,0) := z(10,0).asTypeOf(SInt(16.W)).asBools") 
+    result should containStr ("w(14,0) := Cat(z(5,0), z(7,6)).asTypeOf(SInt(15.W)).asBools")
+    result should containStr ("wu := w.asTypeOf(SInt(32.W)).asUInt") 
+    result should containStr ("w := (((z*z)+z)+1.U).asTypeOf(Vec(32, Bool()))")
     
-    result should contain ("ww(31,25) := Mux(w(6,5).asUInt === \"b00\".U(2.W), \"b0100000\".U(7.W), \"b0000000\".U(7.W)).asBools")
+    result should containStr ("ww(31,25) := Mux(w(6,5).asUInt === \"b00\".U(2.W), \"b0100000\".U(7.W), \"b0000000\".U(7.W)).asBools")
     // ugly rendering but ... it works ...
-    result should contain ("ww(31,25) := Mux(b, \"b01\".U(2.W).asTypeOf(Vec(7, Bool())), (Mux(b, \"b10\".U(2.W), \"b00\".U(2.W)).asTypeOf(Vec(7, Bool()))))")
+    result should containStr ("ww(31,25) := Mux(b, \"b01\".U(2.W).asTypeOf(Vec(7, Bool())), (Mux(b, \"b10\".U(2.W), \"b00\".U(2.W)).asTypeOf(Vec(7, Bool()))))")
   }
     
   it should "also deal with mixed signed and concat" in {
@@ -72,16 +72,16 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends RawModule {")
-    result should contain ("val lhsc = Wire(Vec(32, Bool()))")
-    result should contain ("val wu = Wire(Vec(32, Bool()))")
-    result should contain ("val auto_concat = Wire(new Bundle {",
+    result should containStr ("class Test() extends RawModule {")
+    result should containStr ("val lhsc = Wire(Vec(32, Bool()))")
+    result should containStr ("val wu = Wire(Vec(32, Bool()))")
+    result should containStr ("val auto_concat = Wire(new Bundle {",
                               "val lhsc_15_0 = Vec(16, Bool())",
                               "val lhsc_31_16 = Vec(16, Bool())",
                             "})")
-    result should contain ("auto_concat := wu(10,0).asTypeOf(SInt(32.W)).asTypeOf(auto_concat)")
-    result should contain ("lhsc(15,0) := auto_concat.lhsc_15_0")
-    result should contain ("lhsc(31,16) := auto_concat.lhsc_31_16")
+    result should containStr ("auto_concat := wu(10,0).asTypeOf(SInt(32.W)).asTypeOf(auto_concat)")
+    result should containStr ("lhsc(15,0) := auto_concat.lhsc_15_0")
+    result should containStr ("lhsc(31,16) := auto_concat.lhsc_31_16")
 
   }
   
@@ -94,11 +94,11 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends RawModule {")
-    result should contain ("val a = Wire(UInt(17.W))")
-    result should contain ("val res = Wire(UInt(32.W))")
-    result should contain ("res := (a.asTypeOf(SInt(32.W)) >> 1.U).asUInt")
-    result should contain ("res := a.asTypeOf(SInt(32.W)).asUInt >> 1")
+    result should containStr ("class Test() extends RawModule {")
+    result should containStr ("val a = Wire(UInt(17.W))")
+    result should containStr ("val res = Wire(UInt(32.W))")
+    result should containStr ("res := (a.asTypeOf(SInt(32.W)) >> 1.U).asUInt")
+    result should containStr ("res := a.asTypeOf(SInt(32.W)).asUInt >> 1")
   }
   
   it should "properly manage reduction operators" in {
@@ -111,12 +111,12 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends RawModule {")
-    result should contain ("val a = Wire(UInt(32.W))")
-    result should contain ("val b = Wire(Vec(32, Bool()))")
-    result should contain ("val res = Wire(Bool())")
-    result should contain ("b(15,0) := 65535.U.asTypeOf(Vec(16, Bool()))")
-    result should contain ("res := (a&( ~b.asUInt)).orR()")
+    result should containStr ("class Test() extends RawModule {")
+    result should containStr ("val a = Wire(UInt(32.W))")
+    result should containStr ("val b = Wire(Vec(32, Bool()))")
+    result should containStr ("val res = Wire(Bool())")
+    result should containStr ("b(15,0) := 65535.U.asTypeOf(Vec(16, Bool()))")
+    result should containStr ("res := (a&( ~b.asUInt)).orR()")
 
   }
   
@@ -133,11 +133,11 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends RawModule {")
-    result should contain ( "w := a^b" )
-    result should contain ( "r := w^c" )
-    result should contain ( "o := (w&c)|(a&b)" )
-    result should contain ( "o := (w && c) || (a && b)" )
+    result should containStr ("class Test() extends RawModule {")
+    result should containStr ( "w := a^b" )
+    result should containStr ( "r := w^c" )
+    result should containStr ( "o := (w&c)|(a&b)" )
+    result should containStr ( "o := (w && c) || (a && b)" )
   }
   
   it should "manage edge cases" in {
@@ -167,14 +167,14 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
     )
     debug(result)
     
-    result should contain ("val v = Wire(Bool())")
-    result should contain ("val u = Wire(UInt(8.W))")
-    result should contain (
+    result should containStr ("val v = Wire(Bool())")
+    result should containStr ("val u = Wire(UInt(8.W))")
+    result should containStr (
       "u := (Mux(s.fieldA.asUInt === PC.U, PB.U(8.W), 0.U))+((new my_struct_t).getWidth/8).U",
       "u := ((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U(8.W), 0.U)))+((new my_struct_t).getWidth/8).U"
     )
 
-    result should contain (
+    result should containStr (
       "v := s.fieldC.asUInt >= (((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U, 0.U)))+((new my_struct_t).getWidth/8).U)",
       "v := s.fieldC.asUInt === (((s.fieldB.asUInt+PA.U)+(Mux(s.fieldA.asUInt === PC.U, PB.U, 0.U)))+((new my_struct_t).getWidth/8).U)"
     )
@@ -192,11 +192,11 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("val a = Wire(Vec(8, Bool()))")
-    result should contain ("val b = Wire(Vec(8, Bool()))")
-    result should contain ("val c = Wire(UInt(8.W))")
+    result should containStr ("val a = Wire(Vec(8, Bool()))")
+    result should containStr ("val b = Wire(Vec(8, Bool()))")
+    result should containStr ("val c = Wire(UInt(8.W))")
 
-    result should contain ("c := a.asUInt+b.asUInt")
+    result should containStr ("c := a.asUInt+b.asUInt")
 
   }
 }

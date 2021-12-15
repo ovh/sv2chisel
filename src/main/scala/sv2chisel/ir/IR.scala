@@ -66,9 +66,9 @@ case class UnrecognizedDescription(tokens: Interval) extends Description {
   def mapString(f: String => String) = this
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = ()
 }
 
 case class IsolatedStatement(tokens: Interval, body: Statement) extends Description {
@@ -79,8 +79,8 @@ case class IsolatedStatement(tokens: Interval, body: Statement) extends Descript
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachStmt(f: Statement => Unit): Unit = f(body)
-  def foreachString(f: String => Unit): Unit = Unit
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def foreachString(f: String => Unit): Unit = ()
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = ()
 }
 
 abstract class Header extends Statement {
@@ -90,11 +90,11 @@ abstract class Header extends Statement {
   def mapStmt(f: Statement => Statement) = this.asInstanceOf[T]
   def mapString(f: String => String) = this.asInstanceOf[T]
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.asInstanceOf[T]
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachStmt(f: Statement => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = ()
 }
 
 abstract class CompilerDirective extends Header {
@@ -266,9 +266,9 @@ case class RawScalaExpression(str: String, kind: ExpressionKind) extends Express
   def mapWidth(f: Width => Width) = this
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapInterval(f: Interval => Interval) = this
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 case class RawScalaExprWrapper(
   tokens: Interval, 
@@ -290,8 +290,8 @@ case class RawScalaExprWrapper(
   def mapKind(f: ExpressionKind => ExpressionKind) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = exprs.foreach(f)
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 case class UndefinedExpression(tokens: Interval, flow: Flow = UnknownFlow) extends Expression {
@@ -304,9 +304,9 @@ case class UndefinedExpression(tokens: Interval, flow: Flow = UnknownFlow) exten
   def mapWidth(f: Width => Width): UndefinedExpression = this 
   def mapKind(f: ExpressionKind => ExpressionKind): UndefinedExpression = this 
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit 
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = () 
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 object UndefinedExpression {
   def apply() : UndefinedExpression = UndefinedExpression(UndefinedInterval)
@@ -323,9 +323,9 @@ case class DontCare(tokens: Interval) extends Expression {
   def mapWidth(f: Width => Width) = this 
   def mapKind(f: ExpressionKind => ExpressionKind) = this 
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit 
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = () 
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 object DontCare {
   def apply() : DontCare = DontCare(UndefinedInterval)
@@ -349,9 +349,9 @@ case class StringLit(tokens: Interval, string: String, kind : ExpressionKind, wi
   def mapWidth(f: Width => Width) = this
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
   
   /** Returns an escaped and quoted String */
   def escape: String = {
@@ -410,9 +410,9 @@ case class Reference(
   def mapWidth(f: Width => Width): Reference = this
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
   def asUserRefType(): UserRefType = UserRefType(tokens, name, path, tpe)
 }
 sealed abstract class Assign extends Expression {
@@ -420,8 +420,8 @@ sealed abstract class Assign extends Expression {
   def mapKind(f: ExpressionKind => ExpressionKind) = this.asInstanceOf[T]
   def mapType(f: Type => Type) = this.asInstanceOf[T]
   def mapWidth(f: Width => Width) = this.asInstanceOf[T]
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 sealed trait RemoteLinked {
@@ -456,7 +456,7 @@ case class AutoAssign(tokens: Interval) extends Assign {
   def serialize: String = s"AutoAssign"
   def mapExpr(f: Expression => Expression) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
 }
 case class NamedAssign(
   tokens: Interval, 
@@ -515,9 +515,9 @@ case class TypeInst(
   def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
   def mapWidth(f: Width => Width) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
   def foreachType(f: Type => Unit): Unit = f(tpe)
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 case class SubField(
     tokens: Interval, 
@@ -536,7 +536,7 @@ case class SubField(
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = f(expr)
   def foreachType(f: Type => Unit): Unit = f(tpe)
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 case class SubIndex(
@@ -557,7 +557,7 @@ case class SubIndex(
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = { f(expr); f(index) }
   def foreachType(f: Type => Unit): Unit = f(tpe)
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 case class SubRange(
     tokens: Interval, 
@@ -578,7 +578,7 @@ case class SubRange(
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = { f(expr); f(left); f(right) }
   def foreachType(f: Type => Unit): Unit = f(tpe)
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 sealed abstract class NumberBase(val value: Int) 
@@ -629,9 +629,9 @@ case class Number(tokens: Interval, value: String, width: Width, base: NumberBas
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 object Number {
@@ -674,8 +674,8 @@ case class MaskedNumber(
   def mapWidth(f: Width => Width) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = { f(number); f(mask) }
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
 } 
 
 sealed abstract class ComplexValues extends Expression {
@@ -683,7 +683,7 @@ sealed abstract class ComplexValues extends Expression {
   def flow: Flow = SourceFlow
   def mapWidth(f: Width => Width) = this.asInstanceOf[T]
   def foreachType(f: Type => Unit): Unit = f(tpe)
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 
@@ -694,7 +694,7 @@ case class FillingBitPattern(tokens: Interval, bit: String, kind: ExpressionKind
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapExpr(f: Expression => Expression) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
 }
 
 case class ReplicatePattern(tokens: Interval, scaler: Expression, pattern: Expression, kind: ExpressionKind, tpe: Type) extends ComplexValues {
@@ -754,9 +754,9 @@ case class DefaultAssignPattern(tokens: Interval) extends Expression with HasNam
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 sealed abstract class Literal extends Expression {
@@ -780,9 +780,9 @@ case class BoolLiteral(tokens: Interval, v: Boolean, kind: ExpressionKind) exten
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 case class UIntLiteral(tokens: Interval, value: BigInt, width: Width, base: NumberBase) extends Literal {
   type T = UIntLiteral
@@ -800,8 +800,8 @@ case class UIntLiteral(tokens: Interval, value: BigInt, width: Width, base: Numb
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = this.copy(width = f(width))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
   def foreachWidth(f: Width => Unit): Unit = f(width)
 }
 object UIntLiteral {
@@ -818,8 +818,8 @@ case class SIntLiteral(tokens: Interval, value: BigInt, width: Width) extends Li
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = SIntLiteral(tokens, value, f(width))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
   def foreachWidth(f: Width => Unit): Unit = f(width)
 }
 object SIntLiteral {
@@ -839,8 +839,8 @@ case class FixedLiteral(tokens: Interval, value: BigInt, width: Width, point: Wi
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = FixedLiteral(tokens, value, f(width), f(point))
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
   def foreachWidth(f: Width => Unit): Unit = { f(width); f(point) }
 }
 case class DoPrim(
@@ -863,8 +863,8 @@ case class DoPrim(
   def mapWidth(f: Width => Width) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = args.foreach(f)
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 case class Concat(
@@ -882,8 +882,8 @@ case class Concat(
   def mapWidth(f: Width => Width) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = args.foreach(f)
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 case class DoCast(
@@ -902,7 +902,7 @@ case class DoCast(
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = f(expr)
   def foreachType(f: Type => Unit): Unit = f(tpe)
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 case class DoCall(
     tokens: Interval, 
@@ -922,7 +922,7 @@ case class DoCall(
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = args.foreach(f)
   def foreachType(f: Type => Unit): Unit = f(tpe)
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 /**
@@ -964,9 +964,9 @@ case class DefInstance(
   def mapType(f: Type => Type) = this
   def mapString(f: String => String) = DefInstance(tokens, attributes, f(name), module, portMap, paramMap)
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
   def foreachExpr(f: Expression => Unit): Unit = {portMap.map(f) ; paramMap.map(f)}
-  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
   def foreachString(f: String => Unit): Unit = f(name)
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
@@ -992,10 +992,10 @@ case class DefFunction(
   
   def foreachPort(f: Port => Unit): Unit = ports.map(f)
   def foreachStmt(f: Statement => Unit): Unit = f(body)
-  def foreachExpr(f: Expression => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
   def foreachType(f: Type => Unit): Unit = f(tpe)
   def foreachString(f: String => Unit): Unit = f(name)
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = ()
 }
 
 case class DefType(
@@ -1012,8 +1012,8 @@ case class DefType(
   def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
   def mapString(f: String => String) = this.copy(name = f(name))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachExpr(f: Expression => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
+  def foreachExpr(f: Expression => Unit): Unit = ()
   def foreachType(f: Type => Unit): Unit = f(tpe)
   def foreachString(f: String => Unit): Unit = f(name)
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
@@ -1055,8 +1055,8 @@ case class DefMemory(tokens: Interval,
   def mapType(f: Type => Type) = this.copy(dataType = f(dataType))
   def mapString(f: String => String) = this.copy(name = f(name))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachExpr(f: Expression => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
+  def foreachExpr(f: Expression => Unit): Unit = ()
   def foreachType(f: Type => Unit): Unit = f(dataType)
   def foreachString(f: String => Unit): Unit = f(name)
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
@@ -1143,7 +1143,7 @@ case class DefLogic(
   def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
   def mapString(f: String => String) = this.copy(name = f(name))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
   def foreachExpr(f: Expression => Unit): Unit = resolution.foreachExpr(f)
   def foreachType(f: Type => Unit): Unit = f(tpe)
   def foreachString(f: String => Unit): Unit = f(name)
@@ -1180,8 +1180,8 @@ case class Conditionally(tokens: Interval,
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
   def foreachStmt(f: Statement => Unit): Unit = { f(conseq); f(alt) }
   def foreachExpr(f: Expression => Unit): Unit = f(pred)
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 
@@ -1205,8 +1205,8 @@ case class Switch(tokens: Interval,
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
   def foreachStmt(f: Statement => Unit): Unit = { cases.foreach(t => f(t._2)) ; f(default) }
   def foreachExpr(f: Expression => Unit): Unit = { cases.foreach(t => f(t._1)) ; f(expr) }
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 
@@ -1228,8 +1228,8 @@ case class IfGen(tokens: Interval,
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
   def foreachStmt(f: Statement => Unit): Unit = { f(conseq); f(alt) }
   def foreachExpr(f: Expression => Unit): Unit = f(pred)
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 case class ForGen(tokens: Interval, 
@@ -1250,8 +1250,8 @@ case class ForGen(tokens: Interval,
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
   def foreachStmt(f: Statement => Unit): Unit = { f(stmt) }
   def foreachExpr(f: Expression => Unit): Unit = {f(init) ; f(stop) ; f(step)}
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 
@@ -1267,10 +1267,10 @@ abstract class Block extends Statement with HasName {
   def mapString(f: String => String) = this.asInstanceOf[T] 
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.asInstanceOf[T] 
   def foreachStmt(f: Statement => Unit): Unit = stmts.foreach(f)
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = ()
   
   def appendStmts(s: Seq[Statement]) : T 
   def prependStmts(s: Seq[Statement]) : T 
@@ -1419,10 +1419,10 @@ case class Connect(
   def mapType(f: Type => Type) = this
   def mapString(f: String => String) = this
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
   def foreachExpr(f: Expression => Unit): Unit = { f(loc); f(expr) }
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 
@@ -1439,11 +1439,11 @@ case class ExpressionStatement(
   def mapType(f: Type => Type) = this
   def mapString(f: String => String) = this
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
-  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
   def foreachExpr(f: Expression => Unit): Unit = f(expr)
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = ()
 }
 
 case class Stop(tokens: Interval, attributes: VerilogAttributes, ret: Expression, clk: Expression, en: Expression) extends Statement with HasVerilogAttributes {
@@ -1455,10 +1455,10 @@ case class Stop(tokens: Interval, attributes: VerilogAttributes, ret: Expression
   def mapType(f: Type => Type) = this
   def mapString(f: String => String) = this
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
   def foreachExpr(f: Expression => Unit): Unit = { f(ret) ; f(clk); f(en) }
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 case class Print(tokens: Interval, 
@@ -1478,10 +1478,10 @@ case class Print(tokens: Interval,
   def mapType(f: Type => Type) = this
   def mapString(f: String => String) = this
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
   def foreachExpr(f: Expression => Unit): Unit = { args.foreach(f) }
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }
 case object EmptyStmt extends Statement {
@@ -1494,11 +1494,11 @@ case object EmptyStmt extends Statement {
   def mapType(f: Type => Type) = this
   def mapString(f: String => String) = this
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
-  def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = ()
 }
 
 case class Comment(tokens: Interval, str: String) extends Statement {
@@ -1510,11 +1510,11 @@ case class Comment(tokens: Interval, str: String) extends Statement {
   def mapType(f: Type => Type) = this
   def mapString(f: String => String) = this.copy(str = f(str))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
-  def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
   def foreachString(f: String => Unit): Unit = f(str)
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = ()
 }
 
 case class RawScala(str: String) extends Statement {
@@ -1527,11 +1527,11 @@ case class RawScala(str: String) extends Statement {
   def mapType(f: Type => Type) = this
   def mapString(f: String => String) = this
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this
-  def foreachStmt(f: Statement => Unit): Unit = Unit
-  def foreachExpr(f: Expression => Unit): Unit = Unit
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachString(f: String => Unit): Unit = Unit
-  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
+  def foreachExpr(f: Expression => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachString(f: String => Unit): Unit = ()
+  def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = ()
 }
 
 
@@ -1551,13 +1551,13 @@ case class Width(tokens: Interval, expr: Expression) extends SVNode {
   def mapExpr(f: Expression => Expression): Width = this.copy(expr = f(expr))
   def foreachExpr(f: Expression => Unit): Unit = f(expr)
   
-  def getBoundToZero(): Expression = {
+  def getBoundToZero: Expression = {
     // need to do -1 to get bound from width
     // in some case there is a +1 in the expression, let's just strip it
     expr match {
       case DoPrim(_, _:PrimOps.Add, Seq(e, p), _, _) if(p.serialize == "1") => e 
       case DoPrim(_, _:PrimOps.Add, Seq(p, e), _, _) if(p.serialize == "1") => e 
-      case n: Number => n.copy(value = s"${n.evalBigInt()-1}")
+      case n: Number => n.copy(value = s"${n.evalBigInt-1}")
       case _ => 
         DoPrim(expr.tokens, PrimOps.Sub(UndefinedInterval), Seq(expr, Number(UndefinedInterval,"1", SwExpressionKind)), expr.kind, expr.tpe)
     }
@@ -1641,8 +1641,8 @@ case class VoidType(tokens: Interval) extends Type {
   type T = VoidType
   def mapType(f: Type => Type): T = this
   def mapWidth(f: Width => Width): T = this
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
   def widthOption: Option[Width] = None
   def mapInterval(f: Interval => Interval): T = this.copy(tokens = f(tokens))
   def serialize: String = "void"
@@ -1654,8 +1654,8 @@ case class DataType() extends Type {
   val tokens = UndefinedInterval
   def mapType(f: Type => Type): T = this
   def mapWidth(f: Width => Width): T = this
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
   def widthOption: Option[Width] = None
   def mapInterval(f: Interval => Interval): T = this
   def serialize: String = "Data"
@@ -1668,8 +1668,8 @@ case class RawScalaType(str: String) extends Type {
   val tokens: Interval = UndefinedInterval
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = this
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
   def widthOption: Option[Width] = None
 }
 
@@ -1681,7 +1681,7 @@ case class OptionType(tpe: Type) extends Type {
   def mapType(f: Type => Type) = this.copy(tpe=f(tpe))
   def mapWidth(f: Width => Width) = this
   def foreachType(f: Type => Unit): Unit = f(tpe)
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
   def widthOption: Option[Width] = None
 }
 
@@ -1706,7 +1706,7 @@ abstract class GroundType extends Type {
   type T <: GroundType
   val width: Width
   def mapType(f: Type => Type) = this.asInstanceOf[T]
-  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
   def widthOption: Option[Width] = Some(width)
 }
 object GroundType {
@@ -1748,7 +1748,7 @@ case class IntType(tokens: Interval, base: NumberBase) extends GroundType {
   def serialize: String = s"Int%$base"
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def mapWidth(f: Width => Width) = this
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 object IntType {
   def apply(): IntType = {
@@ -1794,7 +1794,7 @@ case class BundleType(tokens: Interval, fields: Seq[Field]) extends AggregateTyp
   def mapType(f: Type => Type) = this.copy(fields = fields.map(x => x.copy(tpe = f(x.tpe))))
   def foreachType(f: Type => Unit): Unit = fields.foreach{ x => f(x.tpe) }
   def mapWidth(f: Width => Width) = this
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
   def widthOption: Option[Width] = {
     val fieldWidths = fields.map(_.tpe.widthOption)
     fieldWidths.collectFirst {case a@None => a} match {
@@ -1815,7 +1815,7 @@ case class EnumType(tokens: Interval, fields: Seq[EnumField], tpe: Type, kind: E
   def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
   def foreachType(f: Type => Unit): Unit = f(tpe)
   def mapWidth(f: Width => Width) = this
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
   def widthOption: Option[Width] = tpe.widthOption
   
   def isGeneric: Boolean = {
@@ -1851,10 +1851,10 @@ abstract class VecType extends AggregateType {
   
   def mapBound(f: Expression => Expression): T
   
-  def asUnpackedVecType(): UnpackedVecType = {
+  def asUnpackedVecType: UnpackedVecType = {
     UnpackedVecType(tokens, tpe, bound, downto)
   }
-  def asPackedVecType(): PackedVecType = {
+  def asPackedVecType: PackedVecType = {
     PackedVecType(tokens, tpe, bound, downto)
   }
   
@@ -1863,7 +1863,7 @@ abstract class VecType extends AggregateType {
     // in most case there is a -1 in the verilog, let's strip it
     bound match {
       case DoPrim(_, _:PrimOps.Sub, Seq(e, sub), _, _) if(sub.serialize == "1") => e 
-      case n: Number => n.copy(value = s"${n.evalBigInt()+1}")
+      case n: Number => n.copy(value = s"${n.evalBigInt+1}")
       case _ => 
         DoPrim(bound.tokens, PrimOps.Add(UndefinedInterval), Seq(bound, Number(UndefinedInterval,"1", SwExpressionKind)), bound.kind, bound.tpe)
     }
@@ -1984,7 +1984,7 @@ case class ClockType(tokens: Interval) extends GroundType {
   def serialize: String = "Clock"
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def mapWidth(f: Width => Width) = this
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 /* Abstract reset, will be inferred to UInt<1> or AsyncReset */
 case class ResetType(tokens: Interval) extends GroundType {
@@ -1993,7 +1993,7 @@ case class ResetType(tokens: Interval) extends GroundType {
   def serialize: String = "Reset"
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def mapWidth(f: Width => Width) = this
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 case class AsyncResetType(tokens: Interval) extends GroundType {
   type T = AsyncResetType
@@ -2001,7 +2001,7 @@ case class AsyncResetType(tokens: Interval) extends GroundType {
   def serialize: String = "AsyncReset"
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def mapWidth(f: Width => Width) = this
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachWidth(f: Width => Unit): Unit = ()
 }
 
 case class UnknownType(tokens: Interval) extends Type {
@@ -2010,8 +2010,8 @@ case class UnknownType(tokens: Interval) extends Type {
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def mapType(f: Type => Type) = this
   def mapWidth(f: Width => Width) = this
-  def foreachType(f: Type => Unit): Unit = Unit
-  def foreachWidth(f: Width => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
+  def foreachWidth(f: Width => Unit): Unit = ()
   def widthOption: Option[Width] = None
 }
 object UnknownType {
@@ -2063,7 +2063,7 @@ case class Port(
   def mapType(f: Type => Type): T = this.copy(tpe=f(tpe))
   def mapString(f: String => String): T = this.copy(name = f(name))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes): T = this.copy(attributes = f(attributes))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
   def foreachExpr(f: Expression => Unit): Unit = resolution.foreachExpr(f)
   def foreachType(f: Type => Unit): Unit = f(tpe)
   def foreachString(f: String => Unit): Unit = f(name)
@@ -2126,12 +2126,12 @@ case class DefParam(
   def mapString(f: String => String) = this.copy(name = f(name))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
-  def foreachStmt(f: Statement => Unit): Unit = Unit
+  def foreachStmt(f: Statement => Unit): Unit = ()
   def foreachExpr(f: Expression => Unit): Unit = value match {
     case Some(e) => f(e)
     case _ => 
   }
-  def foreachType(f: Type => Unit): Unit = Unit
+  def foreachType(f: Type => Unit): Unit = ()
   def foreachString(f: String => Unit): Unit = f(name)
   def foreachVerilogAttributes(f: VerilogAttributes => Unit): Unit = f(attributes)
 }

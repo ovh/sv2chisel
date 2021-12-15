@@ -29,14 +29,14 @@ abstract class CustomHwEnum extends Enumeration {
   def getWidth: Int = this.values.map(_.getWidth).max
   def apply(): UInt = UInt(this.getWidth.W)
   
-  protected case class Val(data: Data) extends super.Val {}
-  implicit def valueToCustomVal(x: Value): Val = x.asInstanceOf[Val]
+  protected case class V(data: Data) extends super.Val {}
+  implicit def valueToCustomVal(x: Value): V = x.asInstanceOf[V]
   implicit def valueToUInt(x: Value): UInt = x.data.asUInt
 }
 
 private object CustomHwEnumExample extends CustomHwEnum {
-  val stateA = Val(0.U)
-  val stateB = Val(12.U)
-  val stateC = Val(5.U)
+  val stateA = V(0.U)
+  val stateB = V(12.U)
+  val stateC = V(5.U)
 }
 

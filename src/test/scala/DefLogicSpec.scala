@@ -36,16 +36,16 @@ class DefLogicSpecs extends Sv2ChiselSpec {
       |end
       """.stripMargin
     )
-    result should contain ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends MultiIOModule {")
 
-    result should contain ("val WWW = 1")
-    result should contain ("val change = Wire(Bool())")
-    result should contain ("val counter = RegInit(UInt(WW.W), 0.U)")
-    result should contain ("val current = RegInit(UInt(WWW.W), ((1 << WWW)-1).U)")
+    result should containStr ("val WWW = 1")
+    result should containStr ("val change = Wire(Bool())")
+    result should containStr ("val counter = RegInit(UInt(WW.W), 0.U)")
+    result should containStr ("val current = RegInit(UInt(WWW.W), ((1 << WWW)-1).U)")
     
     // TO DO 
-    result should contain ("when(current < ((1 << WWW)-1).U) {")
-    result should contain ("current := current+1.U")
+    result should containStr ("when(current < ((1 << WWW)-1).U) {")
+    result should containStr ("current := current+1.U")
     
   }
   
@@ -70,21 +70,21 @@ class DefLogicSpecs extends Sv2ChiselSpec {
 
       """.stripMargin
     )
-    result should contain ("class my_module(" )
-    result should contain ("val WIDTH: Int = 3" )
-    result should contain (") extends MultiIOModule {")
-    result should contain ("val rst = IO(Input(Bool()))") // clock is abstracted but rst is not
-    result should contain ("val counter = IO(Output(UInt(WIDTH.W)))")
+    result should containStr ("class my_module(" )
+    result should containStr ("val WIDTH: Int = 3" )
+    result should containStr (") extends MultiIOModule {")
+    result should containStr ("val rst = IO(Input(Bool()))") // clock is abstracted but rst is not
+    result should containStr ("val counter = IO(Output(UInt(WIDTH.W)))")
     
-    result should contain ("// NOTE: The following statements are auto generated based on existing output reg of the original verilog source")
-    result should contain ("val counter__out_reg = RegInit(UInt(WIDTH.W), 0.U)")
-    result should contain ("counter := counter__out_reg")
+    result should containStr ("// NOTE: The following statements are auto generated based on existing output reg of the original verilog source")
+    result should containStr ("val counter__out_reg = RegInit(UInt(WIDTH.W), 0.U)")
+    result should containStr ("counter := counter__out_reg")
 
-    result should contain ("when(rst) {")
-    result should contain (  "counter__out_reg := 0.U")
-    result should contain ("} .otherwise {")
-    result should contain (  "counter__out_reg := counter__out_reg+1.U")
-    result should contain ("}")
+    result should containStr ("when(rst) {")
+    result should containStr (  "counter__out_reg := 0.U")
+    result should containStr ("} .otherwise {")
+    result should containStr (  "counter__out_reg := counter__out_reg+1.U")
+    result should containStr ("}")
 
     
   }

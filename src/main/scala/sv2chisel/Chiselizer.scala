@@ -262,10 +262,9 @@ class ChiselImportPackages(val p: ImportPackages) extends Chiselized {
 
 class ChiselDefPackage(val p: DefPackage) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    val s = ArrayBuffer[ChiselTxt]()
-    s += ChiselLine(p, ctx, s"package object ${p.name} {")
-    s ++= p.body.chiselize(ctx.incr())
-    s += ChiselClosingLine(p, ctx, "}")
+    Seq(ChiselLine(p, ctx, s"package object ${p.name} {")) ++ 
+      p.body.chiselize(ctx.incr()) ++ 
+      Seq(ChiselClosingLine(p, ctx, "}"))
   }
 }
 
@@ -323,7 +322,7 @@ class ChiselModule(val m: Module) extends Chiselized {
         
       case _ =>
     }
-    s
+    s.toSeq
   }
 }
 
@@ -443,7 +442,7 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
         ChiselLine(na, pCtxt.incr(2), s"$dq${na.name}$dq -> $wL${na.name}$wR") +: comma
       }).flatten.dropRight(1)
       
-      s ++= ending
+      s.toSeq ++ ending
     }
 
     /************* ACTUAL BLACKBOX EMISSION ******************/
@@ -523,7 +522,7 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       s ++= addRessourceTxt
       s += ChiselLine(ctx, "}")
     }
-    s
+    s.toSeq
   }
 }
 
@@ -555,7 +554,7 @@ class ChiselDefFunction(val f: DefFunction) extends Chiselized {
     }
     s += ChiselTxt(mCtxt, s" {")
     s ++= f.mapPort(_ => EmptyStmt).body.chiselize(mCtxt)
-    s += ChiselClosingLine(f, ctx, "}")
+    s.toSeq :+ ChiselClosingLine(f, ctx, "}")
   }
 }
 
@@ -649,7 +648,7 @@ class ChiselEnumField(val f: EnumField) extends Chiselized {
     val decl = s"val ${f.name} ="
     forceValues match {
       case true => 
-        Seq(ChiselLine(f, ctx, s"$decl Val(")) ++
+        Seq(ChiselLine(f, ctx, s"$decl V(")) ++
           f.value.chiselize(ctx.incr()) ++
           Seq(ChiselTxt(f, ctx, ")"))
         
@@ -776,7 +775,7 @@ class ChiselStatement(val s: Statement) extends Chiselized {
       case p: Print => Seq(ChiselLine(s, ctx, p.serialize))
       case RawScala(str) => 
         // TODO : refacto => will fail on small chunks without intended newlines
-        str.split("\n").map(txt => ChiselLine(s, ctx, txt))
+        str.split("\n").toSeq.map(txt => ChiselLine(s, ctx, txt))
       case EmptyStmt => Seq()
       
       // default, not likely to provide anything chisel-compatible  
@@ -1000,7 +999,7 @@ class ChiselRawScalaExprWrapper(e: RawScalaExprWrapper){
       // finishing with an expression
       store ++= e.exprs.last.chiselize(ctx)
     }
-    store
+    store.toSeq
   }
 }
 
@@ -1016,7 +1015,7 @@ class ChiselStringLit(e: StringLit){
     val base = ChiselTxtS(e, ctx, e.escape)
     e.kind match {
       case HwExpressionKind => 
-        e.width.expr.evalBigIntOption() match {
+        e.width.expr.evalBigIntOption match {
           case Some(b) if(b == e.string.length) => base ++ ChiselTxtS(".V")
           case _ => base ++ ChiselTxtS(".V(") ++ e.width.chiselize(ctx) ++ ChiselTxtS(")")
         }
@@ -1541,7 +1540,7 @@ class ChiselDoCast(e: DoCast){
         
       case (isS, _, v: VecType, _) => 
         val width = e.expr.tpe.widthOption match {
-          case Some(w) => w.expr.evalBigIntOption() 
+          case Some(w) => w.expr.evalBigIntOption 
           case None => None 
         }
         rtrace(ctx, e, s"width: $width ; e.tpe : ${e.expr.tpe.serialize} ; e: ${e.expr.serialize}")
@@ -1601,7 +1600,7 @@ class ChiselConcat(e: Concat){
 
 class ChiselComment(val c: Comment) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    c.str.split("\n").map(s => {
+    c.str.split("\n").toSeq.map(s => {
       ChiselLine(c, ctx, s"// $s")
     })
   }
@@ -1659,8 +1658,7 @@ class ChiselIfGen(val i: IfGen) extends Chiselized {
     r += ChiselTxt(new Interval(i.pred.tokens.b, i.pred.tokens.b), ctx, ") {")
     r ++= i.conseq.chiselize(iCtxt)
     r ++= getAlt(i.alt)
-    r += ChiselClosingLine(i, ctx, "}")
-    r
+    r.toSeq :+ ChiselClosingLine(i, ctx, "}")
   }
 }
 
@@ -1692,8 +1690,7 @@ class ChiselConditionally(val i: Conditionally) extends Chiselized {
     r += ChiselTxt(new Interval(i.pred.tokens.b, i.pred.tokens.b), ctx, ") {")
     r ++= i.conseq.chiselize(iCtxt)
     r ++= getAlt(i.alt)
-    r += ChiselClosingLine(i, ctx, "}")
-    r
+    r.toSeq :+ ChiselClosingLine(i, ctx, "}")
   }
 }
 
@@ -1814,7 +1811,7 @@ class ChiselDefInstance(val i: DefInstance) extends Chiselized {
     })
     // Port map
     // Best effort based on predefined flows
-    decl ++ (i.portMap.map( a => {
+    decl.toSeq ++ (i.portMap.map( a => {
       a match {
         case na: NamedAssign => 
           rdebug(ctx, na, s"${na.serialize}: $na")

@@ -27,8 +27,8 @@ class AsUIntSubAccessSpec extends Sv2ChiselSpec {
     )
     debug(result)
 
-    result shouldNot contain ( "b := a.asUInt(3,0)" )
-    result should contain ( "b := a.asUInt.apply(3,0)" )
+    result shouldNot containStr ( "b := a.asUInt(3,0)" )
+    result should containStr ( "b := a.asUInt.apply(3,0)" )
   }
   
   it should "add apply for asUInt() in subindex" in {
@@ -46,8 +46,8 @@ class AsUIntSubAccessSpec extends Sv2ChiselSpec {
     )
     debug(result)
 
-    result shouldNot contain ( "b := a.asUInt(3)" )
-    result should contain ( "b := a.asUInt.apply(3)" )
+    result shouldNot containStr ( "b := a.asUInt(3)" )
+    result should containStr ( "b := a.asUInt.apply(3)" )
   }
   
   it should "add apply for literals in subindex" in {
@@ -57,7 +57,7 @@ class AsUIntSubAccessSpec extends Sv2ChiselSpec {
     )
     debug(result)
 
-    result should contain ( "val P: Bool = 5.U.apply(2)" )
+    result should containStr ( "val P: Bool = 5.U.apply(2)" )
   }
 
 }

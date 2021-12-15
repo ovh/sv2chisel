@@ -13,7 +13,7 @@ class EmitterSpec extends Sv2ChiselSpec {
   behavior of "Emitter"
   
   def checkOneLine(result: String) = {
-    result should contain ("import chisel3._")
+    result should containStr ("import chisel3._")
     result should containLineSet (
       "// first intro comment",
       "",
@@ -119,7 +119,7 @@ class EmitterSpec extends Sv2ChiselSpec {
   }
   
   def checkMultiLine(result: String) = {
-    result should contain ("import chisel3._")
+    result should containStr ("import chisel3._")
     result should containLineSet (
       "/* first intro comment",
       " *",
@@ -267,7 +267,7 @@ class EmitterSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     
-    result should contain ("import chisel3._")
+    result should containStr ("import chisel3._")
     result should containLineSet (
       "/* first intro comment",
       " *",
@@ -305,7 +305,7 @@ class EmitterSpec extends Sv2ChiselSpec {
       |endpackage""".stripMargin
     )
     
-    result should contain ("import chisel3._")
+    result should containStr ("import chisel3._")
     result should containLineSet (
       "package object test_p {",
       "  val A = 2",
@@ -330,7 +330,7 @@ class EmitterSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     
-    result should contain ("import chisel3._")
+    result should containStr ("import chisel3._")
     result should containLineSet (
       "  val a: Boolean",
       "  val b: Boolean",

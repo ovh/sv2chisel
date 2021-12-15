@@ -40,9 +40,9 @@ class AddDontCareSpec extends Sv2ChiselSpec {
 
     val result = emit(sub + main, Some("raw"))
       
-    result should contain ( "class my_sub() extends RawModule {")
+    result should containStr ( "class my_sub() extends RawModule {")
     
-    result should contain ( 
+    result should containStr ( 
       "val inst = Module(new my_sub)",
       "inst.i := i",
       "o := inst.o",
@@ -74,9 +74,9 @@ class AddDontCareSpec extends Sv2ChiselSpec {
 
     val result = emit(bb, main, Some("raw"), TranslationOptions())
       
-    result should contain ( "class my_black_box() extends BlackBox {")
+    result should containStr ( "class my_black_box() extends BlackBox {")
     
-    result should contain ( 
+    result should containStr ( 
       "val inst = Module(new my_black_box)",
       "inst.io.i := i",
       "o := inst.io.o",

@@ -36,7 +36,7 @@ class HwString(s: String) {
 
   /** Simple conversion (length is inferred based on string length) */
   def V: Vec[UInt] = { //scalastyle:ignore method.name
-    VecInit(s.toCharArray.map(_.U(8.W)))
+    VecInit(s.toCharArray.toIndexedSeq.map(_.U(8.W)))
   }
 
   /** Conversion with length specified

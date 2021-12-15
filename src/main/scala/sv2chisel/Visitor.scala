@@ -52,7 +52,7 @@ class Visitor(
   }
   
   private def visitSourceText(ctx: Source_textContext): SourceFile = {
-    SourceFile(ctx.getSourceInterval(), safePath, ctx.description.asScala.map(visitDescription))
+    SourceFile(ctx.getSourceInterval(), safePath, ctx.description.asScala.toSeq.map(visitDescription))
   }
   
   private def unsupportedDesc(ctx: ParserRuleContext, msg : String): Description = {
@@ -73,7 +73,7 @@ class Visitor(
       case p: Program_declarationContext => unsupportedDesc(p, "Program_declarationContext")
       case c: Config_declarationContext => unsupportedDesc(c, "Config_declarationContext")
       case _ => 
-        // val attr = visitAttributes(ctx.attribute_instance.asScala)
+        // val attr = visitAttributes(ctx.attribute_instance.asScala.toSeq)
         (ctx.package_item_item, ctx.bind_directive) match {
           case (p, null) => unsupportedDesc(p, "Isolated Package Item")
           case (null, b) => unsupportedDesc(b, "Isolated Bind Directive")
@@ -97,7 +97,7 @@ class Visitor(
   
   private def visitTf_port_item(p: Tf_port_itemContext): Port = {
     
-    val attr = visitAttributes(p.attribute_instance.asScala)
+    val attr = visitAttributes(p.attribute_instance.asScala.toSeq)
 
     val direction = p.tf_port_direction.getChild(0) match {
       case pd: Port_directionContext => getPortDirection(pd)
@@ -133,7 +133,7 @@ class Visitor(
       case (tpe, name) => (visitData_type_or_implicit(tpe, true)._1, name.getText())
     }
     
-    val unpacked = p.variable_dimension.asScala.map(getVariableDim)
+    val unpacked = p.variable_dimension.asScala.toSeq.map(getVariableDim)
       .collect {case u: UnpackedVecType => u}
     
     val fullType = getFullType(unpacked, tpe)
@@ -148,7 +148,7 @@ class Visitor(
   
   // unfortunate partial code duplication with visitTf_port_item due to duplication in parser tree
   private def visitTf_port_declaration(ctx: Tf_port_declarationContext): Seq[Port] = {
-    val attr = visitAttributes(ctx.attribute_instance.asScala)
+    val attr = visitAttributes(ctx.attribute_instance.asScala.toSeq)
 
     val direction = ctx.tf_port_direction.getChild(0) match {
       case pd: Port_directionContext => getPortDirection(pd)
@@ -168,11 +168,11 @@ class Visitor(
       case cdi => visitData_type_or_implicit(cdi, true)._1 // we assume synthesizable hardware ...
     }
     
-    ctx.list_of_tf_variable_identifiers.list_of_tf_variable_identifiers_item.asScala.map(item => {
+    ctx.list_of_tf_variable_identifiers.list_of_tf_variable_identifiers_item.asScala.toSeq.map(item => {
 
       val argname = item.identifier.getText()
       
-      val unpacked = item.variable_dimension.asScala.map(getVariableDim)
+      val unpacked = item.variable_dimension.asScala.toSeq.map(getVariableDim)
         .collect {case u: UnpackedVecType => u}
       val fullType = getFullType(unpacked, tpe)
       
@@ -201,7 +201,7 @@ class Visitor(
       case null =>
       case c => unsupported.raiseIt(ctx, s"Complex function name, got: ${c.getText}") 
     }
-    val name = ctx.identifier.asScala match {
+    val name = ctx.identifier.asScala.toSeq match {
       case Seq() => throwParserError(ctx)
       case Seq(id) => id.getText()
       case s => s.map(_.getText()).mkString(".")
@@ -209,13 +209,13 @@ class Visitor(
     
     val portItems = ctx.tf_port_list match {
       case null => Seq()
-      case l => l.tf_port_item.asScala.map(visitTf_port_item)
+      case l => l.tf_port_item.asScala.toSeq.map(visitTf_port_item)
     }
     
-    val stmts = ctx.tf_item_declaration.asScala.map(d => d.getChild(0) match {
+    val stmts = ctx.tf_item_declaration.asScala.toSeq.map(d => d.getChild(0) match {
       case b: Block_item_declarationContext => Seq(visitBlock_item_declaration(b))
       case p: Tf_port_declarationContext => visitTf_port_declaration(p)
-    }).flatten ++ ctx.statement_or_null.asScala.map(visitStatement_or_null)
+    }).flatten ++ ctx.statement_or_null.asScala.toSeq.map(visitStatement_or_null)
     
     val stmt = getStmtOrSimpleBlock(ctx, portItems ++ stmts)
     
@@ -237,7 +237,7 @@ class Visitor(
   }
   
   private def visitPackage_item(ctx: Package_itemContext): Statement = {
-    val attr = visitAttributes(ctx.attribute_instance.asScala)
+    val attr = visitAttributes(ctx.attribute_instance.asScala.toSeq)
     ctx.package_item_item.getChild(0) match {
       case n: Net_declarationContext => visitNet_declaration(n, attr)
       case d: Data_declarationContext => visitData_declaration(d, attr)
@@ -269,8 +269,8 @@ class Visitor(
   private def visitPackage_declaration(ctx: Package_declarationContext): Description = {
     unsupported.check(ctx)
     
-    val attr = visitAttributes(ctx.attribute_instance.asScala)
-    val id = ctx.identifier.asScala match {
+    val attr = visitAttributes(ctx.attribute_instance.asScala.toSeq)
+    val id = ctx.identifier.asScala.toSeq match {
       case Seq(id) => id.getText  
       case Seq(id1, id2) => 
         val decl = id1.getText
@@ -280,7 +280,7 @@ class Visitor(
         decl
       case _ => throwParserError(ctx)
     }
-    val body = ctx.package_item.asScala.map(visitPackage_item) match {
+    val body = ctx.package_item.asScala.toSeq.map(visitPackage_item) match {
       case Seq() => EmptyStmt
       case Seq(s) => s
       case s => SimpleBlock(s)
@@ -290,8 +290,8 @@ class Visitor(
   }
   
   private def visitPackageImport(ctx: Package_import_declarationContext): ImportPackages = {
-    val packages = ctx.package_import_item.asScala.map{ p => 
-      p.identifier.asScala match {
+    val packages = ctx.package_import_item.asScala.toSeq.map{ p => 
+      p.identifier.asScala.toSeq match {
         case Seq(h) => PackageRef(ctx.getSourceInterval(),h.getText())
         case Seq(h,q) => PackageRef(ctx.getSourceInterval(),h.getText(),q.getText())
         case _ => throwParserError(ctx)
@@ -333,7 +333,7 @@ class Visitor(
   }
   
   private def visitAttributeInstance(ctx: Attribute_instanceContext) : VerilogAttributes = {
-    (ctx.attr_spec.asScala, ctx.TICK_IDENTIFIER) match {
+    (ctx.attr_spec.asScala.toSeq, ctx.TICK_IDENTIFIER) match {
       case (Seq(), id) => VerilogAttribute(ctx.getSourceInterval(), id.getText())
       case (l, null) => 
         l.map { child =>
@@ -437,7 +437,7 @@ class Visitor(
   }
   
   private def getStructUnionMember(ctx: Struct_union_memberContext): Field = {
-    val attr = visitAttributes(ctx.attribute_instance.asScala)
+    val attr = visitAttributes(ctx.attribute_instance.asScala.toSeq)
     (ctx.random_qualifier) match {
       case null => // ok
       case _ => unsupported.raiseIt(ctx, "random qualifier is not supported")
@@ -445,7 +445,7 @@ class Visitor(
     val (tpe, res) = visitData_type_or_void(ctx.data_type_or_void)
     
     val l = ctx.list_of_variable_decl_assignments.variable_decl_assignment
-      .asScala.map(d => visitVariable_decl_assignment(d, tpe, res, attr))
+      .asScala.toSeq.map(d => visitVariable_decl_assignment(d, tpe, res, attr))
     
     l match {
       case Seq(l) => Field(ctx.getSourceInterval, attr, l.name, Default, l.tpe)
@@ -474,7 +474,7 @@ class Visitor(
   // enum_name_declaration:
   //  identifier ( LSQUARE_BR integral_number ( COLON integral_number )? RSQUARE_BR )? ( ASSIGN expression )?;
   private def getEnumNameDecl(ctx: Enum_name_declarationContext): EnumField = {
-    ctx.integral_number.asScala match {
+    ctx.integral_number.asScala.toSeq match {
       case Seq() =>
       case _ => unsupported.raiseIt(ctx, s"advanced enum name declaration (ignoring bracket content)") 
     }
@@ -487,7 +487,7 @@ class Visitor(
   private def getDataTypeUsual(ctx: Data_type_usualContext, isHw: Boolean): (Type, LogicResolution) = {
     trace(ctx, s"getDataTypeUsual ${getRawText(ctx)}")
     val dtp = ctx.data_type_primitive
-    val enum = ctx.enum_name_declaration.asScala
+    val enum = ctx.enum_name_declaration.asScala.toSeq
     val struct = ctx.struct_union
     val pack = ctx.package_or_class_scoped_path
     
@@ -516,7 +516,7 @@ class Visitor(
           case "struct" => 
             if(ctx.KW_PACKED == null) info(ctx, "All struct declaration are treated as packed")
             if(ctx.signing != null) unsupported.raiseIt(ctx, "Signed typedef")
-            val fields = ctx.struct_union_member.asScala.map(getStructUnionMember)
+            val fields = ctx.struct_union_member.asScala.toSeq.map(getStructUnionMember)
             (BundleType(ctx.getSourceInterval, fields), LogicUnresolved(UndefinedExpression()))
             
           case "union" => unsupportedType(ctx, "union")
@@ -526,7 +526,7 @@ class Visitor(
       case _ => throwParserError(ctx)
     }
     // IMPORTANT NOTE: variable dim is to be applied to any result of this function !!
-    val packed = ctx.variable_dimension.asScala.map(getVariableDim)
+    val packed = ctx.variable_dimension.asScala.toSeq.map(getVariableDim)
       .collect {case u: UnpackedVecType => u.asPackedVecType}
     (packed, tpe) match {
       case (Seq(), _) => (tpe, res)
@@ -694,7 +694,7 @@ class Visitor(
   
   private def getPath(ctx: Package_or_class_scoped_pathContext): Reference = {
     unsupported.check(ctx)
-    val path = ctx.package_or_class_scoped_path_item.asScala.map(getPathItem).reverse
+    val path = ctx.package_or_class_scoped_path_item.asScala.toSeq.map(getPathItem).reverse
     val intv = ctx.getSourceInterval()
     path match {
       case Seq()  => throwParserError(ctx)
@@ -739,8 +739,8 @@ class Visitor(
   }
   
   private def getStructPatternKey(ctx: Assignment_patternContext): Expression = {    
-    val exprs = ctx.expression.asScala.map(getExpression(_))
-    val assigns = ctx.structure_pattern_key.asScala.map(c => 
+    val exprs = ctx.expression.asScala.toSeq.map(getExpression(_))
+    val assigns = ctx.structure_pattern_key.asScala.toSeq.map(c => 
       (c.identifier, c.assignment_pattern_key) match {
         case (i, null) => getRef(i)
         case (null, a) => getAssignPatternKey(a)
@@ -751,8 +751,8 @@ class Visitor(
   }
   
   private def getArrayPatternKey(ctx: Assignment_patternContext): Expression = {    
-    val exprs = ctx.expression.asScala.map(getExpression(_))
-    val assigns = ctx.array_pattern_key.asScala.map(c => 
+    val exprs = ctx.expression.asScala.toSeq.map(getExpression(_))
+    val assigns = ctx.array_pattern_key.asScala.toSeq.map(c => 
       (c.constant_expression, c.assignment_pattern_key) match {
         case (e, null) => getExpression(e.expression)
         case (null, a) => getAssignPatternKey(a)
@@ -768,10 +768,10 @@ class Visitor(
       case tpe => unsupported.raiseIt(ctx, s"Unsupported assignement pattern type ${tpe.getText()} ")
     }
     val assig = ctx.assignment_pattern
-    val exprs = assig.expression.asScala
+    val exprs = assig.expression.asScala.toSeq
     
-    val struct = assig.structure_pattern_key.asScala
-    val array = assig.array_pattern_key.asScala
+    val struct = assig.structure_pattern_key.asScala.toSeq
+    val array = assig.array_pattern_key.asScala.toSeq
     
     (assig.constant_expression, exprs, struct, array) match {
       case (c,   Seq(), Seq(), Seq()) => getExpression(c.expression)
@@ -808,12 +808,12 @@ class Visitor(
     }
     
     if(noNameOnly){
-      ctx.list_of_arguments_named_item.asScala.foreach(getNamed) // to get detailed errors
-      ctx.expression.asScala.map(getNoName)
+      ctx.list_of_arguments_named_item.asScala.toSeq.foreach(getNamed) // to get detailed errors
+      ctx.expression.asScala.toSeq.map(getNoName)
     } else {
       // can get named then named or expression then named
       // so named will always be after noname
-      ctx.expression.asScala.map(getNoName) ++ ctx.list_of_arguments_named_item.asScala.map(getNamed)
+      ctx.expression.asScala.toSeq.map(getNoName) ++ ctx.list_of_arguments_named_item.asScala.toSeq.map(getNamed)
     }
   }
   
@@ -839,7 +839,7 @@ class Visitor(
             case null =>  unsupportedExpr(d, "Unexpecting package or class path in primary function call")
             case p => 
               val loc = getPath(p)
-              val res = dtp.variable_dimension.asScala.map(d => getVariableDimSubRange(d, loc)) match {
+              val res = dtp.variable_dimension.asScala.toSeq.map(d => getVariableDimSubRange(d, loc)) match {
                 case Seq() => loc 
                 case s => s.reduceRight((a, b) => a match {
                   case sr: SubRange => sr.copy(expr = b)
@@ -886,7 +886,7 @@ class Visitor(
   
   private def getConcatenation(ctx: ConcatenationContext): Expression = {
     val i = ctx.getSourceInterval
-    val exp = ctx.expression.asScala.map(getExpression(_))
+    val exp = ctx.expression.asScala.toSeq.map(getExpression(_))
     ctx.concatenation match {
       case null => Concat(i, exp, uk, ut)
       case c => 
@@ -899,7 +899,7 @@ class Visitor(
   
   private def getArrayRangeExpr(ctx: Array_range_expressionContext, loc: Expression) : Expression = {
     val intv = ctx.getSourceInterval()
-    ctx.expression.asScala.map(getExpression(_)) match {
+    ctx.expression.asScala.toSeq.map(getExpression(_)) match {
       case Seq(i) => SubIndex(intv, loc, i, UnknownExpressionKind, UnknownType())
       case Seq(left, right) => 
         val (l,r) = getComplexRange(ctx.operator_plus_minus, left, right)
@@ -926,7 +926,7 @@ class Visitor(
   //               LPAREN ( list_of_arguments )? RPAREN
   //               ( KW_WITH LPAREN expression RPAREN )? #PrimaryCall
   private def getCall(ctx: PrimaryCallContext): Expression = {
-    forbidExpressionAttributes(ctx.attribute_instance.asScala)
+    forbidExpressionAttributes(ctx.attribute_instance.asScala.toSeq)
     unsupported.check(ctx)
     val ref = getPrimary(ctx.primary) match {
       case r: Reference => r 
@@ -1010,7 +1010,7 @@ class Visitor(
         s.map(ctx => {
           val field = getRefText(ctx.identifier)
           val expr = SubField(ctx.getSourceInterval, path, field, UnknownExpressionKind, UnknownType())
-          getSubIndexes(expr, ctx.bit_select.asScala)
+          getSubIndexes(expr, ctx.bit_select.asScala.toSeq)
         }).reduceLeft((a,b) => updateLastIndexRef(b, a))
     }
   }
@@ -1033,19 +1033,19 @@ class Visitor(
         // b_vect[15 -: 8] // == b_vect[8 :15]
         lazy val r_minus_one = r match {
           case DoPrim(_,Add(_),Seq(e, Number(_, "1",_,_,_)),_,_) => e // remove trailing +1
-          case n: Number => n.copy(value = s"${n.evalBigInt()-1}") // do the simple math
+          case n: Number => n.copy(value = s"${n.evalBigInt-1}") // do the simple math
           case _ => DoPrim(ui, Sub(ui), Seq(r, Number(ui, "1"))) // default
         }
         lazy val r_plus_one = r match {
           case DoPrim(_,Sub(_),Seq(e, Number(_, "1",_,_,_)),_,_) => e // remove trailing -1
-          case n: Number => n.copy(value = s"${n.evalBigInt()+1}") // do the simple math
+          case n: Number => n.copy(value = s"${n.evalBigInt+1}") // do the simple math
           case _ => DoPrim(ui, Add(ui), Seq(r, Number(ui, "1"))) // default
         }
       
         (op.PLUS, op.MINUS, l, r) match {
-        case (_, null, nl:Number, nr: Number) => (Number(ui, s"${nl.evalBigInt()+nr.evalBigInt()-1}"), l)
+        case (_, null, nl:Number, nr: Number) => (Number(ui, s"${nl.evalBigInt+nr.evalBigInt-1}"), l)
         case (_, null, _, _) => (DoPrim(ui, Add(ui), Seq(l, r_minus_one)), l)
-        case (null, _, nl:Number, nr: Number) => (l, Number(ui, s"${nl.evalBigInt()-nr.evalBigInt()+1}"))
+        case (null, _, nl:Number, nr: Number) => (l, Number(ui, s"${nl.evalBigInt-nr.evalBigInt+1}"))
         case (null, _, _, _) => (l, DoPrim(ui, Sub(ui), Seq(l, r_plus_one)))
         case _ => throwParserError(ctx)
       }
@@ -1054,9 +1054,9 @@ class Visitor(
   
   private def getVariablePath(ctx: Package_or_class_scoped_hier_id_with_selectContext): Expression = {
     val path = getPath(ctx.package_or_class_scoped_path)
-    val bs = ctx.bit_select.asScala
-    val id_bs = ctx.identifier_with_bit_select.asScala
-    val range = ctx.expression.asScala.map(getExpression(_))
+    val bs = ctx.bit_select.asScala.toSeq
+    val id_bs = ctx.identifier_with_bit_select.asScala.toSeq
+    val range = ctx.expression.asScala.toSeq.map(getExpression(_))
     
     val expr = getSubFieldsSubIndexes(getSubIndexes(path, bs), id_bs)
     
@@ -1078,7 +1078,7 @@ class Visitor(
   private def getVariableLvalue(ctx: Variable_lvalueContext) : Expression = {
     ctx match {
       case v: VarLConcatContext => 
-        val exprs = v.variable_lvalue.asScala.map(getVariableLvalue)
+        val exprs = v.variable_lvalue.asScala.toSeq.map(getVariableLvalue)
         Concat(ctx.getSourceInterval, exprs, UnknownExpressionKind)
 
       case v: VarLPathContext =>
@@ -1094,9 +1094,9 @@ class Visitor(
   private def getIncrDecr(ctx: Inc_or_dec_expressionContext): Expression = {
     val (a,v,op,prefix) = ctx match {
       case c:Inc_or_dec_expressionPreContext => 
-        (c.attribute_instance.asScala, c.variable_lvalue, c.inc_or_dec_operator, true)
+        (c.attribute_instance.asScala.toSeq, c.variable_lvalue, c.inc_or_dec_operator, true)
       case c:Inc_or_dec_expressionPostContext => 
-        (c.attribute_instance.asScala, c.variable_lvalue, c.inc_or_dec_operator, false)
+        (c.attribute_instance.asScala.toSeq, c.variable_lvalue, c.inc_or_dec_operator, false)
     }
     forbidExpressionAttributes(a)
     
@@ -1111,7 +1111,7 @@ class Visitor(
   }
   
   private def getMulDivRem(ctx: ExpressionBinOpMulContext) : Expression = {
-    forbidExpressionAttributes(ctx.attribute_instance.asScala)
+    forbidExpressionAttributes(ctx.attribute_instance.asScala.toSeq)
     val op = ctx.operator_mul_div_mod
     val primop = (op.MUL, op.DIV, op.MOD) match {
       case (m, null, null) => Mul(m.getSourceInterval())
@@ -1121,10 +1121,10 @@ class Visitor(
     }
     val kind = UnknownExpressionKind
     val tpe = UnknownType()
-    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.map(getExpression(_)), kind, tpe)
+    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
   }
   private def getShift(ctx: ExpressionBinOpShiftContext) : Expression = {
-    forbidExpressionAttributes(ctx.attribute_instance.asScala)
+    forbidExpressionAttributes(ctx.attribute_instance.asScala.toSeq)
     val op = ctx.operator_shift
     val primop = (op.SHIFT_LEFT, op.SHIFT_RIGHT, op.ARITH_SHIFT_LEFT, op.ARITH_SHIFT_RIGHT) match {
       case (s, null, null, null) => Shl(s.getSourceInterval())
@@ -1135,11 +1135,11 @@ class Visitor(
     }
     val kind = UnknownExpressionKind
     val tpe = UnknownType()
-    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.map(getExpression(_)), kind, tpe)
+    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
   }
   
   private def getAddSub(ctx: ExpressionBinOpAddContext) : Expression = {
-    forbidExpressionAttributes(ctx.attribute_instance.asScala)
+    forbidExpressionAttributes(ctx.attribute_instance.asScala.toSeq)
     val op = ctx.operator_plus_minus
     val primop = (op.PLUS, op.MINUS) match {
       case (a, null) => Add(a.getSourceInterval())
@@ -1148,19 +1148,19 @@ class Visitor(
     }
     val kind = UnknownExpressionKind
     val tpe = UnknownType()
-    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.map(getExpression(_)), kind, tpe)
+    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
   }
   
   private def getPowerOp(ctx: ExpressionBinOpPowerContext): Expression = {
-    forbidExpressionAttributes(ctx.attribute_instance.asScala)
+    forbidExpressionAttributes(ctx.attribute_instance.asScala.toSeq)
     val primop = Pow(ctx.DOUBLESTAR.getSourceInterval())
     val kind = UnknownExpressionKind
     val tpe = UnknownType()
-    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.map(getExpression(_)), kind, tpe)
+    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
   }
   
   private def getCmpOp(ctx: ExpressionBinOpCmpContext): Expression = {
-    forbidExpressionAttributes(ctx.attribute_instance.asScala)
+    forbidExpressionAttributes(ctx.attribute_instance.asScala.toSeq)
     val op = ctx.operator_cmp
     val primop = (op.LT, op.LE, op.GT, op.GE) match {
       case (lt, null, null, null) => Lt(lt.getSourceInterval())
@@ -1171,11 +1171,11 @@ class Visitor(
     }
     val kind = UnknownExpressionKind
     val tpe = UnknownType()
-    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.map(getExpression(_)), kind, tpe)
+    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
   }
   
   private def getEqOp(ctx: ExpressionBinOpEqContext): Expression = {
-    forbidExpressionAttributes(ctx.attribute_instance.asScala)
+    forbidExpressionAttributes(ctx.attribute_instance.asScala.toSeq)
     val op = ctx.operator_eq_neq
     val primop = (op.EQ,op.NEQ,op.CASE_EQ,op.CASE_NEQ,op.WILDCARD_EQ,op.WILDCARD_NEQ) match {
       case (eq, null, null, null, null, null) => Eq(eq.getSourceInterval())
@@ -1188,11 +1188,11 @@ class Visitor(
     }
     val kind = UnknownExpressionKind
     val tpe = UnknownType()
-    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.map(getExpression(_)), kind, tpe)
+    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
   }
   
   private def getTernaryOp(ctx: ExpressionTernaryContext): Expression = {
-    forbidExpressionAttributes(ctx.attribute_instance.asScala)
+    forbidExpressionAttributes(ctx.attribute_instance.asScala.toSeq)
     ctx.KW_MATCHES match {
       case null =>
       case k => unsupported.raiseIt(ctx, s"Unsupported keyword ${k.getText()}") 
@@ -1201,7 +1201,7 @@ class Visitor(
     val primop = InlineIf(ctx.QUESTIONMARK.getSourceInterval())
     val kind = UnknownExpressionKind
     val tpe = UnknownType()
-    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.map(getExpression(_)), kind, tpe)
+    DoPrim(ctx.getSourceInterval, primop, ctx.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
   }
   
   private def unsupportedUnary(o: TerminalNode): PrimOp = {
@@ -1254,7 +1254,7 @@ class Visitor(
       
       case e: ExpressionUnaryContext => getUnaryOp(e)
       case e: ExpressionBinOpBitAndContext => 
-        DoPrim(i, BitAnd(e.AMPERSAND.getSourceInterval()), e.expression.asScala.map(getExpression(_)), kind, tpe)
+        DoPrim(i, BitAnd(e.AMPERSAND.getSourceInterval()), e.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
       case e: ExpressionBinOpBitXorContext => 
         val opX = e.operator_xor
         val op = (opX.XOR,opX.NXOR,opX.XORN) match {
@@ -1265,13 +1265,13 @@ class Visitor(
             BitXor(opX.getSourceInterval())
           case _ => throwParserError(ctx)
         }
-        DoPrim(i, op, e.expression.asScala.map(getExpression(_)), kind, tpe)
+        DoPrim(i, op, e.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
         
       case e: ExpressionBinOpBitOrContext => 
-        DoPrim(i, BitOr(e.BAR.getSourceInterval()), e.expression.asScala.map(getExpression(_)), kind, tpe)
+        DoPrim(i, BitOr(e.BAR.getSourceInterval()), e.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
       case e: ExpressionBinOpAndContext => 
-        DoPrim(i, And(e.LOG_AND.getSourceInterval()), e.expression.asScala.map(getExpression(_)), kind, tpe)
-      case e: ExpressionBinOpOrContext => DoPrim(i, Or(e.LOG_OR.getSourceInterval()), e.expression.asScala.map(getExpression(_)), kind, tpe)
+        DoPrim(i, And(e.LOG_AND.getSourceInterval()), e.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
+      case e: ExpressionBinOpOrContext => DoPrim(i, Or(e.LOG_OR.getSourceInterval()), e.expression.asScala.toSeq.map(getExpression(_)), kind, tpe)
       
       case e: ExpressionBinOpImplContext => unsupportedExpr(e, "operator imply") 
       case e: ExpressionAssignContext => unsupportedExpr(e, "assign expression")
@@ -1287,7 +1287,7 @@ class Visitor(
     val intv = ctx.getSourceInterval()
     ctx match {
       case null => SomeVecType(intv, Seq(UnknownType()), UndefinedExpression(intv), false)
-      case r => r.expression.asScala match {
+      case r => r.expression.asScala.toSeq match {
         case Seq(h, l) => val (high, downto) = (h.getText(),l.getText()) match {
             case (_,"0") => (h, true)
             case ("0",_) => (l, false)
@@ -1301,10 +1301,10 @@ class Visitor(
   }
   
   private def getPackedDim(ctx: Packed_dimensionContext) : PackedVecType = {
-    getRangeExpression(ctx.range_expression).asPackedVecType()
+    getRangeExpression(ctx.range_expression).asPackedVecType
   }
   private def getUnpackedDim(ctx: Unpacked_dimensionContext) : UnpackedVecType = {
-    getRangeExpression(ctx.range_expression).asUnpackedVecType()
+    getRangeExpression(ctx.range_expression).asUnpackedVecType
   }
   
   private def getArrayRangeType(ctx: Array_range_expressionContext) : Type = {
@@ -1314,7 +1314,7 @@ class Visitor(
       case _ => unsupported.raiseIt(ctx, "Complex array range declaration are not supported.")
     }
     
-    ctx.expression.asScala match {
+    ctx.expression.asScala.toSeq match {
       case Seq(l, h) => val (high, downto) = (l.getText(),h.getText()) match {
           case ("0",_) => (h, false)
           case (_,"0") => (l, true)
@@ -1328,7 +1328,7 @@ class Visitor(
   }
   
   private def getImplicitDataType(ctx: Implicit_data_typeContext) : Type = {
-    def err(){
+    def err(): Unit = {
       unsupported.raiseIt(ctx, s"Unsupported signed implicit data type ${getRawText(ctx)}")
     }
     
@@ -1336,7 +1336,7 @@ class Visitor(
     // raise error when not feasible
     val signed = isSigned(ctx.signing)
     
-    ctx.packed_dimension.asScala.map(getPackedDim) match {
+    ctx.packed_dimension.asScala.toSeq.map(getPackedDim) match {
       case Seq() => 
         if(isSigned(ctx.signing)) { err() }
         BoolType(ctx.getSourceInterval())
@@ -1438,12 +1438,12 @@ class Visitor(
       case list =>
         // nonansi port listing prior inline declaration 
         // warning only here because this list of declared port name is purely informative
-        val declaredPortNames = list.nonansi_port.asScala.map(p => {
+        val declaredPortNames = list.nonansi_port.asScala.toSeq.map(p => {
           (p.identifier, p.nonansi_port__expr) match {
-            case (null, expr) => expr.identifier_doted_index_at_end.asScala match {
-              case Seq(id) => id.identifier.asScala match {
+            case (null, expr) => expr.identifier_doted_index_at_end.asScala.toSeq match {
+              case Seq(id) => id.identifier.asScala.toSeq match {
                   case Seq(name) => 
-                    if(!id.range_expression.asScala.isEmpty) 
+                    if(!id.range_expression.asScala.toSeq.isEmpty) 
                       critical(ctx, s"NonAnsi port with unexpected range_expression");
                     name.getText()
                   case s => 
@@ -1466,8 +1466,8 @@ class Visitor(
         })
         
         var previousDirection : Option[Direction] = None
-        val ports = list.list_of_port_declarations_ansi_item.asScala.map(p => {
-          val attr = visitAttributes(p.attribute_instance.asScala)
+        val ports = list.list_of_port_declarations_ansi_item.asScala.toSeq.map(p => {
+          val attr = visitAttributes(p.attribute_instance.asScala.toSeq)
           val decl = p.ansi_port_declaration
           val direction = (decl.port_direction, previousDirection) match {
             case (null, None) => 
@@ -1487,7 +1487,7 @@ class Visitor(
           }
           val name = decl.port_identifier.getText()
           
-          val unpacked = decl.variable_dimension.asScala.map(getVariableDim)
+          val unpacked = decl.variable_dimension.asScala.toSeq.map(getVariableDim)
             .collect {case u: UnpackedVecType => u}
           
           val fullType = getFullType(unpacked, tpe)
@@ -1499,7 +1499,7 @@ class Visitor(
   }
   
   private def visitNonansi_port_declaration(ctx: Nonansi_port_declarationContext): Statement = {
-    val attr = visitAttributes(ctx.attribute_instance.asScala)
+    val attr = visitAttributes(ctx.attribute_instance.asScala.toSeq)
     
     val (direction, (tpe, resolution)) = (ctx.KW_INPUT,ctx.KW_OUTPUT,ctx.KW_INOUT) match {
       case (d, null, null) => (Input(d.getSourceInterval()), visitTypeRes(ctx.net_or_var_data_type, isHw = true))
@@ -1513,10 +1513,10 @@ class Visitor(
     // IDs for INPUT and INOUT
     val portA = ctx.list_of_variable_identifiers match {
       case null => Seq()
-      case l => l.list_of_variable_identifiers_item.asScala.map(id => {
+      case l => l.list_of_variable_identifiers_item.asScala.toSeq.map(id => {
         val name = id.identifier.getText()
         
-        val unpacked = id.variable_dimension.asScala.map(getVariableDim)
+        val unpacked = id.variable_dimension.asScala.toSeq.map(getVariableDim)
           .collect {case u: UnpackedVecType => u}
         
         val fullType = getFullType(unpacked, tpe)
@@ -1527,10 +1527,10 @@ class Visitor(
     // OUTPUTS
     val portB = ctx.list_of_variable_port_identifiers match {
       case null => Seq()
-      case l => l.list_of_tf_variable_identifiers.list_of_tf_variable_identifiers_item.asScala.map(id => {
+      case l => l.list_of_tf_variable_identifiers.list_of_tf_variable_identifiers_item.asScala.toSeq.map(id => {
         val name = id.identifier.getText()
         
-        val unpacked = id.variable_dimension.asScala.map(getVariableDim)
+        val unpacked = id.variable_dimension.asScala.toSeq.map(getVariableDim)
           .collect {case u: UnpackedVecType => u}
         
         val fullType = getFullType(unpacked, tpe)
@@ -1550,7 +1550,7 @@ class Visitor(
   }
   
   private def getMinTypMaxExpression(ctx: Mintypmax_expressionContext): Expression = {
-    ctx.expression.asScala match {
+    ctx.expression.asScala.toSeq match {
       case Seq() => UndefinedExpression(ctx.getSourceInterval())
       case Seq(e) => getExpression(e)
       case _ => unsupportedExpr(ctx, "Min-typ-max parameter expression")
@@ -1612,7 +1612,7 @@ class Visitor(
       case _ => (t, SwExpressionKind)
     }
     
-    val (tpe, kind) = ctx.unpacked_dimension.asScala match {
+    val (tpe, kind) = ctx.unpacked_dimension.asScala.toSeq match {
       case Seq() => (updatedTpe, updatedKind)
       case s => (getFullType(s.map(getUnpackedDim),updatedTpe), SwExpressionKind)
     }
@@ -1629,7 +1629,7 @@ class Visitor(
           case null => UnknownType() 
           case dt   => visitData_type_or_implicit(dt, false)._1
         }
-        l.param_assignment.asScala.map(visitParam_assignment(_, tpe, attr))
+        l.param_assignment.asScala.toSeq.map(visitParam_assignment(_, tpe, attr))
         
       case _ => throwParserError(ctx)
     }
@@ -1663,7 +1663,7 @@ class Visitor(
           case null => UnknownType()
           case d => getDataType(d, false)._1
         }
-        p.list_of_param_assignments.param_assignment.asScala.map(visitParam_assignment(_, tpe, NoVerilogAttribute))
+        p.list_of_param_assignments.param_assignment.asScala.toSeq.map(visitParam_assignment(_, tpe, NoVerilogAttribute))
     }
   }
   
@@ -1671,8 +1671,8 @@ class Visitor(
     ctx match {
       case null => Seq()
       case _ =>
-        (ctx.list_of_param_assignments, ctx.parameter_port_declaration.asScala) match {
-          case (l, Seq()) => l.param_assignment.asScala.map(visitParam_assignment(_, UnknownType(), NoVerilogAttribute))
+        (ctx.list_of_param_assignments, ctx.parameter_port_declaration.asScala.toSeq) match {
+          case (l, Seq()) => l.param_assignment.asScala.toSeq.map(visitParam_assignment(_, UnknownType(), NoVerilogAttribute))
           case (null, s) => s.flatMap(visitParameterDeclaration)
           case _ => throwParserError(ctx)
         }
@@ -1698,7 +1698,7 @@ class Visitor(
   
   private def visitNet_decl_assignment(ctx: Net_decl_assignmentContext, tpe: Type, attr: VerilogAttributes): DefLogic = {
     val name = getRefText(ctx.identifier)
-    val fullType = getFullType(ctx.unpacked_dimension.asScala.map(getUnpackedDim),tpe)
+    val fullType = getFullType(ctx.unpacked_dimension.asScala.toSeq.map(getUnpackedDim),tpe)
     
     val init = ctx.expression match {
       case null => UndefinedExpression()
@@ -1713,7 +1713,7 @@ class Visitor(
     unsupported.check(ctx) // includes net_type check
     // First get type & logic resolution (common to all upcoming elements)
     val dtp = ctx.data_type_or_implicit
-    val userTpe = ctx.identifier.asScala
+    val userTpe = ctx.identifier.asScala.toSeq
     
     val tpe = (dtp, userTpe) match {
       case (null, Seq()) => BoolType(UndefinedInterval)
@@ -1723,7 +1723,7 @@ class Visitor(
     }
     
     // Second get respective name & potential assignments 
-    val s = ctx.list_of_net_decl_assignments.net_decl_assignment.asScala
+    val s = ctx.list_of_net_decl_assignments.net_decl_assignment.asScala.toSeq
       .map(c => visitNet_decl_assignment(c,tpe,attr)) 
     getStmtOrSimpleBlock(ctx, s)
   }
@@ -1733,7 +1733,7 @@ class Visitor(
     
     val name = getRefText(ctx.identifier)
     
-    val unpacked = ctx.variable_dimension.asScala.map(getVariableDim)
+    val unpacked = ctx.variable_dimension.asScala.toSeq.map(getVariableDim)
       .collect {case u: UnpackedVecType => u}
     val fullType = getFullType(unpacked, tpe)
     
@@ -1765,11 +1765,11 @@ class Visitor(
         }
       case dt => // all typedef combined with actual type defition
         val (tpe, _) = getDataType(dt, isHw = true) // assuming hardware (could be questioned)
-        val id = ctx.identifier.asScala match {
+        val id = ctx.identifier.asScala.toSeq match {
           case Seq(i) => i.getText
           case _ => throwParserError(ctx)
         }
-        if(!ctx.variable_dimension.asScala.isEmpty) 
+        if(!ctx.variable_dimension.asScala.toSeq.isEmpty) 
           unsupported.raiseIt(ctx, s"Unsupported variable_dimension within context ${getRawText(ctx)}")
           
         DefType(ctx.getSourceInterval, attr, id, tpe)
@@ -1787,7 +1787,7 @@ class Visitor(
         val (tpe, res) = visitData_type_or_implicit(dt, true)
 
         val s = ctx.list_of_variable_decl_assignments.variable_decl_assignment
-          .asScala.map(d => visitVariable_decl_assignment(d, tpe, res, attr)) 
+          .asScala.toSeq.map(d => visitVariable_decl_assignment(d, tpe, res, attr)) 
         getStmtOrSimpleBlock(ctx, s)
         
       case _ => throwParserError(ctx)
@@ -1811,7 +1811,7 @@ class Visitor(
 
   private def visitContinuous_assign(ctx: Continuous_assignContext, attr: VerilogAttributes): Statement = {
     unsupported.check(ctx)
-    val s = ctx.list_of_variable_assignments.variable_assignment.asScala
+    val s = ctx.list_of_variable_assignments.variable_assignment.asScala.toSeq
       .map(v => visitVariable_assignment(v, attr))
     getStmtOrSimpleBlock(ctx, s)
   }
@@ -1823,7 +1823,7 @@ class Visitor(
   }
   
   private def getEventExpressionItem(ctx: Event_expression_itemContext): EventControl = {
-    (ctx.event_expression, ctx.expression.asScala) match {
+    (ctx.event_expression, ctx.expression.asScala.toSeq) match {
       case (e, Seq()) => getEventExpression(e)
       case (null, Seq(e)) => 
         val i = ctx.getSourceInterval()
@@ -1844,7 +1844,7 @@ class Visitor(
   }
   
   private def getEventExpression(ctx: Event_expressionContext): EventControl = {
-    ctx.event_expression_item.asScala.map(getEventExpressionItem) match {
+    ctx.event_expression_item.asScala.toSeq.map(getEventExpressionItem) match {
       case Seq() => unsupportedEvent(ctx,"null event_expression")
       case Seq(e) => e 
       case _ => unsupportedEvent(ctx,"multiple event_expression")
@@ -1902,7 +1902,7 @@ class Visitor(
   }
   
   private def visitBlock_item_declaration(ctx: Block_item_declarationContext): Statement = {
-    val attr = visitAttributes(ctx.attribute_instance.asScala)
+    val attr = visitAttributes(ctx.attribute_instance.asScala.toSeq)
     val s = (ctx.data_declaration, ctx.local_parameter_declaration, ctx.parameter_declaration, ctx.let_declaration) match {
       case (d, null, null, null) => Seq(visitData_declaration(d, attr))
       case (null, l, null, null) => visitLocal_parameter_declaration(l, attr)
@@ -1918,13 +1918,13 @@ class Visitor(
       case NoVerilogAttribute =>
       case _ => unsupported.raiseIt(ctx, s"Discarded Verilog attributes: ${attr.serialize}") 
     }
-    ctx.identifier.asScala match {
+    ctx.identifier.asScala.toSeq match {
       case Seq() =>
       case _ => unsupported.raiseIt(ctx, ">>> TODO add name management to blocks")
     }
     
-    val items = ctx.block_item_declaration.asScala.map(visitBlock_item_declaration)
-    val stmts = items ++ ctx.statement_or_null.asScala.map(visitStatement_or_null)
+    val items = ctx.block_item_declaration.asScala.toSeq.map(visitBlock_item_declaration)
+    val stmts = items ++ ctx.statement_or_null.asScala.toSeq.map(visitStatement_or_null)
     
     SimpleBlock(ctx.getSourceInterval(),stmts)
   }
@@ -2046,7 +2046,7 @@ class Visitor(
   
   private def visitCond_predicate(ctx: Cond_predicateContext): Expression = {
     unsupported.check(ctx)
-    getExpression(ctx.expression.asScala.head)
+    getExpression(ctx.expression.asScala.toSeq.head)
   }
   
   private def visitConditional_statement(ctx: Conditional_statementContext, attr: VerilogAttributes): Statement = {
@@ -2056,7 +2056,7 @@ class Visitor(
     }
     
     val pred = visitCond_predicate(ctx.cond_predicate)
-    val stmt = ctx.statement_or_null.asScala.map(visitStatement_or_null)
+    val stmt = ctx.statement_or_null.asScala.toSeq.map(visitStatement_or_null)
     val (conseq, alt) = stmt match {
       case Seq(s) => (s, EmptyStmt)
       case Seq(c, a) => (c, a)
@@ -2071,7 +2071,7 @@ class Visitor(
   //     ) statement_or_null;
   
   private def getCaseItem(ctx: Case_itemContext, comp: Expression): (Expression, Statement) = {
-    val expr = (ctx.KW_DEFAULT, ctx.expression.asScala) match {
+    val expr = (ctx.KW_DEFAULT, ctx.expression.asScala.toSeq) match {
       case (null, Seq()) => throwParserError(ctx)
       case (null, Seq(e)) => getExpression(e, Some(comp))
       case (null, s) => s.map(getExpression(_, Some(comp))).reduce((a, b) => DoPrim(UndefinedInterval, PrimOps.Or(UndefinedInterval), Seq(a, b)))
@@ -2102,7 +2102,7 @@ class Visitor(
       case (_, null) => unsupportedStmt(ctx, "Malformed case statement")
       case (e, i) => 
         val expr = getExpression(e)
-        val items = i.asScala.map(getCaseItem(_, expr))
+        val items = i.asScala.toSeq.map(getCaseItem(_, expr))
         items.collect{ case (_:DefaultAssignPattern, s) => s} match {
           case Seq() => 
             // Do not use Switch for now (more complicated update to legalize expression required)
@@ -2123,12 +2123,12 @@ class Visitor(
     ctx match {
       case null => unsupportedExpr(ctx, "Need a valid expression as for loop start condition")
       case _ =>
-        (ctx.list_of_variable_assignments, ctx.for_variable_declaration.asScala) match {
+        (ctx.list_of_variable_assignments, ctx.for_variable_declaration.asScala.toSeq) match {
           case (null, Seq()) => unsupportedExpr(ctx, "Unexpected null for loop initialization")
           case (null, Seq(v)) => unsupportedExpr(v, "TODO? for variable declaration")
           case (null, _) => unsupportedExpr(ctx, "Unexpected multiple for variable declaration in for loop initialization.")
           case (l, _) => 
-            l.variable_assignment.asScala.map(v => {
+            l.variable_assignment.asScala.toSeq.map(v => {
               val loc = getVariableLvalue(v.variable_lvalue) match {
                 case Reference(_, n, Seq(),_,_,_) => n
                 case _ => 
@@ -2150,7 +2150,7 @@ class Visitor(
     ctx match {
       case null => unsupportedExpr(ctx, "Need a valid expression as for loop step condition")
       case _ =>
-        ctx.sequence_match_item.asScala match {
+        ctx.sequence_match_item.asScala.toSeq match {
           case Seq(s) => s.getChild(0) match {
             case o: Operator_assignmentContext => 
               o.assignment_operator.ASSIGN match {
@@ -2221,7 +2221,7 @@ class Visitor(
       case s => unsupportedStmt(s, "identifier") 
     }
     
-    val attr = visitAttributes(ctx.attribute_instance.asScala)
+    val attr = visitAttributes(ctx.attribute_instance.asScala.toSeq)
     visitStatement_item(ctx.statement_item, attr)
   }
   
@@ -2248,7 +2248,7 @@ class Visitor(
   
   private def visitIf_generate_construct(ctx: If_generate_constructContext, attr: VerilogAttributes): Statement = {
     val pred = getExpression(ctx.constant_expression.expression)
-    val (conseq, alt) = ctx.generate_item.asScala.map(visitGenerate_item) match {
+    val (conseq, alt) = ctx.generate_item.asScala.toSeq.map(visitGenerate_item) match {
       case Seq(c) => (c, EmptyStmt)
       case Seq(c, a) => (c, a)
     }
@@ -2330,8 +2330,8 @@ class Visitor(
     ctx.list_of_parameter_value_assignments match {
       case null => Seq()
       case l =>
-        val raw = l.param_expression.asScala
-        val named = l.named_parameter_assignment.asScala
+        val raw = l.param_expression.asScala.toSeq
+        val named = l.named_parameter_assignment.asScala.toSeq
         (raw, named) match {
           case (Seq(), n) => n.map(getNamedParam)
           case (r, Seq()) => r.map(r => {
@@ -2345,13 +2345,13 @@ class Visitor(
   }
   
   private def getPortMap(ctx: List_of_port_connectionsContext): Seq[Assign] = {
-    val ordered = ctx.ordered_port_connection.asScala.map {c =>
-      forbidExpressionAttributes(c.attribute_instance.asScala)
+    val ordered = ctx.ordered_port_connection.asScala.toSeq.map {c =>
+      forbidExpressionAttributes(c.attribute_instance.asScala.toSeq)
       NoNameAssign(c.getSourceInterval,getExpression(c.expression), UnknownFlow)
     }
     
-    val named = ctx.named_port_connection.asScala.map {c =>
-      forbidExpressionAttributes(c.attribute_instance.asScala)
+    val named = ctx.named_port_connection.asScala.toSeq.map {c =>
+      forbidExpressionAttributes(c.attribute_instance.asScala.toSeq)
       val id = getRefText(c.identifier)
       val tokens = c.getSourceInterval()
       (c.MUL, c.identifier, c.expression) match {
@@ -2384,7 +2384,7 @@ class Visitor(
       case null => Seq()
       case p    => visitParameter_value_assignment(p)
     }
-    val insts = ctx.hierarchical_instance.asScala
+    val insts = ctx.hierarchical_instance.asScala.toSeq
       .map(i => visitHierarchical_instance(i, attr, module, params))
     getStmtOrSimpleBlock(ctx, insts)
   }
@@ -2453,8 +2453,8 @@ class Visitor(
   
   
   private def visitGenerate_begin_end_block(ctx: Generate_begin_end_blockContext): Statement = {
-    val stmts = ctx.generate_item.asScala.map(visitGenerate_item)
-    val name = ctx.identifier.asScala.map(_.getText()) match {
+    val stmts = ctx.generate_item.asScala.toSeq.map(visitGenerate_item)
+    val name = ctx.identifier.asScala.toSeq.map(_.getText()) match {
       case Seq() => ""
       case Seq(n) => n
       case Seq(n, n2) if (n == n2) => n  
@@ -2470,7 +2470,7 @@ class Visitor(
   private def visitGenerate_item(ctx: Generate_itemContext): Statement = {
     ctx match {
       case g: GenItemItemContext => 
-      val attr = visitAttributes(g.attribute_instance.asScala)
+      val attr = visitAttributes(g.attribute_instance.asScala.toSeq)
       visitGenerate_item_item(g.generate_item_item, attr)
       case g: GenItemDataDeclContext => unsupportedStmt(g, "GenItemDataDecl")
       case g: GenItemGenRegContext => unsupportedStmt(g, "GenItemGenReg")
@@ -2480,7 +2480,7 @@ class Visitor(
   }
   
   private def visitGenerate_region(ctx: Generate_regionContext): Statement = {
-    val s = ctx.generate_item.asScala.map(visitGenerate_item)
+    val s = ctx.generate_item.asScala.toSeq.map(visitGenerate_item)
     SimpleBlock(ctx.getSourceInterval, s)
   }
   
@@ -2496,7 +2496,7 @@ class Visitor(
     ctx match {
       case i: ModuleGenRegContext => visitGenerate_region(i.generate_region)
       case i: ModuleItemItemContext =>
-        val attr = visitAttributes(i.attribute_instance.asScala)
+        val attr = visitAttributes(i.attribute_instance.asScala.toSeq)
         visitModule_item_item(i.module_item_item, attr)
       case i: ModulePortDeclContext => visitNonansi_port_declaration(i.nonansi_port_declaration)
         
@@ -2514,7 +2514,7 @@ class Visitor(
     unsupported.check(ctx)
     val h = ctx.module_header_common
     unsupported.check(h)
-    val attr = visitAttributes(h.attribute_instance.asScala)
+    val attr = visitAttributes(h.attribute_instance.asScala.toSeq)
     val name = getRefText(h.identifier)
     val params = visitParams(h.parameter_port_list)
     
@@ -2526,13 +2526,13 @@ class Visitor(
           ExtModule(ctx.getSourceInterval(), attr, name, params, SimpleBlock(s), path)
         case _ =>
           info(ctx, "Non ansi port declarations or empty port declaration: parsing blackbox body to fetch inline ports")
-          val body = SimpleBlock(ports ++ ctx.module_item.asScala.map(visitModule_item))
+          val body = SimpleBlock(ports ++ ctx.module_item.asScala.toSeq.map(visitModule_item))
           val m = Module(ctx.getSourceInterval(), attr,name,params,body)
           ExtModule(ctx.getSourceInterval(), attr, name, params, SimpleBlock(m.ports), path)
       }
     } else {
       // ports are considered directly as the first statements in all cases
-      val body = SimpleBlock(ports ++ ctx.module_item.asScala.map(visitModule_item))
+      val body = SimpleBlock(ports ++ ctx.module_item.asScala.toSeq.map(visitModule_item))
       Module(ctx.getSourceInterval(), attr,name,params,body)
     }
     

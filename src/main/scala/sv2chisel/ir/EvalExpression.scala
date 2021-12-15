@@ -115,6 +115,6 @@ class EvalExpression(e: Expression) {
     }
   }
   
-  def evalBigIntOption(): Option[BigInt] = recEvalBigInt(e)
-  def evalBigInt(): BigInt = this.evalBigIntOption().get
+  def evalBigIntOption: Option[BigInt] = recEvalBigInt(e)
+  def evalBigInt: BigInt = this.evalBigIntOption.get
 }

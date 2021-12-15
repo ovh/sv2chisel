@@ -25,10 +25,10 @@ class StringSpec extends Sv2ChiselSpec {
     ))
     debug(result)
     
-    result should contain ( "import sv2chisel.helpers.vecconvert._" ) // to get .V
+    result should containStr ( "import sv2chisel.helpers.vecconvert._" ) // to get .V
     
     // probably the most decent option (asUInt)
-    result should contain ( "(str(W-1,0).asUInt === \"OPTIONS \".V.asUInt) || (str(W-1,32).asUInt === \"GET \".V.asUInt)" ) 
+    result should containStr ( "(str(W-1,0).asUInt === \"OPTIONS \".V.asUInt) || (str(W-1,32).asUInt === \"GET \".V.asUInt)" ) 
   }
 
 }

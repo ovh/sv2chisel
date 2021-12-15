@@ -12,7 +12,7 @@ class InstanceFlowSpec extends Sv2ChiselSpec {
   
   "Instance Concats" should "be properly emitted" in {
     val result = emitInModule(s"""
-      |// might contain more than the RAM due to moves
+      |// might containStr more than the RAM due to moves
       |localparam DBLW = 2;
       |localparam WWW = 16;
       |wire [DBLW-1:0]   inst_in_u1;
@@ -47,11 +47,11 @@ class InstanceFlowSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends RawModule {")
+    result should containStr ("class Test() extends RawModule {")
     
-    result should contain ("inst.in := inst_in_u3")
+    result should containStr ("inst.in := inst_in_u3")
     
-    result should contain (
+    result should containStr (
       "val inst_din = Wire(new Bundle {",
         "val inst_in_u1 = UInt(DBLW.W)",
         "val inst_in_b = Bool()",
@@ -67,11 +67,11 @@ class InstanceFlowSpec extends Sv2ChiselSpec {
       "})",
     )
     
-    result should contain ("inst.din := inst_din.asTypeOf(inst.din)") // issue here
-    result should contain ("inst_dout := inst.dout.asTypeOf(inst_dout)")
-    result should contain ("inst_out_u3 := inst.out.asTypeOf(inst_out_u3)")
+    result should containStr ("inst.din := inst_din.asTypeOf(inst.din)") // issue here
+    result should containStr ("inst_dout := inst.dout.asTypeOf(inst_dout)")
+    result should containStr ("inst_out_u3 := inst.out.asTypeOf(inst_out_u3)")
     // LHS bundle serialization
-    result should contain (
+    result should containStr (
       "inst_out_u1 := inst_dout.inst_out_u1",
       "inst_out_b := inst_dout.inst_out_b",
       "inst_out_u2 := inst_dout.inst_out_u2"

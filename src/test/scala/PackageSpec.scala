@@ -21,10 +21,10 @@ class PackageSpec extends Sv2ChiselSpec {
         "my_package"
       ))
 
-    result should contain ("package object my_package {")
-    result should contain ("val test = 0")
-    result should contain ("val A: Boolean = true")
-    result should contain ("}")
+    result should containStr ("package object my_package {")
+    result should containStr ("val test = 0")
+    result should containStr ("val A: Boolean = true")
+    result should containStr ("}")
 
   }
   
@@ -37,7 +37,7 @@ class PackageSpec extends Sv2ChiselSpec {
         "my_package"
       ))
 
-    result should contain (  "object mynewtype_t {",
+    result should containStr (  "object mynewtype_t {",
                                 "def apply() = Vec(TEST, Bool())",
                               "}")
 

@@ -14,7 +14,7 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
   
   it should "properly remove concats or use Cat" in {
     val result = emitInModule(s"""
-      |// might contain more than the RAM due to moves
+      |// might containStr more than the RAM due to moves
       |localparam DBLW = 2;
       |localparam WWW = 16;
       |
@@ -31,8 +31,8 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("class Test() extends RawModule {")
-    result should contain ("val auto_concat = Wire(new Bundle {",
+    result should containStr ("class Test() extends RawModule {")
+    result should containStr ("val auto_concat = Wire(new Bundle {",
                               "val bool = Bool()",
                               "val packsmall_i_WWW_1_1 = Vec(WWW-1, Bool())",
                               "val packsmall_i_0 = Bool()",
@@ -43,7 +43,7 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
                             "packsmall(i)(0) := auto_concat.packsmall_i_0")
     
     // seccond concat inline
-    result should contain ("pack((2*i)+1) := Mux(bool, Cat(packsmall(i)(WWW-1,0).asUInt, \"b0\".U(1.W)), 0.U)")
+    result should containStr ("pack((2*i)+1) := Mux(bool, Cat(packsmall(i)(WWW-1,0).asUInt, \"b0\".U(1.W)), 0.U)")
     
   }
   
@@ -59,12 +59,12 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should contain ("import chisel3._")
-    result should contain ("import sv2chisel.helpers.vecconvert._")
-    result should contain ("import chisel3.util.Cat")
+    result should containStr ("import chisel3._")
+    result should containStr ("import sv2chisel.helpers.vecconvert._")
+    result should containStr ("import chisel3.util.Cat")
 
-    result should contain ("class Test() extends RawModule {")
-    result should contain (
+    result should containStr ("class Test() extends RawModule {")
+    result should containStr (
                             "val w = Wire(UInt(WWW.W))",
                             "val y = Wire(Vec(WWW, Bool()))",
                             "w := Cat((VecInit.tabulate((WWW-AAA))(_ => false.B)).asUInt, y(AAA-1,0).asUInt)",
@@ -83,11 +83,11 @@ class RemoveConcatSpec extends Sv2ChiselSpec {
       """.stripMargin
     ))
     debug(result)
-    result should contain ("import chisel3._")
-    result should contain ("import sv2chisel.helpers.vecconvert._")
-    result should contain ("import chisel3.util.Cat")
+    result should containStr ("import chisel3._")
+    result should containStr ("import sv2chisel.helpers.vecconvert._")
+    result should containStr ("import chisel3.util.Cat")
 
-    result should contain (
+    result should containStr (
                             "def w(y:Vec[Bool]): UInt = {",
                             "Cat((VecInit.tabulate((WWW-AAA))(_ => false.B)).asUInt, y(AAA-1,0).asUInt)",
                             "}"

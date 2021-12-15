@@ -23,13 +23,13 @@ class EnumSpec extends Sv2ChiselSpec {
       """.stripMargin
     ))
     debug(result)
-    result should contain ("import chisel3._")
-    result should contain ("import sv2chisel.helpers.enum._")
+    result should containStr ("import chisel3._")
+    result should containStr ("import sv2chisel.helpers.enum._")
     
-    result should contain ("object state_t extends GenericHwEnum {")
-    result should contain ("val STATE_A = Value")
-    result should contain ("val STATE_B = Value")
-    result should contain ("val STATE_C = Value")
+    result should containStr ("object state_t extends GenericHwEnum {")
+    result should containStr ("val STATE_A = Value")
+    result should containStr ("val STATE_B = Value")
+    result should containStr ("val STATE_C = Value")
     
     // compression option to discuss below a given number of characters 
     // object state_t extends GenericHwEnum {
@@ -49,13 +49,13 @@ class EnumSpec extends Sv2ChiselSpec {
       """.stripMargin
     ))
     debug(result)
-    result should contain ("import chisel3._")
-    result should contain ("import sv2chisel.helpers.enum._")
+    result should containStr ("import chisel3._")
+    result should containStr ("import sv2chisel.helpers.enum._")
     
-    result should contain ("object state_t extends GenericHwEnum {")
-    result should contain ("val STATE_A = Value")
-    result should contain ("val STATE_B = Value")
-    result should contain ("val STATE_C = Value")
+    result should containStr ("object state_t extends GenericHwEnum {")
+    result should containStr ("val STATE_A = Value")
+    result should containStr ("val STATE_B = Value")
+    result should containStr ("val STATE_C = Value")
     
     // compression option to discuss below a given number of characters 
     // object state_t extends GenericHwEnum {
@@ -75,13 +75,13 @@ class EnumSpec extends Sv2ChiselSpec {
       """.stripMargin
     ))
     debug(result)
-    result should contain ("import chisel3._")
-    result should contain ("import sv2chisel.helpers.enum._")
+    result should containStr ("import chisel3._")
+    result should containStr ("import sv2chisel.helpers.enum._")
     
-    result should contain ("object state_t extends CustomHwEnum {")
-    result should contain ("val STATE_A = Val(0.U(2.W))")
-    result should contain ("val STATE_B = Val(3.U(2.W))")
-    result should contain ("val STATE_C = Val(2.U(2.W))")
+    result should containStr ("object state_t extends CustomHwEnum {")
+    result should containStr ("val STATE_A = V(0.U(2.W))")
+    result should containStr ("val STATE_B = V(3.U(2.W))")
+    result should containStr ("val STATE_C = V(2.U(2.W))")
     
   }
   

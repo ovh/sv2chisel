@@ -24,7 +24,7 @@ class FunctionSpec extends Sv2ChiselSpec {
         """.stripMargin
       ))
       
-    result should contain (  "def simple_function(in:Bool): Bool = {",
+    result should containStr (  "def simple_function(in:Bool): Bool = {",
                                 "in",
                               "}")
 
@@ -39,7 +39,7 @@ class FunctionSpec extends Sv2ChiselSpec {
         """.stripMargin
       ))
 
-    result should contain (  "def simple_function(in:Bool): Bool = {",
+    result should containStr (  "def simple_function(in:Bool): Bool = {",
                                 "in",
                               "}")
 
@@ -54,7 +54,7 @@ class FunctionSpec extends Sv2ChiselSpec {
         """.stripMargin
       ))
 
-    result should contain (  "def simple_function(in:Bool): Bool = {",
+    result should containStr (  "def simple_function(in:Bool): Bool = {",
                                 "in",
                               "}")
 
@@ -72,7 +72,7 @@ class FunctionSpec extends Sv2ChiselSpec {
         """.stripMargin
       ))
       
-    result should contain (  "def sum(a:UInt, b:UInt): UInt = {",
+    result should containStr (  "def sum(a:UInt, b:UInt): UInt = {",
                                 "a+b",
                               "}")
 
@@ -101,7 +101,7 @@ class FunctionSpec extends Sv2ChiselSpec {
         """.stripMargin
       ))
       
-    result should contain (  "def sum(a:UInt, b:UInt): UInt = {",
+    result should containStr (  "def sum(a:UInt, b:UInt): UInt = {",
                                 "a+b",
                               "}")
                                
@@ -155,21 +155,21 @@ class FunctionSpec extends Sv2ChiselSpec {
     trace(verilog)
     val result = emit(verilog)
       
-    result should contain ( "def sum(a:UInt, b:UInt): UInt = {",
+    result should containStr ( "def sum(a:UInt, b:UInt): UInt = {",
                               "a+b",
                             "}")
     
-    result should contain ( "val i_a = IO(Input(Vec(8, Bool())))")
-    result should contain ( "val i_b = IO(Input(UInt(8.W)))")
-    result should contain ( "val i_c = IO(Input(Bool()))")
-    result should contain ( "val o = IO(Output(UInt(8.W)))")
-    result should contain ( "val o_v = IO(Output(Vec(8, Bool())))")
+    result should containStr ( "val i_a = IO(Input(Vec(8, Bool())))")
+    result should containStr ( "val i_b = IO(Input(UInt(8.W)))")
+    result should containStr ( "val i_c = IO(Input(Bool()))")
+    result should containStr ( "val o = IO(Output(UInt(8.W)))")
+    result should containStr ( "val o_v = IO(Output(Vec(8, Bool())))")
 
-    result should contain ( "i_a(2,0) := 0.U.asTypeOf(Vec(3, Bool()))")
-    result should contain ( "o_v(2,0) := 0.U.asTypeOf(Vec(3, Bool()))")
+    result should containStr ( "i_a(2,0) := 0.U.asTypeOf(Vec(3, Bool()))")
+    result should containStr ( "o_v(2,0) := 0.U.asTypeOf(Vec(3, Bool()))")
     
-    result should contain ( "o := sum(i_a.asUInt, i_b)")
-    result should contain ( "o_v := sum(i_a.asUInt, i_c).asBools") // Bool is a subtype of UInt => no need for a cast
+    result should containStr ( "o := sum(i_a.asUInt, i_b)")
+    result should containStr ( "o_v := sum(i_a.asUInt, i_c).asBools") // Bool is a subtype of UInt => no need for a cast
 
   }
 }

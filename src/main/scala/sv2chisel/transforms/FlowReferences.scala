@@ -178,7 +178,7 @@ class FlowReferences(
           case (_, false, _, _: NamedAssign) => getNamedFlows(namedPorts, ports)
           case (_, false, _, _: NoNameAssign) => getSeqFlows(namedPorts.values.toSeq, ports)
           case (_, _, false, _: NamedAssign) => ports.map(_ => UnknownFlow)
-          case (_, _, false, _: NoNameAssign) => getSeqFlows(noNamePorts, ports)
+          case (_, _, false, _: NoNameAssign) => getSeqFlows(noNamePorts.toSeq, ports)
           case _ => ports.map(_ => UnknownFlow)
         }
       }
