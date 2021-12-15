@@ -16,7 +16,6 @@ lazy val commonSettings = Seq (
   organizationHomepage := Some(url("https://ovhcloud.com/")),
   // versions
   scalaVersion := ScalaVersion,
-  version := "0.1.0-RC1",
   // dependencies
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % ScalaTestVersion % Test,
