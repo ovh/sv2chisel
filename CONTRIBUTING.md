@@ -1,4 +1,4 @@
-# Contributing to ##sv2chisel##
+# Contributing to sv2chisel
  
 This project accepts contributions. In order to contribute, you should
 pay attention to a few things:
@@ -11,7 +11,7 @@ pay attention to a few things:
  
 # Coding and documentation Style
  
-##LANGUAGE_GUIDELINES##
+Please refer to [Scala style guide](https://docs.scala-lang.org/style/) as a reference.
  
 # Submitting Modifications
  
@@ -20,8 +20,8 @@ and follow the DCO which is defined below.
  
 # Licensing for new files
  
-##PROJECT_NAME## is licensed under a ##PROJECT_LICENSE## license. Anything
-contributed to ##PROJECT_NAME## must be released under this license.
+sv2chisel is licensed under a BSD-3-Clause license. Anything
+contributed to sv2chisel must be released under this license.
  
 When introducing a new file into the project, please make sure it has a
 copyright header making clear under which license it's being released.

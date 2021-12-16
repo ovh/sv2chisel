@@ -11,31 +11,20 @@ This means it might probably *not* work out-of-the-box with your own code, some 
 
 **sv2chisel** emerged as a research effort, if you use it or borrow some concepts in your own work, please cite the [associated paper](https://hal.archives-ouvertes.fr/hal-02949112/document) (bibtex entry below).
 
-# Content
+### Repository Structure
 The current repository contains 2 projects:
 - **sv2chisel** the (System)Verilog to Chisel translator
 - *sv2chisel-helpers* a small chisel library of implicit helpers used to make Chisel emission smoother, most notably for the usual (System)Verilog index and range affectation pattern
 
 Note: *sv2chisel-helpers* is not used directly by **sv2chisel** but by the emitted Chisel code. (Check if emitted files include some `import sv2chisel.helpers`)
 
-# Installation
-**sv2chisel** and *sv2chisel-helpers* are currently not available on maven central and hence have to be manually published locally, which only takes a couple of steps detailed below.
+---
 
-## Prerequisite
-- Install sbt [official documentation](https://www.scala-sbt.org/1.x/docs/Setup.html)
+# Setup
 
-## Publish locally sv2chisel & sv2chisel-helpers
-```bash
-git clone https://github.com/ovh/sv2chisel.git
-cd sv2chisel
-sbt
-```
-In sbt shell
-```sbt
-sbt:sv2chisel> publishLocal
-sbt:sv2chisel> helpers/publishLocal
-```
-The `publishLocal` commands make sv2chisel and sv2chisel-helpers libraries available locally to be used in other Scala project.  
+## Get sv2chisel
+- **Simplest way:** Get sv2chisel executable from [sv2chisel releases](https://github.com/ovh/sv2chisel/releases/) (*requirement: java SE 15+* [*java class 59+*](https://en.wikipedia.org/wiki/Java_class_file#General_layout))
+- or see [manual usage from sources](#manual-usage-from-sources) below
 
 ## Setup your own Chisel project
 If this is your first time using [Chisel](https://www.chisel-lang.org), we highly recommend you to follow either the [online bootcamp](https://mybinder.org/v2/gh/freechipsproject/chisel-bootcamp/master) or the [chisel-tutorials](https://github.com/ucb-bar/chisel-tutorial) first.
@@ -49,58 +38,48 @@ libraryDependencies += "com.ovhcloud" %% "sv2chisel-helpers" % "0.1.0-SNAPSHOT"
 
 This new project is intended to be used as output target for the Chisel files converted from your (System)Verilog sources.
 
-## Create a separate sbt project for your own translator app
-*This step is optional, if you want to skip it, just hack into the existing `Main.scala` within your local clone of sv2chisel, editing it as described in the next step.*
-
-Create another empty sbt project. [Official documentation](https://docs.scala-lang.org/getting-started/sbt-track/getting-started-with-scala-and-sbt-on-the-command-line.html) 
-
-To be able to use **sv2chisel** within this newly created project, just add the following line to your `build.sbt` file.
-```sbt
-libraryDependencies += "com.ovhcloud" %% "sv2chisel" % "0.1.0-SNAPSHOT"
-```
+---
 
 # Usage
 Complete 4-steps process, from (System)Verilog descriptions to upgraded Chisel generators:
 
-1. Translation, *either* [simple](#1-translation-simple) *or* [advanced](#1-translation-advanced)
+1. [Translation](#1-translation)
 2. [Creation of a Chisel main](#2-creation-of-a-chisel-main)
 3. [Correctness Test](#3-test-check-translation-correctness)
 4. [Manual upgrade of the 1-1 translation to more idiomatic scala/chisel syntaxes](#4-upgrade-your-low-level-chisel)
 ---
 
-## 1. Translation (simple)
-### A. Create a config file
+## 1. Translation
+### Option A: Create a config file for your HDL project
 See https://github.com/ovh/sv2chisel/blob/master/src/main/resources/project/config.yml
 
-### B. Run the generic application
-Either from shell
+Then simply run sv2chisel with this config file:
 ```bash
-sbt 'runMain sv2chisel.Main -c config.yml'
+./sv2chisel -c config.yml
 ```
 
-or directly in sbt to avoid sbt startup time
+Additional option (such as verbosity control) can be found with `./sv2chisel -help`
+
+### Option B: Raw CLI Usage
+See `./sv2chisel -help` to get started, basic usage:
+
 ```bash
-sbt:sv2chisel> runMain sv2chisel.Main -c config.yml
+./sv2chisel <path/to/my_verilog_file1.sv> ... <path/to/my_verilog_fileN.sv>
 ```
-
-Running `runMain sv2chisel.Main -help` details available options, in particular control of the level of verbosity. 
-
-## 1. Translation [ADVANCED]
-
-### A. Create your own translator app
-Now that **sv2chisel** and *sv2chisel-helpers* libraries are installed on your machine, create a new Scala main app template using sv2chisel API. 
-Here is a template with a few comments to be used as a starting point to translate your (System)Verilog file(s) or project(s):
-https://github.com/ovh/sv2chisel/blob/master/src/main/scala/sv2chisel/AppExample.scala
-
-This template is to be edited to fit your needs and saved under a proper scala hierarchy such as `<your-project>/src/main/scala/<MyTranslator.scala>`
-
-### B. Translate your code 
-1. In your translator project sbt: `runMain MyTranslator`
-2. In your chisel-ready project sbt: `compile` should not raise errors, if it does, please raise an issue here
 
 ---
 
-## 2. Creation of a Chisel Main
+**IMPORTANT TRANSLATION NOTICE**
+
+Please review and fix any error (fatal/critical) messages reported by **sv2chisel** before proceeding any further, as the generated Chisel code will probably not be usable in such cases.
+
+Do not hesitate to raise an issue [here](https://github.com/ovh/sv2chisel/issues) in case of trouble.
+
+---
+
+
+## 2. Creation of a Chisel Main 
+
 In order to check the translation correctness of the translation, let's now translate it back to Verilog!
 Yeah it sounds silly but it's the way it works: Chisel is an hardware construction language, not intended to be provided directly to synthesis and simulation tools but rather to be executed and produce a low-level Verilog, almost down to netlist.
 
@@ -145,17 +124,38 @@ object MyTestGenerator extends App {
   (new ChiselStage()).emitVerilog(new test(10))
 }
 ```
+**HINT:** To automatically create this scala App, just set the `translationOptions.Chiselizer.addTopLevelChiselGenerator: "test"` option in your config file, using the syntax presented in the [example config file](https://github.com/ovh/sv2chisel/blob/master/src/main/resources/project/config.yml) 
+
 To produce your Verilog, run this app with sbt `runMain MyTestGenerator` if placed in *src/main* or with sbt `test:runMain MyTestGenerator` if placed in src/test.
 
+---
+
+**Error reporting**
+
+- `compile` step should not raise errors, if it does, please raise an issue [here](https://github.com/ovh/sv2chisel/issues)
+- Similarly, Chisel elaboration step (in between `Elaborating...` and `Done elaborating.` message) should not raise errors, if it does, please raise an issue [here](https://github.com/ovh/sv2chisel/issues)
+- Finally, FIRRTL compilation step might raise errors, in particular related to missing connections in your design. 
+This is due to a strict Chisel/FIRRTL toolchain policy: no declared wire shall be left unassigned and no latches are allowed.
+If you do get such errors, you are welcome to fix them yourself either in the verilog or the generated chisel, but do not hesitate reach the very welcoming [Chisel/FIRRTL community](https://www.chisel-lang.org/community.html) for help!
+
+---
 
 ## 3. Test: Check translation correctness
 You can now integrate the chisel-emitted Verilog into your usual simulation and synthesis flow, and check that it is consistent.
 Simulation should pass and synthesis produce on-par resource usage results.
 If it is not the case, investigate the translation result, be sure you understand the implication of every warning message and feel free to open an issue for help or to raise a discovered bug.
 
+**HINT**: Beware that ports are flattened in the resulting verilog, you might hence need to write a verilog wrapper by yourself to actually integrate the resulting verilog *(TODO: integrate internal ParamWrapperGenerator to sv2chisel-helpers)*: 
+- a port `myport: Vec(n+1, <>)` *(verilog [N:0])* becomes n ports from `myport_0: <>` to `myport_n: <>`
+- a port `myport: Bundle` *(verilog struct)* becomes several individual ports named after the fields names such as `myport_myfieldA` ... `myport_myfieldN`
+
+
 ## 4. Upgrade your low-level Chisel
-Here we are, here is precisely where the whole fun starts, and where this step-by step guide stops.
+Your translated project is working as expected?
+Here is precisely where the whole fun starts, and where this step-by step guide stops.
 Please refer to [Chisel documentation](https://www.chisel-lang.org) for user-guide and example around Chisel's generation powers.
+
+---
 
 # Citing this work
 If you use this work or borrow some concept for your own research, please cite the following [paper](https://hal.archives-ouvertes.fr/hal-02949112/document):
@@ -242,4 +242,56 @@ sbt:sv2chisel> helpers/publishSigned
 
 ## sv2chisel license
 See https://github.com/ovh/sv2chisel/blob/master/LICENSE
+
+---
+---
+
+# Manual Usage From Sources
+
+## Prerequisite
+- Install sbt [official documentation](https://www.scala-sbt.org/1.x/docs/Setup.html)
+
+## Publish locally sv2chisel & sv2chisel-helpers
+```bash
+git clone https://github.com/ovh/sv2chisel.git
+cd sv2chisel
+sbt
+```
+In sbt shell
+```sbt
+sbt:sv2chisel> publishLocal
+sbt:sv2chisel> helpers/publishLocal
+```
+The `publishLocal` commands make sv2chisel and sv2chisel-helpers libraries available locally to be used in other Scala project. 
+
+### Translation
+#### Option A: Run the generic application
+Either from shell
+```bash
+sbt 'runMain sv2chisel.Main -c config.yml'
+```
+
+or directly in sbt to avoid sbt startup time
+```bash
+sbt:sv2chisel> runMain sv2chisel.Main -c config.yml
+```
+
+Running `runMain sv2chisel.Main -help` details available options, in particular control of the level of verbosity.
+
+#### Option B: Create your own translator app
+##### Setup
+Create a new empty scala project. [Official documentation](https://docs.scala-lang.org/getting-started/sbt-track/getting-started-with-scala-and-sbt-on-the-command-line.html) 
+
+To be able to use **sv2chisel** within this newly created project, just add the following line to your `build.sbt` file.
+```sbt
+libraryDependencies += "com.ovhcloud" %% "sv2chisel" % "0.1.0-SNAPSHOT"
+```
+
+Create a new Scala main app template using sv2chisel API, here is a template with a few comments to be used as a starting point to translate your (System)Verilog file(s) or project(s):
+https://github.com/ovh/sv2chisel/blob/master/src/main/scala/sv2chisel/AppExample.scala
+
+This template is to be edited to fit your needs and saved under a proper scala hierarchy such as `<your-project>/src/main/scala/<MyTranslator.scala>`
+
+##### Translate your code 
+In your translator project sbt: `runMain MyTranslator`
 

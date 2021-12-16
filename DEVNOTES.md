@@ -42,6 +42,25 @@
 
 #### NEXT-STEPS
 
+##### Repository Setup & Distribution
+1. Setup scala-steward on repos
+  - https://github.com/scala-steward-org/scala-steward-action
+  - https://github.com/scala-steward-org/scala-steward/blob/master/docs/repo-specific-configuration.md
+
+2. Setup & comply with proper version scheme
+  - https://www.scala-lang.org/blog/2021/02/16/preventing-version-conflicts-with-versionscheme.html
+
+3. Setup linting
+  - scalafmt
+  - scalastyle
+
+4. Setup Stand-alone Application distribution
+  - In particular windows packages might be useful to reach more hardware engineers
+  - https://github.com/sbt/sbt-native-packager
+  - https://www.scala-sbt.org/sbt-native-packager/
+  - sbt-assembly as of today?
+  - create release on github with assembled files
+
 ##### Re-integrate ifdef (pre-proc macros) within AST 
 - && legalize scoped declaration based on known pattern in the repo
 - De-scope should be done directly here in this pass (only for port decl & val decl)
