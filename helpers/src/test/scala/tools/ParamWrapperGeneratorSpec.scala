@@ -295,7 +295,7 @@ class ParamWrapperGeneratorSpec extends AnyFlatSpec with VerilogMatchers {
 
   it should s"emit flawlessly a wrapper with nested bundle ports" in {
 
-    val result = VerilogPortWrapper.generate(() => new TestBundle(3), "test_wrapper", args = setTestRunDir)
+    val (result, _) = VerilogPortWrapper.generate(() => new TestBundle(3), Some("test_wrapper"), args = setTestRunDir)
 
     result should containExactly(
         "module test_wrapper (",
@@ -354,7 +354,7 @@ class ParamWrapperGeneratorSpec extends AnyFlatSpec with VerilogMatchers {
       out := in.asTypeOf(out)
     }
 
-    val result = VerilogPortWrapper.generate(() => new Test(), "test_wrapper", args = setTestRunDir)
+    val (result, _) = VerilogPortWrapper.generate(() => new Test(), Some("test_wrapper"), args = setTestRunDir)
     result should containExactly(
         "module test_wrapper (",
         "    input [3:0] [4:0] in,",

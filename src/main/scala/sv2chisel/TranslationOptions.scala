@@ -41,24 +41,36 @@ case class RemoveConcatOptions(
   })
 }
 
+case class TopLevelChiselGenerator(
+  name: String,
+  withWrapper: Boolean = true
+){
+  /** Decoder for circe parsing from yaml */
+  def decode: Decoder[TopLevelChiselGenerator] = Decoder.instance(c => {
+    for {
+      name <- c.get[String]("name")
+      withWrapper <- c.getOrElse[Boolean]("withWrapper")(true)
+    } yield {
+      TopLevelChiselGenerator(name, withWrapper)
+    }
+  })
+}
+
 case class ChiselizerOptions(
   unpackedEmissionStyle:ChiselizerOptions.UnpackedEmissionStyle.Value = ChiselizerOptions.UnpackedEmissionStyle.default,
-  addTopLevelChiselGenerator: Option[String] = None,
+  topLevelChiselGenerators: Seq[TopLevelChiselGenerator] = Seq(),
   baseBlackboxRessourcePath: Option[String] = None
 ) extends EasyLogging {
   /** Decoder for circe parsing from yaml */
   def decode: Decoder[ChiselizerOptions] = Decoder.instance(c => {
     val default = ChiselizerOptions()
-    implicit val decoder = ChiselizerOptions.UnpackedEmissionStyle.decode
+    implicit val d1 = ChiselizerOptions.UnpackedEmissionStyle.decode
+    implicit val d2 = TopLevelChiselGenerator("").decode
     for {
       unpackedEmissionStyle <- c.getOrElse[ChiselizerOptions.UnpackedEmissionStyle.Value]("unpackedEmissionStyle")(default.unpackedEmissionStyle)
-      addTopLevelChiselGenerator <- c.getOrElse[String]("addTopLevelChiselGenerator")("")
+      topLevelChiselGenerators <- c.getOrElse[Seq[TopLevelChiselGenerator]]("topLevelChiselGenerators")(Seq())
       baseBlackboxRessourcePath <- c.getOrElse[String]("baseBlackboxRessourcePath")("")
     } yield {
-      val addTop = addTopLevelChiselGenerator match {
-        case "" => None
-        case s => Some(s) 
-      }
       val bbPath = baseBlackboxRessourcePath match {
         case "" => None
         case s if(s.contains("/resources/")) => Some(s)
@@ -67,7 +79,7 @@ case class ChiselizerOptions(
           None
           
       }
-      ChiselizerOptions(unpackedEmissionStyle, addTop, bbPath)
+      ChiselizerOptions(unpackedEmissionStyle, topLevelChiselGenerators, bbPath)
     }
   })
 }

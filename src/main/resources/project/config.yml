@@ -17,7 +17,10 @@
       useChiselCat: true
     Chiselizer:
       unpackedEmissionStyle: Reg # Reg|Mem|SyncReadMem
-      addTopLevelChiselGenerator: "my_module" # name of top
+      topLevelChiselGenerators: # list of top in the project 
+        - name: my_module # name of top
+          withWrapper: true # provide a wrapper for params and with structural ports
+          
       # baseBlackboxRessourcePath must contains /resources/ to be valid
       # - sv files are copied there
       # - blackboxes are mixed with HasBlackBoxResource trait and features a addRessource("path")

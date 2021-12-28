@@ -19,6 +19,7 @@ trait ModuleRenameAnnotation {
   def prefix: String
   def suffix: String
   def doPrefixTop: Boolean
+  def topOnly: Boolean
 
   /** Both prefix & suffix are always applied for submodules
    *
@@ -34,7 +35,8 @@ trait ModuleRenameAnnotation {
 case class ModuleRenameFirrtlAnnotation(
     prefix: String,
     suffix: String,
-    doPrefixTop: Boolean
+    doPrefixTop: Boolean,
+    topOnly: Boolean
 ) extends NoTargetAnnotation
     with ModuleRenameAnnotation
 
@@ -48,11 +50,12 @@ case class ModuleRenameFirrtlAnnotation(
 case class ModuleRenameChiselAnnotation(
     prefix: String,
     suffix: String,
-    doPrefixTop: Boolean
+    doPrefixTop: Boolean = false,
+    topOnly: Boolean = false
 ) extends RunFirrtlTransform
     with ModuleRenameAnnotation {
   def transformClass = classOf[ModuleRename]
-  def toFirrtl       = ModuleRenameFirrtlAnnotation(prefix, suffix, doPrefixTop)
+  def toFirrtl       = ModuleRenameFirrtlAnnotation(prefix, suffix, doPrefixTop, topOnly)
 }
 
 /** Transform adding a suffix to all module/instances of the circuit
@@ -95,7 +98,7 @@ class ModuleRename extends Transform with DependencyAPIMigration with LazyLoggin
      */
     def processStatements(stmt: Statement): Statement = {
       stmt match {
-        case i: DefInstance =>
+        case i: DefInstance if(!anno.topOnly) =>
           val newRef = anno.newSubModuleName(i.module) // there cannot be any instances of main
           logger.debug(s"[debug] Updating reference for instance ${i.name} from ${i.module} to ${newRef}")
           i.copy(module = newRef)
@@ -107,21 +110,16 @@ class ModuleRename extends Transform with DependencyAPIMigration with LazyLoggin
     def processModule(d: DefModule): DefModule = {
       val newName = if (d.name == circuit.main) newMain else anno.newSubModuleName(d.name)
       d.mapStmt(processStatements) match {
-        case m: Module =>
+        case m: Module if(!anno.topOnly || d.name == circuit.main) =>
           logger.debug(s"[debug] Renaming module ${d.name} into ${newName}")
           renames.record(prevTarget.module(d.name), newTarget.module(newName))
           m.copy(name = newName)
-        case m: ExtModule =>
+        case m: ExtModule if(!anno.topOnly) =>
           // this rename does not override the desiredName (m.defname)
           logger.debug(s"[debug] Renaming external module (blackbox) ${d.name} into ${newName}")
           renames.record(prevTarget.module(d.name), newTarget.module(newName))
           m.copy(name = newName)
-        case _ => // fruitless wildcare as of today IR
-          logger.warn(
-              s"[debug] Not renaming DefModule ${d.name} " +
-                s"because its class (${d.getClass.getName}) doesnt match Module or ExtModule"
-          )
-          d
+        case _ => d
       }
     }
 

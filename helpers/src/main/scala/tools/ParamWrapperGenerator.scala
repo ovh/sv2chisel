@@ -503,7 +503,7 @@ object ParamWrapperGenerator {
         throw WrapperException("Instances should be all of the same Module")
       }
       instanceCount += 1
-      (topNameStore, ModuleRenameChiselAnnotation(emittedName, s"$instanceCount", forceName.isDefined))
+      (topNameStore, ModuleRenameChiselAnnotation(emittedName, s"$instanceCount", doPrefixTop = forceName.isDefined))
     }
 
     val verilogParams = new VerilogParams()
@@ -584,7 +584,7 @@ object VerilogPortWrapper {
    *  @param module
    *    function generating a RawModule
    *  @param wrapperName
-   *    name of the generated wrapper (must be different from module name)
+   *    name of the generated wrapper (default: module name, suffixing inner module name with _raw)
    *  @param emitModule
    *    Compile and emit module to verilog file (optional, default false)
    *  @param forcePreset
@@ -596,34 +596,37 @@ object VerilogPortWrapper {
    */
   def generate(
       module: () => RawModule,
-      wrapperName: String,
-      emitModule: Boolean = false,
+      wrapperName: Option[String] = None,
+      emitModule: Boolean = true,
       forcePreset: Boolean = false,
       args: Array[String] = Array.empty
-  ): String = {
+  ): (String, String) = {
 
     val ed                = ChiselGen.elaborate(module.apply, args)
     val (ports, hasReset) = getPorts(ed.designOption.get, forcePreset)
 
-    val instName = ed.designOption.get.desiredName
-    if (instName == wrapperName) throw WrapperException(s"Cannot use the same name for instance and wrapper $instName")
+    val origInstName = ed.designOption.get.desiredName
+    val wName = wrapperName.getOrElse(origInstName)
+    val instName = if(origInstName == wName) s"${origInstName}_raw" else origInstName
 
     if (emitModule) {
       println(s">>>> EMITTING UNDERLYING INSTANCE $instName <<<<<")
-      val updatedED = (forcePreset, hasReset) match {
-        case (true, true) =>
-          ed.mapChiselAnnos(s => s :+ ModulePresetChiselAnnotation(CircuitTarget(instName).module(instName)))
+      val rename = if (origInstName == wName) Seq(ModuleRenameChiselAnnotation("", "raw", topOnly = true)) else Seq()
+      val annos = (forcePreset, hasReset) match {
+        case (true, true) => rename :+ ModulePresetChiselAnnotation(CircuitTarget(instName).module(instName))
         case (true, _) =>
           throw WrapperException("Requesting transformation of reset into preset but no reset port was found")
-        case _ => ed
+        case _ => rename
       }
-      ChiselGen.emitVerilog(updatedED) // main verilog file emitted as a separate file
+      ChiselGen.emitVerilog(ed.mapChiselAnnos(s => annos ++ s)) // main verilog file emitted as a separate file
+    } else if (origInstName == wName) {
+       throw WrapperException("Please provide a different name for the wrapper or enable emitModule for autorename")
     }
 
-    println(s">>>> EMITTING WRAPPER $wrapperName <<<<<")
+    println(s">>>> EMITTING WRAPPER $wName <<<<<")
 
     val wrapper = ArrayBuffer[String]()
-    wrapper += s"module $wrapperName"
+    wrapper += s"module $wName"
     wrapper += ports.map(_.emit).mkString(" (\n    ", ",\n    ", "\n  );\n")
 
     val portMap =
@@ -632,14 +635,14 @@ object VerilogPortWrapper {
 
     wrapper += "endmodule\n"
 
-    wrapper.mkString
+    (wrapper.mkString, wName)
   }
 
   /** Generate the wrapper & write it to a file (<wrapperName>.sv)
    *  @param module
    *    function generating a RawModule
    *  @param wrapperName
-   *    name of the generated wrapper (must be different from module name)
+   *    name of the generated wrapper (default: module name, suffixing inner module name with _raw)
    *  @param emitModule
    *    Compile and emit module to verilog file (optional, default false)
    *  @param forcePreset
@@ -651,18 +654,19 @@ object VerilogPortWrapper {
    */
   def emit(
       module: () => RawModule,
-      wrapperName: String,
-      emitModule: Boolean = false,
+      wrapperName: Option[String] = None,
+      emitModule: Boolean = true,
       forcePreset: Boolean = false,
       args: Array[String] = Array.empty
   ): String = {
-
+    val (wrapper, name) = generate(module, wrapperName, emitModule, forcePreset, args)
+    // file name of original circuit is NOT renamed => avoid overwrite with suffix
     val emissionPath = args.indexOf("--target-dir") match {
-      case -1 => s"${wrapperName}.v"
+      case -1 => s"${name}_wrapper.v"
       case i =>
         args.lift(i + 1) match {
-          case Some(p) => s"$p/${wrapperName}.v"
-          case _       => s"${wrapperName}.v"
+          case Some(p) => s"$p/${name}_wrapper.v"
+          case _       => s"${name}_wrapper.v"
         }
     }
 
@@ -674,7 +678,7 @@ object VerilogPortWrapper {
         val dirs = new File(a.mkString("", "/", ""))
         dirs.mkdirs()
     }
-    val wrapper = generate(module, wrapperName, emitModule, forcePreset, args)
+    
     val writer  = new FileWriter(emissionPath)
     writer.write(wrapper)
     writer.close()

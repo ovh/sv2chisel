@@ -304,22 +304,60 @@ class ChiselModule(val m: Module) extends Chiselized {
     }
     s ++= mod.body.chiselize(mCtxt)
     s += ChiselClosingLine(m, ctx, "}")
-    ctx.options.chiselizer.addTopLevelChiselGenerator match {
-      case Some(m.name) =>
+    ctx.options.chiselizer.topLevelChiselGenerators.find(_.name == m.name) match { 
+      case Some(topOptions) =>
         val appName = s"${m.name.toCamelCap}Gen"
         rinfo(ctx, m, s"Adding top level app generator for module ${m.name} with name $appName")
         s += ChiselLine(ctx, s"")
-        s += ChiselLine(ctx, s"import chisel3.stage.ChiselStage")
         s += ChiselLine(ctx, s"object $appName extends App {")
-        s += ChiselLine(mCtxt, s"new ChiselStage().emitVerilog(new ${m.name}(")
-        if(mod.params.size > 0) {
-          s ++= mod.params.map(_.chiselize(pCtxt, forceType=false, assignToValue=true) ++ comma).flatten.dropRight(1)
-          s += ChiselClosingLine(mod.params.last, mCtxt, s"), args)")
+        
+        lazy val params = mod.params.map(_.chiselize(pCtxt, forceType=false, assignToValue=true) ++ comma).flatten.dropRight(1)
+        lazy val useStringParam = ctx.src.addDep(PackageRef(UndefinedInterval, "chisel3.experimental", "StringParam"))
+        lazy val useIntParam = ctx.src.addDep(PackageRef(UndefinedInterval, "chisel3.experimental", "IntParam"))
+
+        if (topOptions.withWrapper) {
+          if(mod.params.size > 0) {
+            ctx.src.addDep(
+              PackageRef(UndefinedInterval, "sv2chisel.helpers.tools", "{ParamWrapperGenerator, ParamSet}")
+            )
+            s += ChiselLine(mCtxt, s"val gen = () => new ${m.name}(")
+            s ++= params
+            s += ChiselLine(mCtxt, s")")
+            
+            s += ChiselLine(mCtxt, s"val params = ParamSet(Seq(")
+            val dq = "\""
+            s ++= mod.params.flatMap(p => {
+              val (tpe, end) = p.tpe match {
+                case _:IntType => useIntParam; s"IntParam(" -> ")"
+                case _:BoolType => useIntParam; s"IntParam(if(" -> ") 1 else 0)"
+                case _:StringType => useStringParam; s"StringParam(" -> ")"
+                case _ => rfatal(ctx, p, s"Unsupported tpe ${p.tpe} for Wrapper instantiation"); "" -> ""
+              }
+               
+              Seq(ChiselLine(mCtxt.incr(), s"$dq${p.name}$dq -> $tpe")) ++
+                p.value.map(_.chiselize(ctx)).getOrElse(ChiselTxtS("???")) ++
+                ChiselTxtS(end) ++ ChiselTxtS(",") 
+
+            }).dropRight(1)
+            s += ChiselLine(mCtxt, s"))")
+            s += ChiselLine(mCtxt, s"ParamWrapperGenerator.emit(Map(params -> gen), unflatPorts = true, args = args)")
+          } else {
+            
+            ctx.src.addDep(PackageRef(UndefinedInterval, "sv2chisel.helpers.tools", "VerilogPortWrapper"))
+            s += ChiselLine(mCtxt, s"VerilogPortWrapper.emit(() => new ${m.name}(), args = args)")
+
+          }
         } else {
-          s += ChiselTxt(mCtxt, s"), args)")
+          ctx.src.addDep(PackageRef(UndefinedInterval, "chisel3.stage", "ChiselStage"))
+          s += ChiselLine(mCtxt, s"new ChiselStage().emitVerilog(new ${m.name}(")
+          if(mod.params.size > 0) {
+            s ++= params
+            s += ChiselClosingLine(mod.params.last, mCtxt, s"), args)")
+          } else {
+            s += ChiselTxt(mCtxt, s"), args)")
+          }
         }
         s += ChiselClosingLine(m, ctx, "}")
-        
       case _ =>
     }
     s.toSeq
