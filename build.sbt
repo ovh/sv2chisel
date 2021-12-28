@@ -4,7 +4,7 @@
 
 lazy val ScalaVersion       = "2.12.15"
 lazy val CrossScalaVersions = Seq("2.13.6", "2.12.15")
-lazy val ChiselVersions     = Map("12" -> "3.4.4", "13" -> "3.5.0-RC1")
+lazy val ChiselVersion      = "3.5.0-RC1"
 
 lazy val ScalaTestVersion   = "3.2.2"
 lazy val AntlrVersion       = "4.7.1"
@@ -140,9 +140,10 @@ lazy val helpers = (project in file("helpers"))
   .settings(commonSettings: _*)
   .settings(
     name := "sv2chisel-helpers",
-    
+    scalacOptions += "-language:reflectiveCalls", //reflective access to structural type members (Bundle fields)
+    addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % ChiselVersion cross CrossVersion.full), // naming
     libraryDependencies ++= Seq(
-      "edu.berkeley.cs" %% "chisel3" % ChiselVersions(scalaVersion.value.split('.')(1))
+      "edu.berkeley.cs" %% "chisel3" % ChiselVersion
     )
   )
 

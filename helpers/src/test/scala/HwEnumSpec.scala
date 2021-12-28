@@ -26,7 +26,7 @@ class HwEnumSpec extends AnyFlatSpec with VerilogMatchers {
       val stateC = Value
     }
     
-    class Example extends MultiIOModule {
+    class Example extends Module {
       val in       = IO(Input(Bool()))
       val out      = IO(Output(MyEnum()))
 
@@ -71,9 +71,9 @@ class HwEnumSpec extends AnyFlatSpec with VerilogMatchers {
       }
     }
     val verilog = (new ChiselStage()).emitVerilog(new Example(), setTestRunDir)
-    verilog should contains("wire [1:0] test = in ? 2'h0 : 2'h2;")
-    verilog should contains("wire  bool = funHw == 2'h0;")
-    verilog should contains("assign out = bool ? test : 2'h0;")
+    verilog should contain ("wire [1:0] test = in ? 2'h0 : 2'h2;")
+    verilog should contain ("wire  bool = funHw == 2'h0;")
+    verilog should contain ("assign out = bool ? test : 2'h0;")
 
   }
   
@@ -87,7 +87,7 @@ class HwEnumSpec extends AnyFlatSpec with VerilogMatchers {
       val stateC = V(5.U)
     }
     
-    class Example extends MultiIOModule {
+    class Example extends Module {
       val in       = IO(Input(Bool()))
       val out      = IO(Output(MyEnum()))
 
@@ -132,9 +132,9 @@ class HwEnumSpec extends AnyFlatSpec with VerilogMatchers {
       }
     }
     val verilog = (new ChiselStage()).emitVerilog(new Example(), setTestRunDir)
-    verilog should contains("wire [3:0] test = in ? 4'h0 : 4'hc;")
-    verilog should contains("wire  bool = funHw == 4'hc;")
-    verilog should contains("assign out = bool ? test : 4'h0;")
+    verilog should contain ("wire [3:0] test = in ? 4'h0 : 4'hc;")
+    verilog should contain ("wire  bool = funHw == 4'hc;")
+    verilog should contain ("assign out = bool ? test : 4'h0;")
 
   }
   

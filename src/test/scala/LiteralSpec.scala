@@ -29,7 +29,7 @@ class LiteralSpec extends Sv2ChiselSpec {
     
     result should containStr ("import chisel3._")
     
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
 
     result should containStr ("val bool = Wire(Bool())")
     result should containStr ("val iint = RegInit(UInt(5.W), \"b101\".U(5.W))")

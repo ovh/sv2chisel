@@ -11,8 +11,8 @@ trait VerilogMatchers extends Matchers {
   import matchers._
 
   /** Checks that the emitted circuit has the expected lines in order */
-  def containLines(expectedLines: String*) = new VerilogStrictStringsMatcher(expectedLines)
-  def contains(expectedLines: String*)     = new VerilogFlexStringsMatcher(expectedLines)
+  def containExactly(expectedLines: String*) = new VerilogStrictStringsMatcher(expectedLines)
+  def contain(expectedLines: String*)     = new VerilogFlexStringsMatcher(expectedLines)
 
   class VerilogStrictStringsMatcher(expectedLines: Seq[String]) extends Matcher[String] {
     override def apply(verilog: String): MatchResult = {

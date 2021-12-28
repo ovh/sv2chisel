@@ -28,25 +28,25 @@ class vecconvertSpec extends AnyFlatSpec with VerilogMatchers {
       outC := "test".V.asUInt
     }
     val verilog = (new ChiselStage()).emitVerilog(new VecInitTest(), setTestRunDir)
-    verilog should contains("assign outA_0 = 8'h74;")
-    verilog should contains("assign outA_1 = 8'h65;")
-    verilog should contains("assign outA_2 = 8'h73;")
-    verilog should contains("assign outA_3 = 8'h74;")
-    verilog should contains("assign outA_4 = 8'h74;")
-    verilog should contains("assign outA_5 = 8'h65;")
-    verilog should contains("assign outA_6 = 8'h73;")
-    verilog should contains("assign outA_7 = 8'h74;")
+    verilog should contain ("assign outA_0 = 8'h74;")
+    verilog should contain ("assign outA_1 = 8'h65;")
+    verilog should contain ("assign outA_2 = 8'h73;")
+    verilog should contain ("assign outA_3 = 8'h74;")
+    verilog should contain ("assign outA_4 = 8'h74;")
+    verilog should contain ("assign outA_5 = 8'h65;")
+    verilog should contain ("assign outA_6 = 8'h73;")
+    verilog should contain ("assign outA_7 = 8'h74;")
 
-    verilog should contains("assign outB_0 = 8'h0;")
-    verilog should contains("assign outB_1 = 8'h0;")
-    verilog should contains("assign outB_2 = 8'h0;")
-    verilog should contains("assign outB_3 = 8'h0;")
-    verilog should contains("assign outB_4 = 8'h74;")
-    verilog should contains("assign outB_5 = 8'h65;")
-    verilog should contains("assign outB_6 = 8'h73;")
-    verilog should contains("assign outB_7 = 8'h74;")
+    verilog should contain ("assign outB_0 = 8'h0;")
+    verilog should contain ("assign outB_1 = 8'h0;")
+    verilog should contain ("assign outB_2 = 8'h0;")
+    verilog should contain ("assign outB_3 = 8'h0;")
+    verilog should contain ("assign outB_4 = 8'h74;")
+    verilog should contain ("assign outB_5 = 8'h65;")
+    verilog should contain ("assign outB_6 = 8'h73;")
+    verilog should contain ("assign outB_7 = 8'h74;")
 
-    verilog should contains("assign outC = 64'h74736574;") // NB: reversed as expected
+    verilog should contain ("assign outC = 64'h74736574;") // NB: reversed as expected
   }
 
   "Implicit subwords" should "enable direct subrange assignments" in {
@@ -59,11 +59,11 @@ class vecconvertSpec extends AnyFlatSpec with VerilogMatchers {
       outB(4, 3) := Seq(false.B, false.B)
     }
     val verilog = (new ChiselStage()).emitVerilog(new TestVecSubWords(), setTestRunDir)
-    verilog should contains("assign outB_0 = 1'h0;")
-    verilog should contains("assign outB_1 = 1'h1;")
-    verilog should contains("assign outB_2 = 1'h1;")
-    verilog should contains("assign outB_3 = 1'h0;")
-    verilog should contains("assign outB_4 = 1'h0;")
+    verilog should contain ("assign outB_0 = 1'h0;")
+    verilog should contain ("assign outB_1 = 1'h1;")
+    verilog should contain ("assign outB_2 = 1'h1;")
+    verilog should contain ("assign outB_3 = 1'h0;")
+    verilog should contain ("assign outB_4 = 1'h0;")
   }
   it should "enable direct subrange slicing and use in arithmetic expression" in {
     class TestVecSubWords() extends RawModule {
@@ -87,10 +87,10 @@ class vecconvertSpec extends AnyFlatSpec with VerilogMatchers {
 
     }
     val verilog = (new ChiselStage()).emitVerilog(new TestVecSubWords(), setTestRunDir)
-    verilog should contains("assign outA = {in_2,in_1};")
-    verilog should contains("assign checkA = 1'h1;")
-    verilog should contains("assign checkB = 1'h1;")
-    verilog should contains("assign checkC = 1'h1;")
+    verilog should contain ("assign outA = {in_2,in_1};")
+    verilog should contain ("assign checkA = 1'h1;")
+    verilog should contain ("assign checkB = 1'h1;")
+    verilog should contain ("assign checkC = 1'h1;")
     // NB : outB cannot be checked without involving intermediate wires whose names could change
   }
 
@@ -103,7 +103,7 @@ class vecconvertSpec extends AnyFlatSpec with VerilogMatchers {
       outB := Ones
     }
     val verilog = (new ChiselStage()).emitVerilog(new TestBitPattern(), setTestRunDir)
-    verilog should contains("assign outA = 8'h0;")
-    verilog should contains("assign outB = 8'hff;")
+    verilog should contain ("assign outA = 8'h0;")
+    verilog should contain ("assign outB = 8'hff;")
   }
 }

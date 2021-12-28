@@ -283,12 +283,12 @@ class ChiselModule(val m: Module) extends Chiselized {
     val mCtxt = ctx.incr()
     val pCtxt = mCtxt.incr()
     
-    // filter out clock & reset ports provided by MultiIOModule if inference succeeded earlier
+    // filter out clock & reset ports provided by Module if inference succeeded earlier
     val (mod, kind) = (m.clock, m.reset) match {
       case (_, Some(r)) => 
         unsupportedChisel(ctx, m, s"Reset inference ($r) unsupported for now")
-        (m, "MultiIOModule")
-      case (Some(c), None) => (m.mapPort(p => if(p.name == c) EmptyStmt else p), "MultiIOModule")
+        (m, "Module")
+      case (Some(c), None) => (m.mapPort(p => if(p.name == c) EmptyStmt else p), "Module")
       case (None, None) => (m, "RawModule")
     }
     

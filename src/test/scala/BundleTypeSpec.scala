@@ -47,7 +47,7 @@ class BundleTypeSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
       
     result should containStr ("class t1_t extends Bundle {",
                               "val bool = Bool()",

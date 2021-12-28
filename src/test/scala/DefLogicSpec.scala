@@ -36,7 +36,7 @@ class DefLogicSpecs extends Sv2ChiselSpec {
       |end
       """.stripMargin
     )
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
 
     result should containStr ("val WWW = 1")
     result should containStr ("val change = Wire(Bool())")
@@ -72,7 +72,7 @@ class DefLogicSpecs extends Sv2ChiselSpec {
     )
     result should containStr ("class my_module(" )
     result should containStr ("val WIDTH: Int = 3" )
-    result should containStr (") extends MultiIOModule {")
+    result should containStr (") extends Module {")
     result should containStr ("val rst = IO(Input(Bool()))") // clock is abstracted but rst is not
     result should containStr ("val counter = IO(Output(UInt(WIDTH.W)))")
     

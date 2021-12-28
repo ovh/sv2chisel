@@ -26,7 +26,7 @@ class IfElseSpec extends Sv2ChiselSpec {
       |end
       """.stripMargin
     )
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
     
     result should containStr ( "when(( !a) || b) {",
                                "res := 0.U",
@@ -55,7 +55,7 @@ class IfElseSpec extends Sv2ChiselSpec {
       |end
       """.stripMargin
     )
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
     result should containStr ( "when(( !a) || b) {",
                                "res := 0.U",
                              "} .elsewhen (c) {",
@@ -85,7 +85,7 @@ class IfElseSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
     result should containStr ( "when(( !a) || b) {",
                                "res := 0.U",
                              "} .otherwise {",
@@ -118,7 +118,7 @@ class IfElseSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
     
     result should containStr ( "when(( !a) || b) {",
                                "res := 0.U",

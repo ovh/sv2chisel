@@ -64,7 +64,7 @@ class ComplexParamSpec extends Sv2ChiselSpec {
     result should containStr ("import chisel3._")
     result should containStr ("import sv2chisel.helpers.vecconvert._")
     
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
 
     result should containStr ("val IT_DOWN: Seq[Int] = Seq(IT_RIGHT, IT_LEFT)")
     result should containStr ("val IT_UP: Seq[Int] = Seq(IT_LEFT, IT_RIGHT)")

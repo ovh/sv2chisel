@@ -33,7 +33,13 @@ To set-up efficiently a new Chisel project, the easiest way is to clone the [chi
 
 As final step, you need to include sv2chisel-helpers library in this new project, by adding the following line to your `build.sbt` file:
 ```sbt
-libraryDependencies += "com.ovhcloud" %% "sv2chisel-helpers" % "0.1.0-SNAPSHOT"
+// sv2chisel was first published in 2021, on new sonatype servers 
+resolvers ++= Seq(
+  "New Sonatype Snapshots" at "https://s01.oss.sonatype.org/content/repositories/snapshots/",
+  "New Sonatype Releases" at "https://s01.oss.sonatype.org/service/local/repositories/releases/content/",
+)
+// For simpler usage, sv2chisel minor version is aligned on chisel stack minor version: x.5.x 
+libraryDependencies += "com.ovhcloud" %% "sv2chisel-helpers" % "0.5.0-SNAPSHOT"
 ```
 
 This new project is intended to be used as output target for the Chisel files converted from your (System)Verilog sources.

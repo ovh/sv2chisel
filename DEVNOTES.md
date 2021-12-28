@@ -6,12 +6,16 @@
 
 #### URGENT
 - fix proper handling of [A -: W] ranges (off-by-one error) 
-
-- add string legalization at emission:
+- enable snakeCase to camelCase conversion, controlled by a parameter
+- provide a project template 
+  - files, stored in resource: build.sbt & project/build.properties
+  - repo structure: src/main/<resource|scala>, src/test/scala
+  
+- review identifier legalization at emission:
   - scala keywords
-  - chisel keywords?
+  - chisel keywords
 
-- infer UInt for bundle fields (non-critical, harder because usage might be cross descriptions)
+- infer UInt for bundle fields (non-critical, harder because usage is cross descriptions)
 - fix behavior of emission with path relative to ~ (~ considered as standard name)
 - front-end: crash on unknown/illegal parameters (to help with syntax: do not assume they are applied when it runs)
 
@@ -37,10 +41,13 @@
 #### CRITICAL
 - FIX & USE OR DROP Special Vec of Char Inference for register affected to 
 - LESS URGENT : support printf
-- infer Boolean instead of UInt for parameters & then legalize software expression or include implicit conversion Int to Bool
 - Remove all Utils.throwInternalError in IR & implicits => replace with Option, can raise errors properly on None in visitor/transforms/chiselizer 
 
 #### NEXT-STEPS
+
+##### Add CI
+- for all (PRs) github actions: simple sbt 'test'
+- for master/before merging: internal CDS workflow translating some internal verilog code => up to verilog generation 
 
 ##### Repository Setup & Distribution
 1. Setup scala-steward on repos

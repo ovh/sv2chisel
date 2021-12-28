@@ -61,7 +61,7 @@ class SwitchSpec extends Sv2ChiselSpec {
       """.stripMargin
     )
     debug(result)
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
     
     result should containStr ("val mem = Wire(Vec(32, Bool()))",
                             "val prev = Wire(UInt(32.W))",

@@ -30,7 +30,7 @@ class WireOrRegSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
     result should containLineSet (
       "  val c = if (A) Wire(Bool()) ",
       "          else Reg(Bool()) ",
@@ -84,7 +84,7 @@ class WireOrRegSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
     result should containLineSet (
       "  val c = Reg(Bool()) ",
       "  if(A) {",
@@ -109,7 +109,7 @@ class WireOrRegSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
     result should containLineSet (
       "  val c = if (A) WireDefault(Bool(), false.B) ",
       "          else RegInit(Bool(), false.B) ",
@@ -144,7 +144,7 @@ class WireOrRegSpec extends Sv2ChiselSpec {
         """.stripMargin
       )
 
-    result should containStr ("class Test() extends MultiIOModule {")
+    result should containStr ("class Test() extends Module {")
     result should containLineSet (
       "  val c = if (A || (( !A) && ( !B))) Wire(Bool()) ",
       "          else if (( !A) && B) Reg(Bool()) ",
