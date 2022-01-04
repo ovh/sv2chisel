@@ -1036,17 +1036,12 @@ class Visitor(
           case n: Number => n.copy(value = s"${n.evalBigInt-1}") // do the simple math
           case _ => DoPrim(ui, Sub(ui), Seq(r, Number(ui, "1"))) // default
         }
-        lazy val r_plus_one = r match {
-          case DoPrim(_,Sub(_),Seq(e, Number(_, "1",_,_,_)),_,_) => e // remove trailing -1
-          case n: Number => n.copy(value = s"${n.evalBigInt+1}") // do the simple math
-          case _ => DoPrim(ui, Add(ui), Seq(r, Number(ui, "1"))) // default
-        }
       
         (op.PLUS, op.MINUS, l, r) match {
         case (_, null, nl:Number, nr: Number) => (Number(ui, s"${nl.evalBigInt+nr.evalBigInt-1}"), l)
         case (_, null, _, _) => (DoPrim(ui, Add(ui), Seq(l, r_minus_one)), l)
         case (null, _, nl:Number, nr: Number) => (l, Number(ui, s"${nl.evalBigInt-nr.evalBigInt+1}"))
-        case (null, _, _, _) => (l, DoPrim(ui, Sub(ui), Seq(l, r_plus_one)))
+        case (null, _, _, _) => (l, DoPrim(ui, Sub(ui), Seq(l, r_minus_one))) // sub minus => plus 
         case _ => throwParserError(ctx)
       }
     }

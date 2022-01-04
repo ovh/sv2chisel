@@ -19,6 +19,8 @@ class ComplexRangeSpec extends Sv2ChiselSpec {
       |
       |logic [63: 0] dword;
       |logic [7: 0] d_res;
+      |logic [7: 0] e_res;
+      |logic [7: 0] f_res;
       |integer sel;
       |
       |assign a_res = a_vect[ 0 +: 8]; // == a_vect[ 7 : 0]
@@ -28,6 +30,10 @@ class ComplexRangeSpec extends Sv2ChiselSpec {
       |
       |// variable part-select with fixed width
       |assign d_res = dword[8*sel +: 8]; 
+      |localparam W = 8;
+      |assign e_res = dword[W*sel -: W]; 
+      |localparam P = 7;
+      |assign f_res = dword[W*P -: W]; 
       |
       """.stripMargin
     )
@@ -45,6 +51,8 @@ class ComplexRangeSpec extends Sv2ChiselSpec {
     result should containStr ("b_res := b_vect(7,0).asUInt // == b_vect[0 : 7]")
     result should containStr ("b_res := b_vect(15,8).asTypeOf(UInt(8.W)) // == b_vect[8 :15]")
     result should containStr ("d_res := dword((8.U*sel)+7.U,8.U*sel).asTypeOf(UInt(8.W))")
+    result should containStr ("e_res := dword(W.U*sel,(W.U*sel)-(W-1).U).asTypeOf(UInt(8.W))")
+    result should containStr ("f_res := dword(W*P,(W*P)-(W-1)).asTypeOf(UInt(8.W))")
     
   }
 

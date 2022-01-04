@@ -5,7 +5,6 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- fix proper handling of [A -: W] ranges (off-by-one error) 
 - enable snakeCase to camelCase conversion, controlled by a parameter
 - provide a project template 
   - files, stored in resource: build.sbt & project/build.properties
