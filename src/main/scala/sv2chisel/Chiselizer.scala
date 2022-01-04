@@ -134,8 +134,9 @@ case class SnakeString(s: String) {
    * Example:
    *    toCamel("this_is_a_1_test") == "thisIsA1Test"
    */
-  def toCamel(ctx: ChiselEmissionContext): String = if (ctx.toCamelCase) toCamel else s
-  def toCamelCap(ctx: ChiselEmissionContext): String = if (ctx.toCamelCase) toCamelCap else s
+  def toCamelPkg(ctx: ChiselEmissionContext): String = if (ctx.options.chiselizer.toCamelCase) toCamelPkg else s
+  def toCamel(ctx: ChiselEmissionContext): String = if (ctx.options.chiselizer.toCamelCase) toCamel else s
+  def toCamelCap(ctx: ChiselEmissionContext): String = if (ctx.options.chiselizer.toCamelCase) toCamelCap else s
   
   def toCamel: String = 
     "_([a-z\\d])".r.replaceAllIn(s.toLowerCase(), {m =>
@@ -143,6 +144,8 @@ case class SnakeString(s: String) {
     })
   
   def toCamelCap: String = toCamel.capitalize
+  
+  def toCamelPkg: String = s.replaceAll("_", "")
 }
 
 case class ChiselTxt(
@@ -223,10 +226,10 @@ class ChiselSourceFile(val src: SourceFile) extends Chiselized {
     // descriptions must be chiselized prior to getDep
     val desc = src.descriptions.map(_.chiselize(ctx)).flatten
     val dep = src.getDep.map(p => ImportPackages(UndefinedInterval, Seq(p)).chiselize(ctx)).flatten
-    val rootP = ChiselTxtS(ctx, "package " + ctx.srcBasePath.split("/").last)
+    val rootP = ChiselTxtS(ctx, "package " + ctx.srcBasePath.split("/").last.toCamelPkg(ctx))
     val localP = src.path.split("/").dropRight(1).mkString(".") match {
       case "" => Seq()
-      case s => Seq(ChiselLine(ctx, "package " + s))
+      case s => Seq(ChiselLine(ctx, "package " + s.toCamelPkg(ctx)))
     }
       
     rootP ++ localP ++ Seq(ChiselLine(ctx, "\nimport chisel3._")) ++ dep ++
@@ -262,7 +265,7 @@ class ChiselImportPackages(val p: ImportPackages) extends Chiselized {
 
 class ChiselDefPackage(val p: DefPackage) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    Seq(ChiselLine(p, ctx, s"package object ${p.name} {")) ++ 
+    Seq(ChiselLine(p, ctx, s"package object ${p.name} {")) ++ // package should keep a snake_case for now
       p.body.chiselize(ctx.incr()) ++ 
       Seq(ChiselClosingLine(p, ctx, "}"))
   }
@@ -477,7 +480,7 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
           case (SwExpressionKind, _:BoolType) => ("(if(", ") 1 else 0)") // such a shame ...
           case _ => ("","")
         }
-        ChiselLine(na, pCtxt.incr(2), s"$dq${na.name}$dq -> $wL${na.name}$wR") +: comma
+        ChiselLine(na, pCtxt.incr(2), s"$dq${na.name}$dq -> $wL${na.name.toCamel(ctx)}$wR") +: comma
       }).flatten.dropRight(1)
       
       s.toSeq ++ ending
@@ -510,7 +513,8 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
     s ++= defParamsTxt
     
     s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
-    s ++= ports.flatMap(_.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false))
+    val portsOuter = if(requireWrapper) ports.map(p => p.copy(name = p.name.toCamel(ctx))) else ports
+    s ++= portsOuter.flatMap(_.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false))
     s += ChiselClosingLine(e.body, mCtxt, s"})")
     
     if(requireWrapper) {
@@ -518,11 +522,12 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       s += ChiselLine(mCtxt, s"val inst = Module(new $bbName(${e.params.map(_.name).mkString(", ")}))")
       
       s ++= ports.flatMap(p => {
+        val outer = p.name.toCamel(ctx)
         (p.direction, innerBBportsW(p.name)) match {
-          case (_:Input, None) => Seq(ChiselLine(mCtxt, s"inst.io.${p.name} := io.${p.name}"))
-          case (_:Output, None) => Seq(ChiselLine(mCtxt, s"io.${p.name} := inst.io.${p.name}"))
-          case (_:Input, _) => Seq(ChiselLine(mCtxt, s"inst.io.${p.name} := io.${p.name}.asTypeOf(inst.io.${p.name})"))
-          case (_:Output, _) => Seq(ChiselLine(mCtxt, s"io.${p.name} := inst.io.${p.name}.asTypeOf(io.${p.name})"))
+          case (_:Input, None) => Seq(ChiselLine(mCtxt, s"inst.io.${p.name} := io.${outer}"))
+          case (_:Output, None) => Seq(ChiselLine(mCtxt, s"io.${outer} := inst.io.${p.name}"))
+          case (_:Input, _) => Seq(ChiselLine(mCtxt, s"inst.io.${p.name} := io.${outer}.asTypeOf(inst.io.${p.name})"))
+          case (_:Output, _) => Seq(ChiselLine(mCtxt, s"io.${outer} := inst.io.${p.name}.asTypeOf(io.${outer})"))
           case (d, _) => unsupportedChisel(ctx, p, s"Unsupported direction $d for port ${p.name}")
         }
       })

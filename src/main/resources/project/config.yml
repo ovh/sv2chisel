@@ -16,6 +16,7 @@
     RemoveConcats:
       useChiselCat: true
     Chiselizer:
+      toCamelCase: false
       unpackedEmissionStyle: Reg # Reg|Mem|SyncReadMem
       topLevelChiselGenerators: # list of top in the project 
         - name: my_module # name of top

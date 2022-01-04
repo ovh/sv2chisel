@@ -5,7 +5,6 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- enable snakeCase to camelCase conversion, controlled by a parameter
 - provide a project template 
   - files, stored in resource: build.sbt & project/build.properties
   - repo structure: src/main/<resource|scala>, src/test/scala

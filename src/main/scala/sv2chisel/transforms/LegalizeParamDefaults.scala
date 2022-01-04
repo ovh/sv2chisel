@@ -180,7 +180,8 @@ class LegalizeParamDefaults(val options: TranslationOptions) extends DefModuleBa
           val autoName = Action.renameOverride(p.name)
           // warning to be inserted as comment as well 
           stmts += Comment(ui, "[WARNING] " + msg)
-          val init = RawScalaExprWrapper(v.tokens, s"$autoName.getOrElse(%e)", Seq(v), p.kind, p.tpe)
+          val nameRef = Reference(ui, autoName, Seq())
+          val init = RawScalaExprWrapper(v.tokens, s"%e.getOrElse(%e)", Seq(nameRef, v), p.kind, p.tpe)
           stmts += DefParam(ui,NoVerilogAttribute, p.name, p.tpe, Some(init), p.kind)
           assigns += p.name -> init
           

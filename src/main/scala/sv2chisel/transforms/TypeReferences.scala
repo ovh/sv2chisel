@@ -7,6 +7,7 @@ package transforms
 
 import sv2chisel.ir._
 import sv2chisel.ir.refreshTypes._
+import sv2chisel.ir.widthExpressionType._
 
 import org.antlr.v4.runtime.CommonTokenStream
 
@@ -35,10 +36,17 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
       case p: DefParam => refStore += ((WRef(p.name), FullType(p.tpe, p.kind)))
       case t: DefType => 
         val kind = t.tpe match {
-          case e: EnumType => e.fields.foreach(f => {
+          case e: EnumType => 
+            val w = e.tpe match {
+              case _:UnknownType => Width(BigInt(e.fields.length - 1).bitLength)
+              case _ => Width(e.tpe.getWidthExpression)
+            }
+            val tpe = EnumFieldType(UndefinedInterval, w)
+            
+            e.fields.foreach(f => {
               // weird but seems standard to flatten => needs to be explicit in scala
-              refStore += ((WRef(f.name), FullType(e.tpe, e.kind, implicitPath = Seq(t.name)))) 
-              refStore += ((WRef(f.name, Seq(t.name)), FullType(e.tpe, e.kind))) // not sure if used in this way ?
+              refStore += ((WRef(f.name), FullType(tpe, e.kind, implicitPath = Seq(t.name)))) 
+              refStore += ((WRef(f.name, Seq(t.name)), FullType(tpe, e.kind))) // not sure if used in this way ?
             })
             HwExpressionKind
           case _:BundleType => HwExpressionKind  

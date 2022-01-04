@@ -424,14 +424,14 @@ class InferDefLogicClocks(val options: TranslationOptions) extends DescriptionBa
         case (_:LogicUnresolved, _, false, None) => 
         case (_:LogicUnresolved, _:Output, false, Some(v)) => 
           info(p, s"Creating intermediate wire and connect for output port ${p.name} with default value ${v.serialize}")
-          createIntermediateConnect("__out_default")
+          createIntermediateConnect("_out_default")
           
         case (_:LogicUnresolved, d, false, Some(v)) => 
           critical(p, s"Unexpected default values for ${d.serialize} port ${p.name} (Value ${v.serialize} ignored)")
           
         case (_:LogicUnresolved, _: Output, true, _) => 
           info(p, s"Creating proper register declaration and connect for implicit output reg ${p.name}")
-          createIntermediateConnect("__out_reg")
+          createIntermediateConnect("_out_reg")
           
         case (_:LogicUnresolved, d: Direction, true, _) => 
           critical(p, s"Unexpected ${d.serialize} port ${p.name} assigned in clocked region (Resolved as wire)")
@@ -442,18 +442,18 @@ class InferDefLogicClocks(val options: TranslationOptions) extends DescriptionBa
         case (_:LogicRegister, _: Output, false, Some(v)) =>
           warn(p, s"Inconsistent declaration as register of ${p.name} while never assigned in a clocked region (always @<pos|neg>edge <clock>). (resolved as wire declaration)")
           info(p, s"Creating intermediate wire and connect for output port ${p.name} with default value ${v.serialize}")
-          createIntermediateConnect("__out_default")
+          createIntermediateConnect("_out_default")
         
         case (_:LogicWire, _: Output, true, _) =>
           warn(p, s"Inconsistent declaration as wire of ${p.name} while assigned in a clocked region (always @<pos|neg>edge <clock>). (Resolved creating proper register declaration and connect for this implicit output reg)")
-          createIntermediateConnect("__out_reg")
+          createIntermediateConnect("_out_reg")
           
         case (_:LogicWire, d: Direction, true, _) =>
           critical(p, s"Unexpected clocked assignment for declared ${d.serialize} port ${p.name} (resolved as wire)")
         
         case (_:LogicRegister, _: Output, true, _) => 
           info(p, s"Creating proper register declaration and connect for output reg ${p.name}")
-          createIntermediateConnect("__out_reg")
+          createIntermediateConnect("_out_reg")
           
         case (_:LogicRegister, d: Direction, true, _) =>
           critical(p, s"Unexpected ${d.serialize} port ${p.name} register. Cannot make sense of it (resolved to wire)")

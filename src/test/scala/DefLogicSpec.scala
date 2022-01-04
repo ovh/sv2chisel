@@ -77,13 +77,13 @@ class DefLogicSpecs extends Sv2ChiselSpec {
     result should containStr ("val counter = IO(Output(UInt(WIDTH.W)))")
     
     result should containStr ("// NOTE: The following statements are auto generated based on existing output reg of the original verilog source")
-    result should containStr ("val counter__out_reg = RegInit(UInt(WIDTH.W), 0.U)")
-    result should containStr ("counter := counter__out_reg")
+    result should containStr ("val counter_out_reg = RegInit(UInt(WIDTH.W), 0.U)")
+    result should containStr ("counter := counter_out_reg")
 
     result should containStr ("when(rst) {")
-    result should containStr (  "counter__out_reg := 0.U")
+    result should containStr (  "counter_out_reg := 0.U")
     result should containStr ("} .otherwise {")
-    result should containStr (  "counter__out_reg := counter__out_reg+1.U")
+    result should containStr (  "counter_out_reg := counter_out_reg+1.U")
     result should containStr ("}")
 
     

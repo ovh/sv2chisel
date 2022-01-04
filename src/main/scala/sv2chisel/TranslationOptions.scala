@@ -57,6 +57,7 @@ case class TopLevelChiselGenerator(
 }
 
 case class ChiselizerOptions(
+  toCamelCase: Boolean = false,
   unpackedEmissionStyle:ChiselizerOptions.UnpackedEmissionStyle.Value = ChiselizerOptions.UnpackedEmissionStyle.default,
   topLevelChiselGenerators: Seq[TopLevelChiselGenerator] = Seq(),
   baseBlackboxRessourcePath: Option[String] = None
@@ -70,6 +71,7 @@ case class ChiselizerOptions(
       unpackedEmissionStyle <- c.getOrElse[ChiselizerOptions.UnpackedEmissionStyle.Value]("unpackedEmissionStyle")(default.unpackedEmissionStyle)
       topLevelChiselGenerators <- c.getOrElse[Seq[TopLevelChiselGenerator]]("topLevelChiselGenerators")(Seq())
       baseBlackboxRessourcePath <- c.getOrElse[String]("baseBlackboxRessourcePath")("")
+      toCamelCase <- c.getOrElse[Boolean]("toCamelCase")(default.toCamelCase)
     } yield {
       val bbPath = baseBlackboxRessourcePath match {
         case "" => None
@@ -79,7 +81,7 @@ case class ChiselizerOptions(
           None
           
       }
-      ChiselizerOptions(unpackedEmissionStyle, topLevelChiselGenerators, bbPath)
+      ChiselizerOptions(toCamelCase, unpackedEmissionStyle, topLevelChiselGenerators, bbPath)
     }
   })
 }

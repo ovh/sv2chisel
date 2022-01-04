@@ -878,11 +878,11 @@ case class Concat(
   def serialize: String = s"Concat(${indent(args.map(a => s"\n${a.serialize}: <${a.ftpe}>").mkString)}): <${ftpe}>\n"
   def mapKind(f: ExpressionKind => ExpressionKind) = this.copy(kind = f(kind))
   def mapExpr(f: Expression => Expression) = this.copy(args = args map f)
-  def mapType(f: Type => Type) = this
+  def mapType(f: Type => Type) = this.copy(tpe = f(tpe))
   def mapWidth(f: Width => Width) = this
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def foreachExpr(f: Expression => Unit): Unit = args.foreach(f)
-  def foreachType(f: Type => Unit): Unit = ()
+  def foreachType(f: Type => Unit): Unit = f(tpe)
   def foreachWidth(f: Width => Unit): Unit = ()
 }
 
@@ -1739,6 +1739,14 @@ case class UIntType(tokens: Interval, width: Width, base: NumberBase) extends Gr
   def serialize: String = s"UInt%$base(${width.serialize})"
   def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
   def mapWidth(f: Width => Width) = UIntType(tokens, f(width), base)
+  def foreachWidth(f: Width => Unit): Unit = f(width)
+}
+
+case class EnumFieldType(tokens: Interval, width: Width) extends GroundType {
+  type T = EnumFieldType
+  def serialize: String = s"EnumField(${width.serialize})"
+  def mapInterval(f: Interval => Interval) = this.copy(tokens = f(tokens))
+  def mapWidth(f: Width => Width) = this.copy(width = f(width))
   def foreachWidth(f: Width => Unit): Unit = f(width)
 }
 

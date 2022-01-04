@@ -27,7 +27,6 @@ trait ChiselEmissionContext {
   val isRawConnect : Boolean
   val indentLevel : Int
   val indent : String
-  val toCamelCase : Boolean
   def legal(f: String => String): ChiselEmissionContext
   def safe(s: String): String
   def incr(n: Int = 1): ChiselEmissionContext 
@@ -57,7 +56,6 @@ case class ScalaStyleEmission(
   srcBasePath: String,
   nameLegalizer: String => String
 ) extends ChiselEmissionContext {
-  val toCamelCase = true
   def legal(f: String => String): ChiselEmissionContext = this.copy(nameLegalizer = f)
   def safe(s: String): String = nameLegalizer(s)
   def incr(n: Int = 1): ChiselEmissionContext = {

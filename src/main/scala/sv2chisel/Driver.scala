@@ -50,7 +50,10 @@ object Driver extends EasyLogging {
       new RemovePatterns(options),
       new RemoveConcats(options),
       new AddDontCare(options),
-      new LegalizeParamDefaults(options) // needs typed parameters
+      new LegalizeParamDefaults(options), // needs typed parameters
+      
+      // Styling transforms
+      new ToCamelCase(options)
     )
     struct(s"######### Executing ${transforms.size} transforms #########")
     val (timeTransforms, _) = time { project.run(transforms) }
