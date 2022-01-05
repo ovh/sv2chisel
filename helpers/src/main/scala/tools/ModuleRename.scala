@@ -3,6 +3,7 @@ package sv2chisel.helpers.tools
 import chisel3.experimental.RunFirrtlTransform
 
 import firrtl._
+import firrtl.renamemap.MutableRenameMap
 import firrtl.ir._
 import firrtl.annotations._
 import firrtl.options.Dependency
@@ -82,7 +83,7 @@ class ModuleRename extends Transform with DependencyAPIMigration with LazyLoggin
     // This RenameMap is required such that the firrtl compiler is able to track external references to elements of this
     // circuit which includes (most notably) TargetAnnotations, such as the ones used for preset annotation
     // Not providing this RenameMap leads to immediate crash in the following transforms (where last is the emitter)
-    val renames = RenameMap()
+    val renames = MutableRenameMap()
 
     val prevTarget = CircuitTarget(circuit.main)
 
