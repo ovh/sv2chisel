@@ -34,10 +34,10 @@ class bundleconvertSpec extends AnyFlatSpec with VerilogMatchers {
     }
     val verilog = (new ChiselStage()).emitVerilog(new SubRangeBundle(), setTestRunDir)
 
-    verilog should contain ("assign out_a = 1'h0;")
-    verilog should contain ("assign out_b = 1'h1;")
-    verilog should contain ("assign out_c = 5'h4;")
-    verilog should contain ("assign out_d = 1'h1;")
+    verilog should containStr ("assign out_a = 1'h0;")
+    verilog should containStr ("assign out_b = 1'h1;")
+    verilog should containStr ("assign out_c = 5'h4;")
+    verilog should containStr ("assign out_d = 1'h1;")
   }
 
 }

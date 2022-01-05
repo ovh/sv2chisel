@@ -68,7 +68,7 @@ private final case class VerilogPort(
   }
 
   /** emit the port for wrapper IOs */
-  def emit(): String = {
+  def emit: String = {
     s"$dir${getVerilogTypeRec(tpe)} $name"
   }
 
@@ -359,7 +359,7 @@ private final class VerilogParams() {
   }
 
   /** Emit the current set of parameters as verilog string for wrapper declaration */
-  def emit(): String = {
+  def emit: String = {
     params
       .map(p => {
         val decl = s"parameter ${p._1}"
@@ -515,7 +515,7 @@ object ParamWrapperGenerator {
     for ((p, m) <- instances) {
       verilogParams.addParams(p)
 
-      val ed                 = ChiselGen.elaborate(m.apply, args)
+      val ed                 = ChiselGen.elaborate(m.apply(), args)
       val (ports, hasReset)  = getPorts(ed.designOption.get, forcePreset, unflatPorts)
       val (topName, renames) = getNames(ed.designOption.get)
       val instName           = renames.newTopName(topName)
@@ -546,7 +546,7 @@ object ParamWrapperGenerator {
 
     val wrapper = ArrayBuffer[String]()
     wrapper += s"module $emittedName"
-    wrapper += verilogParams.emit()
+    wrapper += verilogParams.emit
     wrapper += autoIOs.map(_.emit).mkString("  (\n    ", ",\n    ", "\n  );\n")
     wrapper += "  initial begin\n"
     wrapper += "    if (!( "
@@ -602,7 +602,7 @@ object VerilogPortWrapper {
       args: Array[String] = Array.empty
   ): (String, String) = {
 
-    val ed                = ChiselGen.elaborate(module.apply, args)
+    val ed                = ChiselGen.elaborate(module.apply(), args)
     val (ports, hasReset) = getPorts(ed.designOption.get, forcePreset)
 
     val origInstName = ed.designOption.get.desiredName

@@ -71,9 +71,9 @@ class HwEnumSpec extends AnyFlatSpec with VerilogMatchers {
       }
     }
     val verilog = (new ChiselStage()).emitVerilog(new Example(), setTestRunDir)
-    verilog should contain ("wire [1:0] test = in ? 2'h0 : 2'h2;")
-    verilog should contain ("wire  bool = funHw == 2'h0;")
-    verilog should contain ("assign out = bool ? test : 2'h0;")
+    verilog should containStr ("wire [1:0] test = in ? 2'h0 : 2'h2;")
+    verilog should containStr ("wire  bool = funHw == 2'h0;")
+    verilog should containStr ("assign out = bool ? test : 2'h0;")
 
   }
   
@@ -132,9 +132,9 @@ class HwEnumSpec extends AnyFlatSpec with VerilogMatchers {
       }
     }
     val verilog = (new ChiselStage()).emitVerilog(new Example(), setTestRunDir)
-    verilog should contain ("wire [3:0] test = in ? 4'h0 : 4'hc;")
-    verilog should contain ("wire  bool = funHw == 4'hc;")
-    verilog should contain ("assign out = bool ? test : 4'h0;")
+    verilog should containStr ("wire [3:0] test = in ? 4'h0 : 4'hc;")
+    verilog should containStr ("wire  bool = funHw == 4'hc;")
+    verilog should containStr ("assign out = bool ? test : 4'h0;")
 
   }
   

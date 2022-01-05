@@ -26,7 +26,7 @@ class ChiselGenSpec extends AnyFlatSpec with VerilogMatchers {
 
   it should "just works with syncronous Reset" in {
     val verilog = ChiselGen.emit(new SimpleRegInit(), setTestRunDir)
-    verilog should contain(
+    verilog should containStr(
         "always @(posedge clock) begin",
         "if (reset) begin",
         "r <= 1'h0;",
@@ -39,8 +39,8 @@ class ChiselGenSpec extends AnyFlatSpec with VerilogMatchers {
 
   it should "just works with Preset" in {
     val verilog = ChiselGen.emitPreset(new SimpleRegInit(), setTestRunDir)
-    verilog should contain("reg  r = 1'h0;")
-    verilog should contain(
+    verilog should containStr("reg  r = 1'h0;")
+    verilog should containStr(
         "always @(posedge clock) begin",
         "r <= in;",
         "end"

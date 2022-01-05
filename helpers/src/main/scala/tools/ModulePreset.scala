@@ -3,7 +3,6 @@ package sv2chisel.helpers.tools
 import chisel3.experimental.{RunFirrtlTransform}
 
 import firrtl._
-import firrtl.PrimOps._
 import firrtl.ir._
 import firrtl.ir.{AsyncResetType}
 import firrtl.annotations._
@@ -54,8 +53,8 @@ class ModulePreset extends Transform with DependencyAPIMigration with LazyLoggin
   ): CircuitState = {
 
     // Annotations to be appended and returned as result of the transform
-    val annos         = cs.annotations.to[ArrayBuffer]
-    val moduleSet     = presetModules.to[HashSet]
+    val annos         = ArrayBuffer(cs.annotations.toSeq:_*)
+    val moduleSet     = HashSet(presetModules.toSeq:_*)
     val circuitTarget = CircuitTarget(cs.circuit.main)
 
     /** Update annotated module
@@ -98,7 +97,7 @@ class ModulePreset extends Transform with DependencyAPIMigration with LazyLoggin
     // ensure that modules are processed in hierarchy order (avoid multiple runs)
     val modules = cs.circuit.modules.reverse.map(processModule)
     val circuit = cs.circuit.copy(modules = modules.reverse)
-    val result  = cs.copy(circuit = circuit, annotations = annos)
+    val result  = cs.copy(circuit = circuit, annotations = annos.toSeq)
     if (moduleSet.isEmpty) {
       result
     } else {

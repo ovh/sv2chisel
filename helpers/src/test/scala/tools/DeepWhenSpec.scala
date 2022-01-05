@@ -43,14 +43,14 @@ class DeepWhenSpec extends AnyFlatSpec with VerilogMatchers {
     val raw       = ChiselStage.emitVerilog(new BasicWhenInner())
     val processed = getProcessedVerilog(new BasicWhenInner())
 
-    raw should contain("innerA <= in;", "innerB <= in;")
+    raw should containStr("innerA <= in;", "innerB <= in;")
     processed shouldNot contain("innerA <= in;", "innerB <= in;")
   }
   it should "work with basic assignations" in {
     val processed = getProcessedVerilog(new BasicWhenInner())
 
-    processed should contain("if (en) begin", "innerA <= in;", "end")
-    processed should contain("if (~en) begin", "innerB <= in;", "end")
+    processed should containStr("if (en) begin", "innerA <= in;", "end")
+    processed should containStr("if (~en) begin", "innerB <= in;", "end")
   }
 
   class MoreAdvancedInner() extends Module {
@@ -75,9 +75,9 @@ class DeepWhenSpec extends AnyFlatSpec with VerilogMatchers {
 
   it should "work with advanced assignations" in {
     val processed = getProcessedVerilog(new MoreAdvancedInner())
-    processed should contain("if (en) begin", "inner1_test <= in;", "end")
-    processed should contain("if (en) begin", "inner1_testV_0 <= in;", "end")
-    processed should contain("if (en) begin", "inner1_testV_1 <= in;", "end")
+    processed should containStr("if (en) begin", "inner1_test <= in;", "end")
+    processed should containStr("if (en) begin", "inner1_testV_0 <= in;", "end")
+    processed should containStr("if (en) begin", "inner1_testV_1 <= in;", "end")
   }
 
   class InnerInner() extends Module {
@@ -102,7 +102,7 @@ class DeepWhenSpec extends AnyFlatSpec with VerilogMatchers {
   it should "work with inner inner assignations" in {
     val processed = getProcessedVerilog(new InnerInner())
 
-    processed should contain("if (cond_0 & cond_1) begin", "inner2 <= inner1;", "end")
-    processed should contain("if (cond_0) begin", "inner1 <= in;", "end")
+    processed should containStr("if (cond_0 & cond_1) begin", "inner2 <= inner1;", "end")
+    processed should containStr("if (cond_0) begin", "inner1 <= in;", "end")
   }
 }

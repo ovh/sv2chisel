@@ -438,8 +438,8 @@ class ParamWrapperGeneratorSpec extends AnyFlatSpec with VerilogMatchers {
     val result = ParamWrapperGenerator.emit(instances, args = setTestRunDir)
     result should containExactly("module Test_0(")
     result should containExactly("module Test_1(")
-    result should contain("verilog_ext_module #(.WIDTH(5)) inner (")
-    result should contain("verilog_ext_module #(.WIDTH(10)) inner (")
+    result should containStr("verilog_ext_module #(.WIDTH(5)) inner (")
+    result should containStr("verilog_ext_module #(.WIDTH(10)) inner (")
   }
 
   it should s"handle forced names for top module" in {
