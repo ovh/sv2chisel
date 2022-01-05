@@ -5,6 +5,11 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
+- check & fix big literal value ex gp1424
+
+- add package generation for struct packed (bundle) at VerilogPort wrapper interfaces 
+  - (for now the original verilog package containing the struct must be included which is not convienient, and not suitable for ChiselAsIP concept outside of translation context)
+
 - provide a project template 
   - files, stored in resource: build.sbt & project/build.properties
   - repo structure: src/main/<resource|scala>, src/test/scala

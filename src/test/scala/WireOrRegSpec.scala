@@ -32,8 +32,8 @@ class WireOrRegSpec extends Sv2ChiselSpec {
 
     result should containStr ("class Test() extends Module {")
     result should containLineSet (
-      "  val c = if (A) Wire(Bool()) ",
-      "          else Reg(Bool()) ",
+      "  val c = if (A) { Wire(Bool())  }",
+      "          else { Reg(Bool())  }",
       "  if(A) {",
       "    c := true.B",
       "  } else {",
@@ -111,8 +111,8 @@ class WireOrRegSpec extends Sv2ChiselSpec {
 
     result should containStr ("class Test() extends Module {")
     result should containLineSet (
-      "  val c = if (A) WireDefault(Bool(), false.B) ",
-      "          else RegInit(Bool(), false.B) ",
+      "  val c = if (A) { WireDefault(Bool(), false.B)  }",
+      "          else { RegInit(Bool(), false.B)  }",
       "  if(A) {",
       "    c := true.B",
       "  } else {",
@@ -146,8 +146,8 @@ class WireOrRegSpec extends Sv2ChiselSpec {
 
     result should containStr ("class Test() extends Module {")
     result should containLineSet (
-      "  val c = if (A || (( !A) && ( !B))) Wire(Bool()) ",
-      "          else if (( !A) && B) Reg(Bool()) ",
+      "  val c = if (A || (( !A) && ( !B))) { Wire(Bool())  }",
+      "          else if (( !A) && B) { Reg(Bool())  }",
       "  if(A) {",
       "    c := true.B",
       "  } else if(B) {",

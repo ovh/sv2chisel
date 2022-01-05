@@ -226,9 +226,7 @@ object Utils extends LazyLogging with InfoLogger {
     "lref", "ref", "width", "legacyConnect", "allElements", "cloneTypeFull", "connectFromBits"
   )
   
-  def legalBundleField(name: String): String = {
-    if(bundleFieldsReservedNames.contains(name)) s"${name}_" else name
-  }
+  def isLegalBundleField(name: String): Boolean = !bundleFieldsReservedNames.contains(name)
 }
 
 

@@ -307,9 +307,9 @@ class ChiselModule(val m: Module) extends Chiselized {
     }
     s ++= mod.body.chiselize(mCtxt)
     s += ChiselClosingLine(m, ctx, "}")
-    ctx.options.chiselizer.topLevelChiselGenerators.find(_.name == m.name) match { 
+    ctx.options.chiselizer.topLevelChiselGenerators.find(g => g.name == m.name || g.name.toCamelCap == m.name) match { 
       case Some(topOptions) =>
-        val appName = s"${m.name.toCamelCap}Gen"
+        val appName = s"${m.name}Gen"
         rinfo(ctx, m, s"Adding top level app generator for module ${m.name} with name $appName")
         s += ChiselLine(ctx, s"")
         s += ChiselLine(ctx, s"object $appName extends App {")
@@ -514,7 +514,7 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
     
     s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
     val portsOuter = if(requireWrapper) ports.map(p => p.copy(name = p.name.toCamel(ctx))) else ports
-    s ++= portsOuter.flatMap(_.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false))
+    s ++= portsOuter.flatMap(_.chiselize(pCtxt.check(Utils.isLegalBundleField), withIO = false))
     s += ChiselClosingLine(e.body, mCtxt, s"})")
     
     if(requireWrapper) {
@@ -555,9 +555,9 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
           innerBBportsW(p.name) match {
             case Some(w) => 
               val tpe = UIntType(UndefinedInterval, w, NumberDecimal)
-              p.copy(tpe = tpe).chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false)
+              p.copy(tpe = tpe).chiselize(pCtxt.check(Utils.isLegalBundleField), withIO = false)
             case _ => 
-              p.chiselize(pCtxt.legal(Utils.legalBundleField), withIO = false)
+              p.chiselize(pCtxt.check(Utils.isLegalBundleField), withIO = false)
           }
       })
       s += ChiselLine(mCtxt, s"})")
@@ -688,14 +688,15 @@ class ChiselField(val f: Field) extends Chiselized {
 class ChiselEnumField(val f: EnumField) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = chiselize(ctx, false)
   def chiselize(ctx: ChiselEmissionContext, forceValues: Boolean): Seq[ChiselTxt] = {
+    val com = if(ctx.options.chiselizer.ignoreEnumFieldScalastyle) " // scalastyle:ignore" else ""
     val decl = s"val ${f.name} ="
     forceValues match {
       case true => 
         Seq(ChiselLine(f, ctx, s"$decl V(")) ++
           f.value.chiselize(ctx.incr()) ++
-          Seq(ChiselTxt(f, ctx, ")"))
+          Seq(ChiselTxt(f, ctx, s")$com"))
         
-      case false => Seq(ChiselLine(f, ctx, s"$decl Value"))
+      case false => Seq(ChiselLine(f, ctx, s"$decl Value$com"))
     }
   }
 }
@@ -748,7 +749,7 @@ class ChiselType(val t: Type) extends Chiselized {
       case b: BundleType if(scalaTypeOnly) => unsupportedChisel(ctx,b, "cannot refer to anonymous Bundle as scalaType")
       case b: BundleType =>
         Seq(ChiselTxt(t, ctx, s"new Bundle { ")) ++
-          b.fields.map(_.chiselize(iCtxt.legal(Utils.legalBundleField))).flatten ++
+          b.fields.map(_.chiselize(iCtxt.check(Utils.isLegalBundleField))).flatten ++
           Seq(ChiselClosingLine(b, ctx, "}"))
 
       case u: UnknownType => 
@@ -850,7 +851,7 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
     val header = s"val ${s.name} = "
     def getIf(b: LogicBinding, doElse: Boolean = false): Seq[ChiselTxt] = {
       (if(doElse) Seq(ChiselLine(ctx, " "* header.length + s"else if (")) else ChiselTxtS("if (")) ++
-        b.ctx.chiselize(ctx) ++ ChiselTxtS(") ") ++ chiselizeSimpleResolution(ctx, b.res)
+        b.ctx.chiselize(ctx) ++ ChiselTxtS(") { ") ++ chiselizeSimpleResolution(ctx, b.res) ++ ChiselTxtS(" }")
     }
       
     val defS: Seq[ChiselTxt] = s.resolution match {
@@ -860,7 +861,8 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
           case Seq() => unsupportedChisel(ctx, s, "Unexpected empty LogicConditional with empty bindings")
           case Seq(a, b) if(Utils.eq(DoPrim(UndefinedInterval, PrimOps.Not(UndefinedInterval), Seq(a.ctx)), b.ctx)) =>
             // a bit more idiomatic
-            getIf(a) ++ Seq(ChiselLine(ctx, " "* header.length + s"else ")) ++ chiselizeSimpleResolution(ctx, b.res)
+            getIf(a) ++ Seq(ChiselLine(ctx, " "* header.length + s"else { ")) ++ 
+              chiselizeSimpleResolution(ctx, b.res) ++ ChiselTxtS(" }")
           case s => getIf(s.head) ++ s.tail.flatMap(getIf(_, doElse = true))
         }
     }
@@ -934,7 +936,7 @@ class ChiselDefType(val t: DefType) extends Chiselized {
     t.tpe match {
       case b: BundleType => 
         Seq(ChiselLine(t, ctx, s"class ${t.name} extends Bundle {")) ++
-          b.fields.flatMap(_.chiselize(ctx.hw().incr().legal(Utils.legalBundleField))) ++
+          b.fields.flatMap(_.chiselize(ctx.hw().incr().check(Utils.isLegalBundleField))) ++
           Seq(ChiselClosingLine(t, ctx, "} "))
           
       case e: EnumType if(e.isGeneric) => 
@@ -974,7 +976,7 @@ class ChiselExpression(val e: Expression) extends Chiselized {
       case x: DoCast => x.chiselize(ctx)
       case x: DoCall => x.chiselize(ctx)
       case x: Concat => x.chiselize(ctx)
-      case x: SubField => x.chiselize(ctx.legal(Utils.legalBundleField))
+      case x: SubField => x.chiselize(ctx.check(Utils.isLegalBundleField))
       case x: SubIndex => x.chiselize(ctx)
       case x: SubRange => x.chiselize(ctx)
       case x: Number => x.chiselize(ctx)
