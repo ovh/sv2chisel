@@ -6,7 +6,7 @@ package sv2chisel
 
 import sv2chisel.Utils.time
 import sv2chisel.chiselize._
-import sv2chisel.ir.{UndefinedInterval, TechnicalInterval, Interval, SourceFile, SVNode}
+import sv2chisel.ir._
 import sv2chisel.antlr.{sv2017Lexer}
 
 import logger._
@@ -125,7 +125,21 @@ object Emitter extends EasyLogging {
       }
       struct(s"# Elapsed time : $timeChiselize ms")
       
-      val emissionPath = ctx.emissionBasePath + "/" + e.src.path.split('.').dropRight(1).mkString("",".",".scala")
+      val containingDir = ((d: String) => (if(d == "") "" else s"$d/"))(ctx.srcBasePath.split('/').last) 
+      
+      val emissionPath = if(ctx.options.chiselizer.toCamelCase) {
+        val pathScala = e.src.path.split('.').dropRight(1).mkString("",".",".scala") // change final extension
+        val elts = pathScala.split('/')
+        val packages = if(elts.length > 1) elts.dropRight(1).map(s => new SnakeString(s).toCamelPkg).toSeq else Seq()
+        val filename = e.src.descriptions.filterNot(_.isInstanceOf[IsolatedStatement]) match {
+          case Seq(p:DefPackage) => s"${p.name}.scala"
+          case Seq(m:DefModule) => s"${m.name}.scala"
+          case _ => elts.last.toCamelCap
+        }
+        ctx.emissionBasePath + "/" + containingDir.toCamelPkg + (packages :+ filename).mkString("/")
+      } else {
+        ctx.emissionBasePath + "/" + containingDir + e.src.path.split('.').dropRight(1).mkString("",".",".scala")
+      }
       
       val dry = if(noFileIO) s" [DRY RUN]" else ""
       
