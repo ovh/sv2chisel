@@ -5,6 +5,31 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
+- infer UInt for bundle fields 
+  - seems critical to reduce compilation time on large desings
+  - harder to get right because usage is cross descriptions
+  
+- support initial statements
+  - static assert => convert to scala's `require` statement
+  - detect initial initialization (equivalent to preset) & attempt to translate it with literals 
+
+- fix blackbox emission 
+  - currently calling modules with BB suffix => not the proper ones
+  - add compatibility with toCamelCase
+
+- keyword sample to fix ?
+- type availability of enum ?
+
+- cleanToken on function return type => currently leads to weird emission of comments
+- fix wrapper compatibility with toCamelCase option 
+  - probably need to record port names before conversion to camelCase somewhere (not bijective)
+
+- fix wrapper vec of bundle => bundle type shall be emitted as type (first, before packed)
+- wrapper: add ability to insert timescale on generated modules
+- wrapper: add clock/clk reset/rst rename option
+
+- reset management: enforce proper toplevel reset type generation depending on reset inference (todo)
+
 - add package generation for struct packed (bundle) at VerilogPort wrapper interfaces 
   - (for now the original verilog package containing the struct must be included which is not convienient, and not suitable for ChiselAsIP concept outside of translation context)
 
@@ -16,7 +41,6 @@
   - scala keywords
   - chisel keywords
 
-- infer UInt for bundle fields (non-critical, harder because usage is cross descriptions)
 - fix behavior of emission with path relative to ~ (~ considered as standard name)
 - front-end: crash on unknown/illegal parameters (to help with syntax: do not assume they are applied when it runs)
 
@@ -45,7 +69,11 @@
 - Remove all Utils.throwInternalError in IR & implicits => replace with Option, can raise errors properly on None in visitor/transforms/chiselizer 
 
 #### NEXT-STEPS
-
+- **longterm & controversial** authorize some partial assign for registers (implicits helpers) 
+  - must be tested first 
+  - might require the use of global object to recall previous assigns and avoid overwritting them
+  - must take assign context (if stack) into account not to propagate logically unrelated values
+  
 ##### Add CI
 - for all (PRs) github actions: simple sbt 'test'
 - for master/before merging: internal CDS workflow translating some internal verilog code => up to verilog generation 

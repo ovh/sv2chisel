@@ -4,8 +4,8 @@ import chisel3.experimental.{RunFirrtlTransform}
 
 import firrtl._
 import firrtl.ir._
-import firrtl.ir.{AsyncResetType}
 import firrtl.annotations._
+import firrtl.options.Dependency
 
 import logger.LazyLogging
 
@@ -31,7 +31,7 @@ case class ModulePresetChiselAnnotation(target: ModuleTarget) extends RunFirrtlT
 class ModulePreset extends Transform with DependencyAPIMigration with LazyLogging {
 
   override val prerequisites                    = firrtl.stage.Forms.HighForm
-  override val dependents                       = Seq.empty
+  override val optionalPrerequisiteOf           = Seq(Dependency[ModuleRename])
   override def invalidates(a: firrtl.Transform) = false
 
   /** Recursively update all annotated modules
@@ -99,6 +99,11 @@ class ModulePreset extends Transform with DependencyAPIMigration with LazyLoggin
     val circuit = cs.circuit.copy(modules = modules.reverse)
     val result  = cs.copy(circuit = circuit, annotations = annos.toSeq)
     if (moduleSet.isEmpty) {
+      result
+    } else if(moduleSet.toSet == presetModules) {
+      logger.error(s"[fatal] Aborting module preset update! ${presetModules.map(_.prettyPrint()).mkString(",")}")
+      logger.error(s"[fatal] Expect further errors if the top-level reset cannot be found.")
+      logger.error(s"[fatal] Did you specify the right ModuleTarget?")
       result
     } else {
       logger.warn("[info] Re-running ModulePreset Propagation")

@@ -14,7 +14,7 @@ trait ChiselMatchers extends Matchers {
   def containLineSet(expectedLines: String*) = new ChiselStrictStringsMatcher(expectedLines)
   def containStr(expectedLines: String*) = new ChiselFlexStringsMatcher(expectedLines)
 
-  def findFaillingLine(data: Seq[String], expected: Seq[String]): String = {
+  def findFaillingLine(data: Array[String], expected: Seq[String]): String = {
     val msg = ArrayBuffer[String]()
     val starts = data.zipWithIndex.collect { case (s, t) if (s == expected.head) => t }
     if(starts.isEmpty) msg += s"[DEBUG] Unable to find a first matching line (${expected.head})"

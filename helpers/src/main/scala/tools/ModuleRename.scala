@@ -67,7 +67,6 @@ class ModuleRename extends Transform with DependencyAPIMigration with LazyLoggin
   // Wiring is not a prerequisite but when mixed-in (by BoringUtils), it must be run before the renaming
   override val prerequisites             = firrtl.stage.Forms.LowForm
   override val optionalPrerequisites     = Seq(Dependency[firrtl.passes.wiring.WiringTransform])
-  override val dependents                = Seq.empty
   override def invalidates(a: Transform) = false
 
   /** Actual IR-modifying function, renaming all modules & instances

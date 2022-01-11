@@ -613,7 +613,7 @@ object VerilogPortWrapper {
       println(s">>>> EMITTING UNDERLYING INSTANCE $instName <<<<<")
       val rename = if (origInstName == wName) Seq(ModuleRenameChiselAnnotation("", "raw", topOnly = true)) else Seq()
       val annos = (forcePreset, hasReset) match {
-        case (true, true) => rename :+ ModulePresetChiselAnnotation(CircuitTarget(instName).module(instName))
+        case (true, true) => rename :+ ModulePresetChiselAnnotation(CircuitTarget(origInstName).module(origInstName))
         case (true, _) =>
           throw WrapperException("Requesting transformation of reset into preset but no reset port was found")
         case _ => rename
