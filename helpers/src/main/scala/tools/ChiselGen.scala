@@ -96,6 +96,19 @@ case class ElaboratedDesign(raw: AnnotationSeq) {
 
 /** Helpers for easy flow split between elaboration and firrtl compilation */
 object ChiselGen {
+  
+  /** Run the provided block and returns both result and the time spent in ms
+   * @param block
+   *   code to be executed
+   * @return (timeSpentInMillisecond, returnValueOfBlock)
+   */
+  def time[R](block: => R): (Double, R) = {
+    val t0 = System.nanoTime()
+    val result = block
+    val t1 = System.nanoTime()
+    val timeMillis = (t1 - t0) / 1000000.0
+    (timeMillis, result)
+  }
 
   /** Usual chisel emission of the given module
    *  @param m

@@ -38,7 +38,7 @@ class PackageSpec extends Sv2ChiselSpec {
       ))
 
     result should containStr (  "object mynewtype_t {",
-                                "def apply() = Vec(TEST, Bool())",
+                                "def apply() = UInt(TEST.W)",
                               "}")
 
   }

@@ -32,10 +32,12 @@ object Driver extends EasyLogging {
     noFileIO: Boolean = false
   ): String = {
     val transforms = Seq(
-      // Core transforms 
-      new CheckUseBeforeDecl(options),
+      // Initial checks & set-up
+      new CheckUseBeforeDecl(options), // set a first version of remoteRefs
       new CheckScopes(options),
       new CheckBlockingAssignments(options),
+      
+      // Core transforms 
       new InferDefLogicClocks(options),
       new PropagateClocks(options),
       new FlowReferences(options),

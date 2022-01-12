@@ -11,7 +11,25 @@ import collection.mutable.{HashMap}
 
 class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransform {
   
-  class UsageStore() {
+  val storeCollection = HashMap[String, UsageStore]()
+  
+  /** helper class containing all the logic for registering usage & choose the final type **/
+  class UsageStore(val name: String) {
+    
+    private val currentType = new HashMap[String, Type]()
+    private val forwardStore = new HashMap[String, (Option[String], String)]() // ref -> store name
+    
+    def applyToStore(ref: String, fwd: (UsageStore, String) => Unit, apply: String => Unit): Unit = {
+      currentType.get(ref) match {
+        case Some(_) => apply(ref)
+        case _ => forwardStore.get(ref) match {
+          case Some((Some(st), fref)) => storeCollection.get(st).map(fwd(_, fref))
+          case Some((None, fref)) => apply(fref)
+          case _ => 
+        }
+      }
+    }
+    
     private val arithmeticUsageCount = new HashMap[String, Int]()
     private val stringAssignedCount = new HashMap[String, Int]()
     // simple apply or slice operator translation
@@ -25,20 +43,28 @@ class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransf
     private val rangeAssignCount = new HashMap[String, Int]()
     
     def registerArithUsage(ref: String): Unit = {
-      val count = arithmeticUsageCount.getOrElse(ref, 0) + 1
-      arithmeticUsageCount.update(ref, count)
+      applyToStore(ref, (st, r) => st.registerArithUsage(r), r => {
+        val count = arithmeticUsageCount.getOrElse(r, 0) + 1
+        arithmeticUsageCount.update(r, count)
+      })
     }
     def registerAssignedString(ref: String): Unit = {
-      val count = stringAssignedCount.getOrElse(ref, 0) + 1
-      stringAssignedCount.update(ref, count)
+      applyToStore(ref, (st, r) => st.registerAssignedString(r), r => {
+        val count = stringAssignedCount.getOrElse(r, 0) + 1
+        stringAssignedCount.update(r, count)
+      })
     }
     def registerIndexAccess(ref: String): Unit = {
-      val count = indexAccessCount.getOrElse(ref, 0) + 1
-      indexAccessCount.update(ref, count)
+      applyToStore(ref, (st, r) => st.registerIndexAccess(r), r => {
+        val count = indexAccessCount.getOrElse(r, 0) + 1
+        indexAccessCount.update(r, count)
+      })
     }
     def registerIndexAssign(ref: String): Unit = {
-      val count = indexAssignCount.getOrElse(ref, 0) + 1
-      indexAssignCount.update(ref, count)
+      applyToStore(ref, (st, r) => st.registerIndexAssign(r), r => {
+        val count = indexAssignCount.getOrElse(r, 0) + 1
+        indexAssignCount.update(r, count)
+      })
     }
     def registerIndex(ref: String, assign: Boolean): Unit = {
       if (assign) {
@@ -48,12 +74,16 @@ class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransf
       }
     }
     def registerBlockAccess(ref: String): Unit = {
-      val count = blockAccessCount.getOrElse(ref, 0) + 1
-      blockAccessCount.update(ref, count)
+      applyToStore(ref, (st, r) => st.registerBlockAccess(r), r => {
+        val count = blockAccessCount.getOrElse(r, 0) + 1
+        blockAccessCount.update(r, count)
+      })
     }
     def registerBlockAssign(ref: String): Unit = {
-      val count = blockAssignCount.getOrElse(ref, 0) + 1
-      blockAssignCount.update(ref, count)
+      applyToStore(ref, (st, r) => st.registerBlockAssign(r), r => {
+        val count = blockAssignCount.getOrElse(r, 0) + 1
+        blockAssignCount.update(r, count)
+      })
     }
     def registerBlock(ref: String, assign: Boolean): Unit = {
       if (assign) {
@@ -64,12 +94,16 @@ class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransf
     }
     
     def registerRangeAccess(ref: String): Unit = {
-      val count = rangeAccessCount.getOrElse(ref, 0) + 1
-      rangeAccessCount.update(ref, count)
+      applyToStore(ref, (st, r) => st.registerRangeAccess(r), r => {
+        val count = rangeAccessCount.getOrElse(r, 0) + 1
+        rangeAccessCount.update(r, count)
+      })
     }
     def registerRangeAssign(ref: String): Unit = {
-      val count = rangeAssignCount.getOrElse(ref, 0) + 1
-      rangeAssignCount.update(ref, count)
+      applyToStore(ref, (st, r) => st.registerRangeAssign(r), r => {
+        val count = rangeAssignCount.getOrElse(r, 0) + 1
+        rangeAssignCount.update(r, count)
+      })
     }
     def registerRange(ref: String, assign: Boolean): Unit = {
       if (assign) {
@@ -79,16 +113,103 @@ class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransf
       }
     }
 
-    // Note : all the following could be written without closing/ locking the store
-    // however it illustrates perfectly well the system with proper use of require & assert
-    
+    // Note : the following could be written without closing/ locking the store
     private var closed = false
-    private val currentType = new HashMap[String, Type]()
     
-    def registerType(ref: String, tpe: Type): Unit = {
-      require(!closed, "Cannot register new type when Store is closed") // => user error
-      currentType.update(ref, tpe)
+    private def fillForwardStore(local: String, remote: String, tpe: Type, store: Option[String])(implicit refStore: RefStore): Unit = {
+      forwardStore += local -> (store -> remote)
+      tpe match {
+        case v: VecType =>
+          v.tpe match {
+            case Seq(t) => fillForwardStore(s"$local[_]", s"$remote[_]", t, store)
+            case _ => 
+          }
+        
+        case b: BundleType =>
+          b.fields.foreach(f => fillForwardStore(s"$local.${f.name}", s"$remote.${f.name}", f.tpe, store))
+          
+        case r:UserRefType => store match {
+          case Some(s) => 
+            storeCollection.get(s) match {
+              case Some(st) => 
+                st.getStore(remote) match {
+                  case Some(sto) =>
+                    sto.getDeclaredType(r.name) match {
+                      case Some(tpe) => fillForwardStore(local, r.name, tpe, Some(sto.name))
+                      case _ => critical(tpe, s"[Impossible] Missing declaration for ${r.name} in ${sto.name}") 
+                    }
+                  case _ => critical(tpe, s"Unable to retrieve remote type $local -> $remote  (${tpe.serialize})") 
+                }
+              case _ => critical(tpe, s"Unable to retrieve description $s store") 
+            }
+          case _ => 
+            r.path match {
+              case Seq(pkg) => 
+                storeCollection.get(pkg).flatMap(_.getDeclaredType(r.name)) match {
+                  case Some(tpe) => fillForwardStore(local, r.name, tpe, Some(pkg))
+                  case _ => critical(tpe, s"Missing declaration for ${r.name} in ${pkg}") 
+                }
+              
+              case _ => 
+                getDeclaredType(r.name) match {
+                  case Some(tpe) => fillForwardStore(local, r.name, tpe, None)
+                  case _ => critical(tpe, s"Missing declaration for ${r.name} in ${name}") 
+                }
+            }
+            
+        }
+        case _ => 
+      }
+      
     }
+    
+    def registerType(ref: String, tpe: Type)(implicit refStore: RefStore): Unit = {
+      require(!closed, "Cannot register new type when Store is closed") // => user error
+      tpe match {
+        case v: VecType =>
+          v.tpe match {
+            case Seq(t) => registerType(s"$ref[_]", t)
+            case _ => 
+          }
+          currentType.update(ref, tpe)
+        
+        case b: BundleType => // typically  DefType (name, BundleType)
+          b.fields.foreach(f => {
+            registerType(s"$ref.${f.name}", f.tpe)
+          })
+          currentType.update(ref, tpe)
+          
+        
+        case r: UserRefType => 
+          currentType.get(r.name) match {
+            case Some(t) if(r.path.isEmpty) => fillForwardStore(ref, r.name, t, None)
+            case _ => refStore.get(r).flatMap(_.defDescription) match {
+              case Some(d) => 
+                debug(tpe, s"Found remote ref type ${r.name} in description $d")
+                storeCollection.get(d).flatMap(_.getDeclaredType(r.name)).map(fillForwardStore(ref, r.name, _, Some(d)))
+              case _ => warn(tpe, s"Cannot find remote ref type ${r.serialize} in refStore: ${refStore.get(r)}")
+            }
+          }
+          
+        case _ => currentType.update(ref, tpe)
+      }
+      
+    }
+    
+    def getStore(ref: String): Option[UsageStore] = getStore(Reference(UndefinedInterval, ref, Seq()))
+    
+    def getStore(ref: Reference): Option[UsageStore] = {
+      currentType.contains(ref.name) match {
+        case true if(ref.path.isEmpty) => Some(this)
+        case _ => forwardStore.get(ref.name).flatMap { case (sn, _) => {
+          sn match {
+            case Some(n) => storeCollection.get(n)
+            case _ => Some(this)
+          }
+        }}
+      }
+    } 
+    def getDeclaredType(ref: String): Option[Type] = currentType.get(ref)
     
     def doConvertToUInt(ref: String): Boolean = {
       if(indexAssignCount.contains(ref) || rangeAssignCount.contains(ref)){
@@ -130,84 +251,81 @@ class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransf
       }
     }
     
-    def getType(ref: String): Type = {
+    def getType(ref: String): Option[Type] = {
       closed = true
-      uintLeafType(ref, currentType(ref))
+      // forward ref do not require local update (untyped reference)
+      currentType.get(ref).map(uintLeafType(ref, _))
+      // currentType.get(ref).map(t => Utils.cleanTok(uintLeafType(ref, t)))
     }
     
     def traceIt(): Unit = {
+      trace(s"##### TRACING STORE FOR DESCRIPTION $name #####")
       trace("arithmeticUsageCount: " + arithmeticUsageCount.map(t => s"${t._1} -> ${t._2}").mkString("\n", "\n", "\n"))
       trace("indexAccessCount: " + indexAccessCount.map(t => s"${t._1} -> ${t._2}").mkString("\n", "\n", "\n"))
       trace("rangeAccessCount: " + rangeAccessCount.map(t => s"${t._1} -> ${t._2}").mkString("\n", "\n", "\n"))
       trace("indexAssignCount: " + indexAssignCount.map(t => s"${t._1} -> ${t._2}").mkString("\n", "\n", "\n"))
       trace("rangeAssignCount: " + rangeAssignCount.map(t => s"${t._1} -> ${t._2}").mkString("\n", "\n", "\n"))
       trace("currentType: " + currentType.map(t => s"${t._1} -> ${t._2.serialize}").mkString("\n", "\n", "\n"))
+      trace("forwardStore: " + forwardStore.map { case (n, (st, r)) => s"$n -> ${st.getOrElse("local")}.$r" }.mkString("\n", "\n", "\n"))
+      trace(s"##### End of tracing for $name #####")
     }
   }
-    
-  def processDescription(d: Description): Description = {
-    val store = new UsageStore()
-    val publicLocalParam = d match {
-      case _: Module => false 
-      case _ => true // cannot infer properly because usage is unknown (not only local)
+  
+  //FIRST PASS => fill local store
+  override val preprocessDescription = Some(((d: Description) => {
+    val name = d match {
+      case n:HasName => n.name
+      case _ => "<unnamed>" 
     }
     
+    val store = new UsageStore(name)
     
-    //FIRST PASS => fill store
-    // assign : true is the expression is an assignement target
-    // returns 
-    def visitExpression(e: Expression, assign: Boolean, whole : Boolean = true): Option[String] = {
+    /** core function looking for reference in expressions 
+      * assign : true if the expression is an assignement target
+      * whole : false if this expression is a subreference
+      * returns a serialized version of this expression down to root ref if any + the store associated to the ref def
+      */
+    def visitExpression(e: Expression, assign: Boolean, whole : Boolean = true): Option[(String, UsageStore)] = {
       e.foreachType(visitType)
       e match {
-        case r: Reference => 
-          if (whole) store.registerBlock(r.serialize, assign)
-          Some(r.serialize)
+        case r: Reference =>
+          val st = store.getStore(r)
+          if (whole) st.map(_.registerBlock(r.serialize, assign))
+          st.map(r.serialize -> _)
+          
         case s: SubField => 
-          s.expr match {
-            case r: Reference => Some(s"${r.serialize}.${s.name}")  
-            case exp => visitExpression(exp, assign, false) match {
-                case None => None 
-                case Some(ref) => Some(s"$ref.${s.name}")
-              }
+          visitExpression(s.expr, assign, false) match {
+            case None => 
+              debug(s, s"Unable to retrieve inner reference for subfield ${s.name} of ${s.expr.serialize}")
+              None
+            case Some((ref, st)) => Some(s"$ref.${s.name}" -> st)
           }
+          
         case s: SubIndex => 
-          s.expr match {
-            case r: Reference => 
-              trace(s, s"registering index ${if(assign) "assign" else "access"} for ${r.serialize}")
-              store.registerIndex(r.serialize, assign)
-              Some(s"${r.serialize}[_]")
-            case exp =>
-              visitExpression(exp, assign, false) match {
-                case None => None 
-                case Some(ref) => 
-                  trace(s, s"registering index ${if(assign) "assign" else "access"} for ${ref}")
-                  store.registerIndex(ref, assign)
-                  Some(s"$ref[_]")
-              }
+          visitExpression(s.expr, assign, false) match {
+            case None => 
+              debug(s, s"Unable to retrieve inner reference for subindex of ${s.expr.serialize}")
+              None 
+            case Some((ref, st)) => 
+              trace(s, s"registering index ${if(assign) "assign" else "access"} for ${ref}")
+              st.registerIndex(ref, assign)
+              Some(s"$ref[_]" -> st)
           }
           
         case s: SubRange => 
-          s.expr match {
-            case r: Reference => 
-              trace(s, s"registering range ${if(assign) "assign" else "access"} for ${r.serialize}")
-              store.registerRange(r.serialize, assign)
-              Some(s"${r.serialize}[_]")
-            case exp =>
-              visitExpression(exp, assign, false) match {
-                case None => None 
-                case Some(ref) => 
-                  trace(s, s"registering range ${if(assign) "assign" else "access"} for ${ref}")
-                  store.registerRange(ref, assign)
-                  Some(s"$ref[_]")
-              }
+          visitExpression(s.expr, assign, false) match {
+            case None => None 
+            case Some((ref, st)) => 
+              store.registerRange(ref, assign)
+              Some(s"$ref[_]" -> st)
           }
-        
+    
         case p: DoPrim =>
           if(assign) critical(p, "Should not try to assign to a primary op")
           p.args.foreach(a => {
             visitExpression(a, assign, whole) match {
               case None => //
-              case Some(ref) => store.registerArithUsage(ref)
+              case Some((ref, st)) => st.registerArithUsage(ref)
             }
           })
           None
@@ -236,21 +354,21 @@ class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransf
       t.foreachType(visitType)
     }
     
-    def visitStatement(s: Statement): Unit = {
+    def visitStatement(s: Statement)(implicit refStore: RefStore): Unit = {
       s.foreachType(visitType)
-      s match {
+      processImportStatement(s, refStore) match {
         case c: Connect => 
-          // (c.loc, c.expr) match {
-          //   case (r: Reference, s: StringLit) => store.registerAssignedString(r.serialize)
-          //   case _ =>
-              visitExpression(c.loc, true)
-              visitExpression(c.expr, false)
-          // }
+          visitExpression(c.loc, true)
+          visitExpression(c.expr, false)
           
         // Localparams might be hardware
-        case p: DefParam if(p.kind == HwExpressionKind && !publicLocalParam) => 
+        case p: DefParam if(p.kind == HwExpressionKind) => 
           store.registerType(p.name, p.tpe)
           s.foreachExpr(visitExpression(_, false))
+          
+        case t: DefType => 
+          store.registerType(t.name, t.tpe)
+          visitType(t.tpe)
           
         case p: Port => 
           store.registerType(p.name, p.tpe)
@@ -290,22 +408,40 @@ class InferUInts(val options: TranslationOptions) extends DescriptionBasedTransf
       }
     }
     
-    d.foreachStmt(visitStatement)
+    d match {
+      case named: HasName => 
+        implicit val refStore = new RefStore()
+        refStore ++= remoteRefs
+        d.foreachStmt(visitStatement)
+        store.traceIt()
+        storeCollection += named.name -> store
+      case _ =>
+    }
+    d
+  }))
+  
+  // SECOND PASS => use store to update declaration AND SubIndex / SubRange Usage Expressions
+  def processDescription(d: Description): Description = {
     
-    store.traceIt()
-    
-    // SECOND PASS => use store to update declaration AND SubIndex / SubRange Usage Expressions
-    
-    def processStatement(s: Statement): Statement = {
+    def processStatement(s: Statement)(implicit store: UsageStore): Statement = {
       s match {
-        case d: DefLogic => d.copy(tpe = store.getType(d.name))
-        case p: Port => p.copy(tpe = store.getType(p.name))
-        case p: DefParam if(p.kind == HwExpressionKind && !publicLocalParam) => p.copy(tpe = store.getType(p.name))
-        case f: DefFunction => f.copy(tpe = store.getType(f.name)).mapStmt(processStatement)
+        case d: DefLogic => store.getType(d.name).map(t => d.copy(tpe = t)).getOrElse(d)
+        case d: DefType => store.getType(d.name).map(t => d.copy(tpe = t)).getOrElse(d)
+        case p: Port => store.getType(p.name).map(t => p.copy(tpe = t)).getOrElse(p)
+        case p: DefParam if(p.kind == HwExpressionKind) => store.getType(p.name).map(t => p.copy(tpe = t)).getOrElse(p)
+        case f: DefFunction => store.getType(f.name).map(t => f.copy(tpe = t)).getOrElse(f).mapStmt(processStatement)
         case _ => s.mapStmt(processStatement)
       }
     }
-    
-    d.mapStmt(processStatement)
+    d match {
+      case named: HasName => 
+        storeCollection.get(named.name) match {
+          case Some(store) => d.mapStmt(processStatement(_)(store))
+          case _ => 
+            fatal(d, s"Unable to retrieve description ${named.name} from local (InferUInt) storage.")
+            d
+        }
+      case _ => d
+    }
   }
 }

@@ -206,8 +206,8 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
             // notable exception : String might be added with String or numTpe => require recursion
             // only allowing + and - on string, add * ?
             (getType(d.args(0), kind), getType(d.args(1), kind)) match {
-              case (Some(ftpe@FullType(_:StringType,_,_,_,_)), _) => Some(ftpe)
-              case (_, Some(ftpe@FullType(_:StringType,_,_,_,_))) => Some(ftpe)
+              case (Some(ftpe@FullType(_:StringType,_,_,_,_,_)), _) => Some(ftpe)
+              case (_, Some(ftpe@FullType(_:StringType,_,_,_,_,_))) => Some(ftpe)
               case _ => numTpe
             }
           case _:NumOp => numTpe 
@@ -318,7 +318,9 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
         (p.tpe, p.value) match {
           case (_: UnknownType, Some(v)) => 
             getType(v, p.kind) match {
-              case Some(ftpe) => store.registerDef(p.name, ftpe, Some(v)); p.copy(tpe = ftpe.tpe, kind = ftpe.kind)
+              case Some(ftpe) => 
+                store.registerDef(p.name, ftpe, Some(v))
+                p.copy(tpe = Utils.cleanTok(ftpe.tpe), kind = ftpe.kind)
               case _ => debug(p, s"Unable to infer proper type for defparam ${p.name}"); p 
             }
           case _ => store.registerDef(p.name, FullType(p.tpe, p.kind), p.value); p
@@ -384,7 +386,7 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
           store.computeBestType(p.name) match {
             case (Some(ftpe), s) => 
               if(!s.isEmpty) info(p, s"Type inference for parameter ${p.name} returned: $s")
-              p.copy(tpe = ftpe.tpe, kind = ftpe.kind)
+              p.copy(tpe = Utils.cleanTok(ftpe.tpe), kind = ftpe.kind)
             case (_, s) => // to do add noDefault here (after bug fix)
               if (noDefault) {
                 debug(p, s"Unable to retrieve type information for parameter ${p.name}: $s")
@@ -402,7 +404,7 @@ class InferParamTypes(val options: TranslationOptions) extends DefModuleBasedTra
                 case (n, o) if(Utils.eq(n, o)) => p
                 case (n, o) =>
                   info(p, s"Converting parameter ${p.name} type from ${o.serialize} to ${n.serialize} ($s)")
-                  p.copy(tpe = n)
+                  p.copy(tpe = Utils.cleanTok(n))
               }
             case _ => p // nothing to do
           }

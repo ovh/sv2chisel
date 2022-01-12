@@ -511,11 +511,14 @@ object ParamWrapperGenerator {
     val verilogInstances = ArrayBuffer[VerilogInstance]()
     val verilogModules   = ArrayBuffer[String]()
     var autoIOs          = Seq[VerilogPort]()
+    
+    var totalElabTime = 0.0
+    var totalFIRTime = 0.0
 
     for ((p, m) <- instances) {
       verilogParams.addParams(p)
 
-      val ed                 = ChiselGen.elaborate(m.apply(), args)
+      val (elabTime, ed)     = ChiselGen.time { ChiselGen.elaborate(m.apply(), args) }
       val (ports, hasReset)  = getPorts(ed.designOption.get, forcePreset, unflatPorts)
       val (topName, renames) = getNames(ed.designOption.get)
       val instName           = renames.newTopName(topName)
@@ -539,8 +542,17 @@ object ParamWrapperGenerator {
           throw WrapperException("Requesting transformation of reset into preset but no reset port was found")
         case _ => Seq(renames)
       }
-      verilogModules += ChiselGen.getVerilog(ed.mapChiselAnnos(s => annos ++ s))
+      
+      val (timeFIR, verilog) = ChiselGen.time { ChiselGen.getVerilog(ed.mapChiselAnnos(s => annos ++ s)) }
+      verilogModules += verilog
+      println(f"> Spent ${(timeFIR + elabTime)/1000}%.2f seconds (Chisel: $elabTime%.2f ms ; FIRRTL: $timeFIR%.2f ms)")
+      totalElabTime += elabTime
+      totalFIRTime += timeFIR
     }
+    val tot = (totalElabTime + totalFIRTime) / 1000
+    val totElab = totalElabTime/1000
+    val totFIR = totalFIRTime/1000
+    println(f">>>> INSTANCE EMISSION: $tot%.2f seconds (Chisel: $totElab%.2f s ; FIRRTL: $totFIR%.2f s)")
 
     println(s">>>> EMITTING WRAPPER $emittedName <<<<<")
 
@@ -602,7 +614,7 @@ object VerilogPortWrapper {
       args: Array[String] = Array.empty
   ): (String, String) = {
 
-    val ed                = ChiselGen.elaborate(module.apply(), args)
+    val (elabTime, ed)    = ChiselGen.time { ChiselGen.elaborate(module.apply(), args) }
     val (ports, hasReset) = getPorts(ed.designOption.get, forcePreset)
 
     val origInstName = ed.designOption.get.desiredName
@@ -618,11 +630,16 @@ object VerilogPortWrapper {
           throw WrapperException("Requesting transformation of reset into preset but no reset port was found")
         case _ => rename
       }
-      ChiselGen.emitVerilog(ed.mapChiselAnnos(s => annos ++ s)) // main verilog file emitted as a separate file
+      // main verilog file emitted as a separate file
+      val (timeFIR, _) = ChiselGen.time { ChiselGen.emitVerilog(ed.mapChiselAnnos(s => annos ++ s)) }
+      val tot = (elabTime + timeFIR) / 1000
+      println(f">>>> INSTANCE EMISSION: $tot%.2f seconds (Chisel: $elabTime%.2f ms ; FIRRTL: $timeFIR%.2f ms)")
     } else if (origInstName == wName) {
        throw WrapperException("Please provide a different name for the wrapper or enable emitModule for autorename")
+    } else {
+      println(f">>>> INSTANCE ELABORATION: $elabTime%.2f seconds (Chisel: $elabTime%.2f ms ; FIRRTL: skipped)")
     }
-
+    
     println(s">>>> EMITTING WRAPPER $wName <<<<<")
 
     val wrapper = ArrayBuffer[String]()

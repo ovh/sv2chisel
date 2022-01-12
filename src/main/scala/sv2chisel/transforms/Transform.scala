@@ -186,7 +186,7 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
   protected def processImportStatement[T <: Statement](s: T, localRefStore: RefStore): T = {
     s match {
       case ImportPackages(_,sp) => sp.foreach(p => {
-        trace(s, s"locally imported package: ${p.path}")
+        debug(s, s"locally imported package: ${p.path}")
         findDescription(p.path) match {
           case Some(d: DefPackage) =>
             d.refs match {
@@ -268,13 +268,13 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
     )}
   }
   
-  private def processDescriptionWrapper(d: Description): Description = {
+  private def processDescriptionWrapper(d: Description, f: Description => Description): Description = {
     currentDescription = Some(d)
     d match {
       case IsolatedStatement(_, i: ImportPackages) => importedPackages ++= i.packages; refOutdated = true
       case _ =>
     }
-    processDescription(d) match {
+    f(d) match {
       case p: DefPackage => 
         scopedPackages += p.name // shall not be considered as Scoped for himself !
         localPackages += ((p.name, p)) // for local usage (within the same Project entry -- edge case)
@@ -332,10 +332,16 @@ abstract class DescriptionBasedTransform extends Transform with InfoLogger {
     
     // Note : project is mutable
     preprocessDescription match {
-      case Some(f) => project.mapEntry(processEntry(_, f))
+      case Some(f) => 
+        project.mapEntry(e => processEntry(e, d => processDescriptionWrapper(d, f)))
+        scopedPackages.clear()
+        localPackages.clear()
+        remoteRefsStore.clear()
+        refOutdated = true
       case None =>
     }
-    project.mapEntry(processEntry(_, processDescriptionWrapper)) // descriptions updated only updated once per entry
+    // descriptions updated only updated once per entry
+    project.mapEntry(e => processEntry(e, d => processDescriptionWrapper(d, processDescription))) 
   }
   
 }

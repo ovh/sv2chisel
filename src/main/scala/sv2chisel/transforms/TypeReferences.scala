@@ -16,13 +16,15 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
   implicit var srcFile : Option[SourceFile] = None
   implicit var stream : Option[CommonTokenStream] = None
   
+  private var defDescription: Option[String] = None 
+  
   def processDescription(d: Description): Description = {
     // for refreshedType -- getting actual pointers
     srcFile = currentSourceFile
     stream = currentStream
     d match {
-      case m: Module => processModule(m)
-      case p: DefPackage => processPackage(p)
+      case m: Module => defDescription = Some(m.name) ; processModule(m)
+      case p: DefPackage => defDescription = Some(p.name) ; processPackage(p)
       case d => d
     }
   }
@@ -33,7 +35,7 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
       case l: DefLogic => refStore += ((WRef(l.name), FullType(l.tpe, HwExpressionKind)))
       case p: Port => refStore += ((WRef(p.name), FullType(p.tpe, HwExpressionKind)))
       case f: DefFunction => refStore += ((WRef(f.name), FullType(f.tpe, HwExpressionKind, portRefs = f.ports)))
-      case p: DefParam => refStore += ((WRef(p.name), FullType(p.tpe, p.kind)))
+      case p: DefParam => refStore += ((WRef(p.name), FullType(p.tpe, p.kind, defDescription = defDescription)))
       case t: DefType => 
         val kind = t.tpe match {
           case e: EnumType => 
@@ -45,14 +47,15 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
             
             e.fields.foreach(f => {
               // weird but seems standard to flatten => needs to be explicit in scala
-              refStore += ((WRef(f.name), FullType(tpe, e.kind, implicitPath = Seq(t.name)))) 
-              refStore += ((WRef(f.name, Seq(t.name)), FullType(tpe, e.kind))) // not sure if used in this way ?
+              refStore += WRef(f.name) -> FullType(tpe, e.kind, implicitPath=Seq(t.name), defDescription=defDescription)
+              // not sure if used in this way ?
+              refStore += WRef(f.name, Seq(t.name)) -> FullType(tpe, e.kind, defDescription = defDescription) 
             })
             HwExpressionKind
           case _:BundleType => HwExpressionKind  
           case _ => UnknownExpressionKind
         }
-        refStore += ((WRef(t.name), FullType(t.tpe, kind, true)))
+        refStore += WRef(t.name) -> FullType(t.tpe, kind, true, defDescription = defDescription)
       case f: ForGen =>
         f.init match {
           case na: NamedAssign => refStore += ((WRef(na.name), FullType(IntType(na.tokens, NumberDecimal), SwExpressionKind)))
@@ -67,7 +70,7 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
     trace(e, s"Entering processExpression for ${e.getClass.getName}: ${e.serialize}")
     val proc = e.mapExpr(processExpression)
     trace(e, s"Continuing processExpression for ${e.getClass.getName}: ${e.serialize} - ${e.tpe.serialize}")
-    proc.mapType(processType) match {
+    proc.mapType(processType(_)) match {
       case r: Reference => 
         refStore.get(r) match {
           case Some(ftpe) => 
@@ -130,7 +133,7 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
         
       case c@DoCast(_, _, _, u: UserRefType) =>
         if(!refStore.contains(u)){
-          critical(u, s"Undeclared type ${u.serialize}")
+          critical(c, s"Undeclared cast type ${u.serialize}")
           c
         } else {
           c.copy(kind = refStore(u).kind) // only retrieve kind associated to type declaration
@@ -140,16 +143,24 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
     }
   }
   
-  def processType(t: Type)(implicit refStore: RefStore): Type = {
+  def processType(t: Type, defDes: Option[String] = None)(implicit refStore: RefStore): Type = {
     trace(t, s"Entering processType for ${t.getClass.getName}: ${t.serialize}")
-    t.mapType(processType).mapWidth(_.mapExpr(processExpression)) match {
+    t.mapType(processType(_, defDes)).mapWidth(_.mapExpr(processExpression)) match {
       case u: UserRefType =>  
-        if(!refStore.contains(u)){
-          critical(u, s"Undeclared type ${u.serialize}")
-          u
-        } else {
+        if(refStore.contains(u)){
           val tpe = Utils.cleanTokens(refStore(u).tpe)
-          u.copy(tpe = processType(tpe)) // could be optimized with some cache system ?
+          u.copy(tpe = processType(tpe, refStore(u).defDescription))
+        } else {
+          // need to fetch from the remote scope itself
+          defDes match {
+            case Some(d) =>
+              refStore.get(WRef(u.name, d +: u.path)) match {
+                case Some(f) => u.copy(tpe = processType(Utils.cleanTokens(f.tpe), f.defDescription))
+                case _ => critical(u, s"Undeclared type ${u.serialize} in scope $d") ; u
+              }
+            case _ => critical(u, s"Undeclared type ${u.serialize}") ; u
+          }
+
         }
       case tpe => tpe
     }
@@ -189,7 +200,7 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
   
   def processStatement(s: Statement)(implicit refStore: RefStore): Statement = {
     trace(s, s"Entering processStatement for ${s.getClass.getName}")
-    s.mapStmt(processStatement).mapExpr(processExpression).mapType(processType) match {
+    s.mapStmt(processStatement).mapExpr(processExpression).mapType(processType(_)) match {
       case i: DefInstance =>
         // let's fetch remote module if known
         currentProject.get.findModule(i.module.serialize) match {
@@ -228,7 +239,7 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
    * Processing Module References
    */
   def processModule(m: Module): Module = {
-    currentProject.get.clearDescriptionCache() // ensure that we have latest results
+    forceRefsRefresh() // ensure that we have latest results
     implicit val ref2Type = new RefStore() 
     ref2Type ++= remoteRefs
     

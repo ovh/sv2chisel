@@ -153,6 +153,10 @@ class LegalizeExpressionSpec extends Sv2ChiselSpec {
       |} my_struct_t;
       |
       |wire my_struct_t s;
+      |// force vec bool fields 
+      |assign s.fieldA[0] = '1;
+      |assign s.fieldB[0] = '1;
+      |assign s.fieldC[0] = '1;
       |
       |wire v;
       |wire [7:0] u;

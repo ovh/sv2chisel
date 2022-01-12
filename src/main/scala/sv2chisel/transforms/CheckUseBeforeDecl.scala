@@ -41,13 +41,13 @@ class CheckUseBeforeDecl(val options: TranslationOptions) extends DescriptionBas
     }
   }
   
-  def visitStatement(s: Statement)(implicit refStore: RefStore): Unit = {
+  def visitStatement(s: Statement)(implicit refStore: RefStore, description: String): Unit = {
     // record
     processImportStatement(s, refStore) match {
       case l: DefLogic => refStore += ((WRef(l.name), FullType(l.tpe, HwExpressionKind)))
       case p: DefParam => refStore += ((WRef(p.name), FullType(p.tpe, p.kind)))
       case t: DefType => 
-        refStore += ((WRef(t.name), FullType(t.tpe, HwExpressionKind)))
+        refStore += ((WRef(t.name), FullType(t.tpe, HwExpressionKind, defDescription = Some(description))))
         t.tpe match {
           case e: EnumType => e.fields.foreach(f => {
             refStore += ((WRef(f.name), FullType(e.tpe, e.kind))) // weird but seems standard to flatten
@@ -78,6 +78,7 @@ class CheckUseBeforeDecl(val options: TranslationOptions) extends DescriptionBas
     implicit val refs = new RefStore() 
     refs ++= remoteRefs
     // propagate to local refs & record them
+    implicit val description = p.name
     visitStatement(p.body)
     forceRefsRefresh() // must be done after visitStatement due to the import statement side effect
     debug(p, s"Updating refs for package ${p.name}")
@@ -88,11 +89,12 @@ class CheckUseBeforeDecl(val options: TranslationOptions) extends DescriptionBas
    * Processing Module References
    */
   def processModule(m: Module): Module = {
-    implicit val ref2Type = new RefStore() 
+    implicit val ref2Type = new RefStore()
     ref2Type ++= remoteRefs
     
     //SINGLE PASS => references shall be registered in ref2Type before use    
     m.foreachParam(p => ref2Type += ((WRef(p.name), FullType(p.tpe, SwExpressionKind))))
+    implicit val description = m.name
     visitStatement(m.body)
     m
   }

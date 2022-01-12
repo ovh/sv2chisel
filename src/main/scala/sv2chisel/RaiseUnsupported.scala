@@ -128,23 +128,23 @@ class RaiseUnsupported(
   def checkIdentifier(ctx: IdentifierContext): Unit = {
     ctx.KW_SAMPLE match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported keyword ${k.getText()}")
+      case k => raiseWarn(ctx, s"Special sv2017 keyword ${k.getText()} treated as simple identifier")
     }
     ctx.KW_RANDOMIZE match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported keyword ${k.getText()}")
+      case k => raiseWarn(ctx, s"Special sv2017 keyword ${k.getText()} treated as simple identifier")
     }
     ctx.KW_TYPE_OPTION match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported keyword ${k.getText()}")
+      case k => raiseWarn(ctx, s"Special sv2017 keyword ${k.getText()} treated as simple identifier")
     }
     ctx.KW_OPTION match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported keyword ${k.getText()}")
+      case k => raiseWarn(ctx, s"Special sv2017 keyword ${k.getText()} treated as simple identifier")
     }
     ctx.KW_STD match {
       case null =>
-      case k => raiseIt(ctx, s"Unsupported keyword ${k.getText()}")
+      case k => raiseWarn(ctx, s"Special sv2017 keyword ${k.getText()} treated as simple identifier")
     }
   }
   
