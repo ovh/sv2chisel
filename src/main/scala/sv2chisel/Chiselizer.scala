@@ -512,6 +512,8 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
     }).flatten
     s ++= defParamsTxt
     
+    if(requireWrapper) s += ChiselLine(mCtxt, s"override def desiredName = $dq${e.name}Wrapper$dq")
+    
     s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
     val portsOuter = if(requireWrapper) ports.map(p => p.copy(name = p.name.toCamel(ctx))) else ports
     s ++= portsOuter.flatMap(_.chiselize(pCtxt.check(Utils.isLegalBundleField), withIO = false))
@@ -550,6 +552,7 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
         s += ChiselTxt(mCtxt, s") extends BlackBox$resource {")
       }
       s ++= defParamsTxt
+      s += ChiselLine(mCtxt, s"override def desiredName = $dq${e.name}$dq") // actual mapping to existing file
       s += ChiselLine(mCtxt, s"val io = IO(new Bundle {") // still using a bundle of ios for compatibility
       s ++= ports.flatMap(p => {
           innerBBportsW(p.name) match {

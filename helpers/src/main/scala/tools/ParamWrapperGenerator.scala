@@ -59,7 +59,11 @@ private final case class VerilogPort(
       case u: UInt if (u.getWidth == 1) => s""
       case u: UInt                      => s" [${u.getWidth - 1}:0]"
 
-      case v: Vec[_] => s" [${v.length - 1}:0]${v.headOption.map(getVerilogTypeRec(_)).getOrElse("")}"
+      case v: Vec[_] => 
+        v.headOption match {
+          case Some(_:Record) => s"${v.headOption.map(getVerilogTypeRec(_)).getOrElse("")} [${v.length - 1}:0]"
+          case _ => s" [${v.length - 1}:0]${v.headOption.map(getVerilogTypeRec(_)).getOrElse("")}"
+        }
 
       case b: Record => s" ${b.className.split('$').head}"
 
@@ -68,8 +72,8 @@ private final case class VerilogPort(
   }
 
   /** emit the port for wrapper IOs */
-  def emit: String = {
-    s"$dir${getVerilogTypeRec(tpe)} $name"
+  def emit(implicit rnp: Map[String, String]): String = {
+    s"$dir${getVerilogTypeRec(tpe)} ${rnp.get(name).getOrElse(name)}"
   }
 
   private def unflat(flatPrefix: String, prefix: String, ports: Seq[VerilogPort]): Seq[VerilogPort] = {
@@ -90,21 +94,22 @@ private final case class VerilogPort(
   }
 
   /** emit the port for IOs map after instance declaration */
-  def emitInstance(ref: VerilogPort): (Seq[String], Seq[String]) = {
+  def emitInstance(ref: VerilogPort)(implicit rnp: Map[String, String]): (Seq[String], Seq[String]) = {
     // NB: ref is the wrapper
-    lazy val stdMap = s".$name(${ref.name})"
+    val wrapPortName = rnp.get(ref.name).getOrElse(ref.name)
+    lazy val stdMap = s".$name(${wrapPortName})"
     (tpe, ref.tpe) match {
       case (_: Clock, _) => (Seq(stdMap), Seq())
       case (_: Reset, _) => (Seq(stdMap), Seq())
 
       case (u: UInt, v: UInt) if (u.getWidth < v.getWidth) =>
-        val portMap = s".$name(${ref.name}[${u.getWidth - 1}:0])"
+        val portMap = s".$name(${wrapPortName}[${u.getWidth - 1}:0])"
         if (dir == "input") {
           println(s"[NOTE] Using only ${u.getWidth} bits out of ${v.getWidth} for port $name")
           (Seq(portMap), Seq())
         } else {
-          println(s"[NOTE] Padding unused bits of port ${ref.name} (${v.getWidth - 1} downto ${u.getWidth}) with '0")
-          (Seq(portMap), Seq(s"assign ${ref.name}[${v.getWidth - 1}:${u.getWidth}] = '0;"))
+          println(s"[NOTE] Padding unused bits of port ${wrapPortName} (${v.getWidth - 1} downto ${u.getWidth}) with '0")
+          (Seq(portMap), Seq(s"assign ${wrapPortName}[${v.getWidth - 1}:${u.getWidth}] = '0;"))
         }
 
       case (_: UInt, _) => (Seq(stdMap), Seq())
@@ -117,7 +122,7 @@ private final case class VerilogPort(
           .zip(ref.flatPorts)
           .zipWithIndex
           .map {
-            case ((l, r), i) => l.emitInstance(r.copy(name = s"${ref.name}[$i]"))
+            case ((l, r), i) => l.emitInstance(r.copy(name = s"${wrapPortName}[$i]"))
           }
           .reduceOption((t, r) => (t._1 ++ r._1, t._2 ++ r._2))
           .getOrElse((Seq(), Seq()))
@@ -125,8 +130,8 @@ private final case class VerilogPort(
         val assignIndexes = ref.flatPorts.zipWithIndex.drop(flatPorts.length).flatMap {
           case (p, i) => {
             if (p.dir != "input") {
-              println(s"[NOTE] Assigning port ${ref.name} to 0")
-              Some(s"assign ${ref.name}[$i] = '0;")
+              println(s"[NOTE] Assigning port ${wrapPortName} to 0")
+              Some(s"assign ${wrapPortName}[$i] = '0;")
             } else {
               None
             }
@@ -142,17 +147,17 @@ private final case class VerilogPort(
             case (field, dr) => {
               (fpMapL.get(s"${name}_${field}"), l.elements.get(field), fpMapR.get(s"${name}_${field}")) match {
                 case (Some(pl), Some(_), Some(pr)) =>
-                  pl.emitInstance(pr.copy(name = s"${ref.name}.${field}"))
+                  pl.emitInstance(pr.copy(name = s"${wrapPortName}.${field}"))
 
                 case (None, None, Some(pr)) if (pr.dir == "input") => (Seq(), Seq())
                 case (None, None, Some(_)) =>
-                  println(s"[NOTE] assigning field ${ref.name}.${field} to '0")
-                  (Seq(), Seq(s"assign ${ref.name}.${field} = '0;"))
+                  println(s"[NOTE] assigning field ${wrapPortName}.${field} to '0")
+                  (Seq(), Seq(s"assign ${wrapPortName}.${field} = '0;"))
 
                 case (None, Some(dl), None) => // field is a bundle or vec which also gets flattened
                   (dl, dr) match {
                     case ((_: Vec[_], _: Vec[_]) | (_: Record, _: Record)) =>
-                      val prefix = s"${ref.name}.${field}"
+                      val prefix = s"${wrapPortName}.${field}"
                       val lfp    = unflat(s"${name}_${field}", prefix, flatPorts)
                       val rfp    = unflat(s"${name}_${field}", prefix, ref.flatPorts)
 
@@ -201,7 +206,7 @@ private final case class VerilogPort(
   /** Perform recursive type update with associated update of flatPorts */
   private def updatePortRec(base: VerilogPort, remote: VerilogPort): VerilogPort = {
     if (base.name != remote.name || base.dir != remote.dir) {
-      throw WrapperException(s"Unexpected update of port: ${base.emit} with ${remote.emit}")
+      throw WrapperException(s"Unexpected update of port: ${base.emit(Map())} with ${remote.emit(Map())}")
     }
     // base = wrapper ; remote = instance
     (base.tpe, remote.tpe) match {
@@ -319,7 +324,7 @@ private final case class VerilogInstance(
    *  @param ind
    *    : indent level to be applied to the whole emitted block
    */
-  def emit(ind: Int, wrapperPorts: Seq[VerilogPort]): String = {
+  def emit(ind: Int, wrapperPorts: Seq[VerilogPort])(implicit rnp: Map[String, String]): String = {
     println(s" > Instanciating $name")
     ArrayBuffer[String]()
     val s = ArrayBuffer[String]()
@@ -479,6 +484,12 @@ object ParamWrapperGenerator {
    *    use if preset are being used (helps properly manage the reset signal)
    *  @param unusedParams
    *    set of parameters to be emitted as wrapper parameters (bad practice for verilog compatibility only)
+   *  @param renameWrapperPorts
+   *    map of renames of wrapper ports (use-case: reset & clock signal renames)
+   *  @param initialStatements
+   *    Seq of lines to be inserted before the wrapper (use-case: import external packages)
+   *  @param args
+   *    additional args for chisel generation (optional, default empty array)
    *  @return
    *    a string containing the wrapper
    */
@@ -488,8 +499,11 @@ object ParamWrapperGenerator {
       unflatPorts: Boolean = false,
       forcePreset: Boolean = false,
       unusedParams: ParamSetLike = ParamSet(Seq()),
+      renameWrapperPorts: Map[String, String] = Map.empty,
+      initialStatements: Seq[String] = Seq.empty,
       args: Array[String] = Array.empty
   ): String = {
+    implicit val rnp = renameWrapperPorts
     var topNameStore = ""
     lazy val emittedName = forceName match {
       case Some(s) => s
@@ -557,6 +571,7 @@ object ParamWrapperGenerator {
     println(s">>>> EMITTING WRAPPER $emittedName <<<<<")
 
     val wrapper = ArrayBuffer[String]()
+    wrapper += initialStatements.mkString("", "\n","\n")
     wrapper += s"module $emittedName"
     wrapper += verilogParams.emit
     wrapper += autoIOs.map(_.emit).mkString("  (\n    ", ",\n    ", "\n  );\n")
@@ -601,6 +616,10 @@ object VerilogPortWrapper {
    *    Compile and emit module to verilog file (optional, default false)
    *  @param forcePreset
    *    top level synchronous reset (required) is converted to Preset (optional, default false)
+   *  @param renameWrapperPorts
+   *    map of renames of wrapper ports (use-case: reset & clock signal renames)
+   *  @param initialStatements
+   *    Seq of lines to be inserted before the wrapper (use-case: import external packages)
    *  @param args
    *    additional args for chisel generation (optional, default empty array)
    *  @return
@@ -611,9 +630,11 @@ object VerilogPortWrapper {
       wrapperName: Option[String] = None,
       emitModule: Boolean = true,
       forcePreset: Boolean = false,
+      renameWrapperPorts: Map[String, String] = Map.empty,
+      initialStatements: Seq[String] = Seq.empty,
       args: Array[String] = Array.empty
   ): (String, String) = {
-
+    implicit val rnp = renameWrapperPorts
     val (elabTime, ed)    = ChiselGen.time { ChiselGen.elaborate(module.apply(), args) }
     val (ports, hasReset) = getPorts(ed.designOption.get, forcePreset)
 
@@ -643,11 +664,14 @@ object VerilogPortWrapper {
     println(s">>>> EMITTING WRAPPER $wName <<<<<")
 
     val wrapper = ArrayBuffer[String]()
+    wrapper += initialStatements.mkString("", "\n","\n")
     wrapper += s"module $wName"
     wrapper += ports.map(_.emit).mkString(" (\n    ", ",\n    ", "\n  );\n")
 
-    val portMap =
-      ports.map(p => p.emitInstance(p)).reduceOption((t, r) => (t._1 ++ r._1, t._2 ++ r._2)).getOrElse((Seq(), Seq()))
+    val portMap = ports.map(p => p.emitInstance(p))
+                       .reduceOption((t, r) => (t._1 ++ r._1, t._2 ++ r._2))
+                       .getOrElse((Seq(), Seq()))
+                       
     wrapper += portMap._1.mkString(s"  $instName inst (\n    ", ",\n    ", "\n  );\n")
 
     wrapper += "endmodule\n"
@@ -660,10 +684,16 @@ object VerilogPortWrapper {
    *    function generating a RawModule
    *  @param wrapperName
    *    name of the generated wrapper (default: module name, suffixing inner module name with _raw)
+   *  @param wrapperExt
+   *    file extension of the wrapper (default: sv,  required for root scope import and usage of struct as port)
    *  @param emitModule
-   *    Compile and emit module to verilog file (optional, default false)
+   *    Compile and emit module to verilog file (optional, default true)
    *  @param forcePreset
    *    top level synchronous reset (required) is converted to Preset
+   *  @param renameWrapperPorts
+   *    map of renames of wrapper ports (use-case: reset & clock signal renames)
+   *  @param initialStatements
+   *    Seq of lines to be inserted before the wrapper (use-case: import external packages)
    *  @param args
    *    additional args for chisel generation
    *  @return
@@ -672,18 +702,21 @@ object VerilogPortWrapper {
   def emit(
       module: () => RawModule,
       wrapperName: Option[String] = None,
+      wrapperExt: String = "sv",
       emitModule: Boolean = true,
       forcePreset: Boolean = false,
+      renameWrapperPorts: Map[String, String] = Map.empty,
+      initialStatements: Seq[String] = Seq.empty,
       args: Array[String] = Array.empty
   ): String = {
-    val (wrapper, name) = generate(module, wrapperName, emitModule, forcePreset, args)
+    val (w, name) = generate(module, wrapperName, emitModule, forcePreset, renameWrapperPorts, initialStatements, args)
     // file name of original circuit is NOT renamed => avoid overwrite with suffix
     val emissionPath = args.indexOf("--target-dir") match {
-      case -1 => s"${name}_wrapper.v"
+      case -1 => s"${name}_wrapper.$wrapperExt"
       case i =>
         args.lift(i + 1) match {
-          case Some(p) => s"$p/${name}_wrapper.v"
-          case _       => s"${name}_wrapper.v"
+          case Some(p) => s"$p/${name}_wrapper.$wrapperExt"
+          case _       => s"${name}_wrapper.$wrapperExt"
         }
     }
 
@@ -697,9 +730,9 @@ object VerilogPortWrapper {
     }
     
     val writer  = new FileWriter(emissionPath)
-    writer.write(wrapper)
+    writer.write(w)
     writer.close()
 
-    wrapper
+    w
   }
 }

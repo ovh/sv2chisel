@@ -5,32 +5,21 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-- infer UInt for bundle fields 
-  - seems critical to reduce compilation time on large desings
-  - harder to get right because usage is cross descriptions
   
 - support initial statements
   - static assert => convert to scala's `require` statement
   - detect initial initialization (equivalent to preset) & attempt to translate it with literals 
 
 - fix blackbox emission 
-  - currently calling modules with BB suffix => not the proper ones
   - add compatibility with toCamelCase
 
-- keyword sample to fix ?
-- type availability of enum ?
-
 - cleanToken on function return type => currently leads to weird emission of comments
-- fix wrapper compatibility with toCamelCase option 
+- wrapper: fix compatibility with toCamelCase option 
   - probably need to record port names before conversion to camelCase somewhere (not bijective)
-
-- fix wrapper vec of bundle => bundle type shall be emitted as type (first, before packed)
-- wrapper: add ability to insert timescale on generated modules
-- wrapper: add clock/clk reset/rst rename option
 
 - reset management: enforce proper toplevel reset type generation depending on reset inference (todo)
 
-- add package generation for struct packed (bundle) at VerilogPort wrapper interfaces 
+- wrapper: optionally add package generation for struct packed (bundle) at VerilogPort wrapper interfaces 
   - (for now the original verilog package containing the struct must be included which is not convienient, and not suitable for ChiselAsIP concept outside of translation context)
 
 - provide a project template 
@@ -39,9 +28,9 @@
   
 - review identifier legalization at emission:
   - scala keywords
-  - chisel keywords
+  - chisel keywords (only done for bundle fields yet)
 
-- fix behavior of emission with path relative to ~ (~ considered as standard name)
+- fix behavior of emission with path relative to ~ (~ considered as standard directory name)
 - front-end: crash on unknown/illegal parameters (to help with syntax: do not assume they are applied when it runs)
 
 - add true regression tests based on actual sv files (internal repo and CI ?) down to 

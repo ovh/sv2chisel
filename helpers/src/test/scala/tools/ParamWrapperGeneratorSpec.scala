@@ -208,7 +208,7 @@ class ParamWrapperGeneratorSpec extends AnyFlatSpec with VerilogMatchers {
         "  )",
         "  (",
         "    input MyBundle in,",
-        "    output [1:0] MyBundle out",
+        "    output MyBundle [1:0] out",
         "  );"
     )
     result should containExactly("  generate")
@@ -300,7 +300,7 @@ class ParamWrapperGeneratorSpec extends AnyFlatSpec with VerilogMatchers {
     result should containExactly(
         "module test_wrapper (",
         "    input MyBundle in,",
-        "    output [1:0] MyBundle out",
+        "    output MyBundle [1:0] out",
         "  );"
     )
 
@@ -364,6 +364,44 @@ class ParamWrapperGeneratorSpec extends AnyFlatSpec with VerilogMatchers {
 
     result should containExactly(
         "  Test inst (",
+        "    .in_0(in[0]),",
+        "    .in_1(in[1]),",
+        "    .in_2(in[2]),",
+        "    .in_3(in[3]),",
+        "    .out_0(out[0]),",
+        "    .out_1(out[1])",
+        "  );"
+    )
+  }
+  
+  it should s"emit flawlessly a wrapper with proper vec ports with clock & reset rename" in {
+    class Test extends Module {
+      val in  = IO(Input(Vec(4, UInt(5.W))))
+      val out = IO(Output(Vec(2, UInt(10.W))))
+      val in_reg = Reg(in.cloneType)
+      in_reg := in
+      out := in_reg.asTypeOf(out)
+    }
+
+    val (result, _) = VerilogPortWrapper.generate(
+      () => new Test(), 
+      Some("test_wrapper"), 
+      renameWrapperPorts = Map("reset" -> "rst", "clock" -> "clk"),
+      args = setTestRunDir
+    )
+    result should containExactly(
+        "module test_wrapper (",
+        "    input clk,",
+        "    input rst,",
+        "    input [3:0] [4:0] in,",
+        "    output [1:0] [9:0] out",
+        "  );"
+    )
+
+    result should containExactly(
+        "  Test inst (",
+        "    .clock(clk),",
+        "    .reset(rst),",
         "    .in_0(in[0]),",
         "    .in_1(in[1]),",
         "    .in_2(in[2]),",
