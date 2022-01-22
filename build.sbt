@@ -3,7 +3,7 @@
 // Copyright 2020 The sv2chisel Authors. All rights reserved.
 
 lazy val ScalaVersion       = "2.12.15"
-lazy val CrossScalaVersions = Seq("2.13.6", "2.12.15")
+lazy val CrossScalaVersions = Seq("2.13.7", "2.12.15")
 lazy val ChiselVersion      = "3.5.0-RC2"
 
 lazy val ScalaTestVersion   = "3.2.2"
