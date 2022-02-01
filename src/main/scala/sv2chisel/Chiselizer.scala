@@ -887,41 +887,10 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
       case r => unsupportedChisel(ctx,s,s"Unexpected unresolved logic in chiselize step ${r.serialize}"); ("Wire", None)
     }
     
-    // to do : proper management of clock & reset for non trivial cases
-    import ChiselizerOptions.UnpackedEmissionStyle.{Reg, Mem, SyncReadMem}
-    val decl = (s.tpe, value, ctx.options.chiselizer.unpackedEmissionStyle) match {
-      case (u: UnpackedVecType, None, Reg) => 
-        Seq(ChiselLine(s, ctx, s"Reg(")) ++ u.chiselize(hCtxt)
-      case (u: UnpackedVecType, _, Reg) => 
-        Seq(ChiselLine(s, ctx, s"RegInit(")) ++ u.chiselize(hCtxt)
-        
-      case (u: UnpackedVecType, _, style) => 
-        val txt = style match {
-          case Mem => "Mem"
-          case SyncReadMem => "SyncReadMem"
-          case _ => "Reg"
-        }
-        
-        (u.tpe, value) match {
-          case (Seq(t), None) => ChiselTxtS(s, ctx, s"$txt(") ++ u.getLen.chiselize(ctx) ++
-            ChiselTxtS(",") ++ t.chiselize(hCtxt)
-          case (Seq(_), _) => 
-            rcritical(ctx, s, s"Cannot emit ${s.name} as Mem because it has an init value, using RegInit instead")
-            ChiselTxt(s, ctx, s"RegInit(") +: u.chiselize(hCtxt)
-          case _ => unsupportedChisel(ctx, s, "MixedVecType")
-        }
-      case (UserRefType(_,_,_,_:EnumType), None, _) => // standard 
-        ChiselTxt(s, ctx, s"$kind(") +: s.tpe.chiselize(hCtxt)
-        
-      case (UserRefType(_,_,_,_:EnumType), _, _) => ChiselTxtS(s, ctx, s"$kind(") // avoid type
-      
-      case _ => ChiselTxt(s, ctx, s"$kind(") +: s.tpe.chiselize(hCtxt)
-    }
-    
     val comma = Seq(ChiselTxt(ctx, ", "))
     val rpar = Seq(ChiselTxt(ctx, ") "))
     
-    decl ++ ((s.tpe, value) match {
+    lazy val valueTokens = ((s.tpe, value) match {
       case (_, None) => rpar
       case (UserRefType(_,_,_,_:EnumType), Some(e)) => // special case for RegInit & WireDefault with HwEnum
         val baseUInt = UIntType(UndefinedInterval, UnknownWidth(), NumberDecimal)
@@ -929,6 +898,38 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
         
       case (_, Some(e)) => comma ++ e.chiselize(hCtxt) ++ rpar
     })
+    
+    // to do : proper management of clock & reset for non trivial cases
+    import ChiselizerOptions.UnpackedEmissionStyle.{Reg, Mem}
+    (s.tpe, value, ctx.options.chiselizer.unpackedEmissionStyle) match {
+      case (u: UnpackedVecType, None, Reg) => ChiselTxtS(s, ctx, s"Reg(") ++ u.chiselize(hCtxt) ++ rpar
+      case (u: UnpackedVecType, _, Reg) => ChiselTxtS(s, ctx, s"RegInit(") ++ u.chiselize(hCtxt) ++ valueTokens
+        
+      case (u: UnpackedVecType, _, Mem) => 
+        rinfo(ctx, s, s"Emitting unpacked for node ${s.name}")
+        (u.tpe, value) match {
+          case (Seq(t), None) => ChiselTxtS(s, ctx, s"Mem(") ++ u.getLen.chiselize(ctx) ++
+            ChiselTxtS(",") ++ t.chiselize(hCtxt) ++ rpar
+            
+          case (Seq(t), Some(v)) => 
+            val vtoks = v match {
+              case DoCast(_, u:UIntLiteral, _, _) if(u.value == 0) => ChiselTxtS(u, ctx, "BigInt(0)")
+              case _ => unsupportedChisel(ctx, s, s"TODO: MemInit value ${v.serialize} (${v.getClass.getName})") 
+            }
+            ctx.src.addDep(PackageRef(UndefinedInterval, "sv2chisel.helpers", "MemInit"))
+            ChiselTxtS(s, ctx, s"MemInit.fill(") ++ u.getLen.chiselize(ctx) ++
+              ChiselTxtS(",") ++ t.chiselize(hCtxt) ++ ChiselTxtS(")(") ++ vtoks ++ rpar
+
+          case _ => unsupportedChisel(ctx, s, "MixedVecType")
+        }
+        
+      case (UserRefType(_,_,_,_:EnumType), None, _) => // standard 
+        ChiselTxtS(s, ctx, s"$kind(") ++ s.tpe.chiselize(hCtxt) ++ valueTokens
+        
+      case (UserRefType(_,_,_,_:EnumType), _, _) => ChiselTxtS(s, ctx, s"$kind(") ++ valueTokens // avoid type
+      
+      case _ => ChiselTxtS(s, ctx, s"$kind(") ++ s.tpe.chiselize(hCtxt) ++ valueTokens
+    }
   }
 }
 

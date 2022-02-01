@@ -12,13 +12,13 @@
     
   translationOptions:
     LegalizeParamDefaults:
-      legalizeMethod: moveOrComment # comment|overrideOption|moveOrComment|moveOrOverride
+      legalizeMethod: moveOrOverride # comment|overrideOption|moveOrComment|moveOrOverride
     RemoveConcats:
       useChiselCat: true
     Chiselizer:
       toCamelCase: false
       ignoreEnumFieldScalastyle: false
-      unpackedEmissionStyle: Reg # Reg|Mem|SyncReadMem
+      unpackedEmissionStyle: Reg # Reg|Mem
       topLevelChiselGenerators: # list of top in the project 
         - name: my_module # name of top
           withWrapper: true # provide a wrapper for params and with structural ports

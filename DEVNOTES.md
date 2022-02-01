@@ -5,7 +5,10 @@
 ### SHORT-TERM Improvements
 
 #### URGENT
-  
+
+- provide minimal "compatibility" for synchronous reset (no inference, just ensure no collision between Module's and user-defined signal)
+  - nb: reset is `final` in `Module` class
+
 - support initial statements
   - static assert => convert to scala's `require` statement
   - detect initial initialization (equivalent to preset) & attempt to translate it with literals 
@@ -20,7 +23,7 @@
 - reset management: enforce proper toplevel reset type generation depending on reset inference (todo)
 
 - wrapper: optionally add package generation for struct packed (bundle) at VerilogPort wrapper interfaces 
-  - (for now the original verilog package containing the struct must be included which is not convienient, and not suitable for ChiselAsIP concept outside of translation context)
+  - (for now the original verilog package containing the struct must be included which is not convenient, and not suitable for ChiselAsIP concept outside of translation context)
 
 - provide a project template 
   - files, stored in resource: build.sbt & project/build.properties

@@ -154,6 +154,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
       
     result shouldNot containStr ( "import chisel3.util.HasBlackBoxResource")
     result should containStr ( "class my_black_box() extends RawModule {",
+      "override def desiredName = \"my_black_boxWrapper\"",
       "",
       "val io = IO(new Bundle {",
         "val i = Input(Vec(4, UInt(8.W)))",
@@ -167,6 +168,7 @@ class BlackBoxSpec extends Sv2ChiselSpec {
       "o := inst.io.o"
     )
     result should containStr ( "class my_black_boxBB() extends BlackBox {",
+      "override def desiredName = \"my_black_box\"",
       "val io = IO(new Bundle {",
         "val i = Input(UInt((4*8).W))",
         "val o = Output(UInt((4*8).W))",

@@ -89,8 +89,8 @@ case class ChiselizerOptions(
 }
 object ChiselizerOptions {
   object UnpackedEmissionStyle extends Enumeration with EnumDecoder {
-    val Reg, Mem, SyncReadMem = Value
-    def default = Reg
+    val Reg, Mem = Value
+    def default = Mem
     def ctx = "unpackedEmissionStyle for Chiselizer"
   }
 }
