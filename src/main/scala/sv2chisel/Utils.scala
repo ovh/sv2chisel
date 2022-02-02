@@ -8,11 +8,10 @@
 package sv2chisel
 
 import sv2chisel.ir._
-import sv2chisel.transforms.InfoLogger
-import logger.{LazyLogging}
+import logger.{InfoLogging}
 import org.antlr.v4.runtime.{CommonTokenStream}
 
-object Utils extends LazyLogging with InfoLogger {
+object Utils extends InfoLogging {
   var currentSourceFile : Option[SourceFile] = None
   var currentStream : Option[CommonTokenStream] = None
   

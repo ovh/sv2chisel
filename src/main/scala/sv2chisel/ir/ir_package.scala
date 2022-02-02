@@ -6,5 +6,6 @@ package sv2chisel
 
 package object ir {
   type Interval = org.antlr.v4.runtime.misc.Interval // avoid import in all files
+  implicit def svnode2Interval[T <: SVNode](n:T): Interval = n.tokens
 }
 

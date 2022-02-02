@@ -115,10 +115,18 @@ object ScalaStyleEmission {
   }
 }
 
-object Emitter extends EasyLogging {
+object Emitter extends InfoLogging {
+  
+  implicit def token2Interval(tok: Token): Interval = Some(tok.getTokenIndex()).map(i => new Interval(i,i)).get
+  
+  var currentSourceFile : Option[SourceFile] = None 
+  var currentStream : Option[CommonTokenStream] = None
 
   def emitChisel(ctx: ChiselEmissionContext, noFileIO: Boolean = false): String = {
     ctx.project.getEntries.map(e => {
+      // setup current context
+      currentSourceFile = Some(e.src)
+      currentStream = Some(e.stream)
       struct(s"######### CHISELIZING ${e.src.path} #########")
       val (timeChiselize, chisel) = time {
         e.src.chiselize(ctx.setFile(e.src, e.stream))
@@ -168,9 +176,11 @@ object Emitter extends EasyLogging {
   
   
   private def emit(ctx: ChiselEmissionContext, chisel: Seq[ChiselTxt], stream: CommonTokenStream): String = {
+    var lineptr = 0
     
     def emitRaw(t: ChiselTxt, lastWasSingleLineComment: Boolean): String = {
       if(t.newLine || lastWasSingleLineComment) {
+        lineptr += 1
         "\n" + ctx.indent * t.indentLevel + t.txt 
       } else {
         t.txt
@@ -247,7 +257,11 @@ object Emitter extends EasyLogging {
             } else {
               (false, false) // not emitted
             }
-            
+          
+          case sv2017Lexer.PREPROC =>
+            critical(tok, s"Ignoring preprocessor directive: '${tok.getText().trim}'")
+            (false, false)
+          
           case _ => 
             ws.clear() // prevent carrying unwanted whitespaces between tokens
             val stop = tok.getType match {
@@ -286,7 +300,6 @@ object Emitter extends EasyLogging {
       (emittedUntil, result)
     }
     
-    
     val emitted = ArrayBuffer[String]()
     var emittedUntil = -1
     val maxToken = stream.size()
@@ -298,6 +311,9 @@ object Emitter extends EasyLogging {
       val lastWasSingleLineComment = cToken.tokens match {
         case UndefinedInterval => false
         // case i: Interval => 
+        case SkipInterval(until) =>
+          emittedUntil = Seq(Seq(emittedUntil, until).max, maxToken).min
+          false
         case i: Interval if(i.b > emittedUntil && emittedUntil+1 < maxToken) => 
           // first collect hidden comments & \n && integrate it
           val (low, high, stopAt1stMain) = i match {
@@ -316,6 +332,7 @@ object Emitter extends EasyLogging {
             val (h, txt) = retrieveHidden(low, high, cToken.indentLevel, cToken.newLine, stopAt1stMain)
             trace(s" |-> low = $low ; high = $high ==> h= $h (${stream.get(h).getType}: `${stream.get(h).getText}`)")
             trace(s" |-> hidden retrieved: `${txt}`")
+            lineptr += txt.count(_=='\n')
             emitted += txt
             // second increase the emittedUntil
             emittedUntil = Seq(h, i.a).max

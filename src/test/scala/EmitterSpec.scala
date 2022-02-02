@@ -6,6 +6,7 @@ package sv2chiselTests
 
 import sv2chiselTests.utils._
 import logger._
+import java.io.{PrintStream, ByteArrayOutputStream}
 
 class EmitterSpec extends Sv2ChiselSpec {
   Logger.setLevel(LogLevel.Warn)
@@ -349,4 +350,32 @@ class EmitterSpec extends Sv2ChiselSpec {
     )
   }
   
+  
+  it should "warn about preprocessor directives" in {
+
+    
+    val out = new ByteArrayOutputStream()
+    Logger.setOutput(new PrintStream(out))
+    val result = emitInModule("""
+      |`ifndef USE_REG
+      |wire [31:0] res;
+      |`else
+      |reg [31:0] res;
+      |`endif
+      """.stripMargin
+    )
+    
+    val stdout = out.toString
+    Logger.reset()
+    stdout should containStr ( "[critical] Ignoring preprocessor directive: '`ifndef USE_REG' at sv2chiselTests.EmitterSpec:4:4" )
+    stdout should containStr ( "[critical] Ignoring preprocessor directive: '`else' at sv2chiselTests.EmitterSpec:6:4" )
+    stdout should containStr ( "[critical] Ignoring preprocessor directive: '`endif' at sv2chiselTests.EmitterSpec:8:4" )
+    
+    result should containStr ("class Test() extends RawModule {") // no clock
+    result should containLineSet (
+      "  val res = Wire(UInt(32.W)) ",
+      "  val res = Wire(UInt(32.W)) ",
+    )
+
+  }
 }

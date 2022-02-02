@@ -537,7 +537,8 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
       s ++= addRessourceTxt
     }
       
-    s += ChiselClosingLine(e, ctx, "}")
+    // s += ChiselClosingLine(e, ctx, "}")//////
+    s += ChiselLine(SkipInterval(e.tokens.b), ctx, "}")
     
     // adding dedicated inner if required
     if (requireWrapper) {

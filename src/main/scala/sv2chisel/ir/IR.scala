@@ -10,6 +10,7 @@ package ir
 
 import sv2chisel.ir.evalExpression._
 import Utils.{indent}
+import logger.{HasPath}
 
 import collection.mutable.{HashMap, HashSet, ArrayBuffer}
 
@@ -18,6 +19,9 @@ case object UndefinedInterval extends Interval(-1,-1) {
 }
 case class TechnicalInterval(r: Int) extends Interval(-1,r) {
   override def toString : String = s"TechnicalInterval($b)"
+}
+case class SkipInterval(until: Int) extends Interval(-2,until) {
+  override def toString : String = s"SkipInterval($b)"
 }
 
 /** Intermediate Representation for SourceFile */
@@ -28,7 +32,7 @@ sealed abstract class SVNode {
   def mapInterval(f: Interval => Interval): T
 }
 
-case class SourceFile(tokens: Interval, path: String, descriptions: Seq[Description]) extends SVNode {
+case class SourceFile(tokens: Interval, path: String, descriptions: Seq[Description]) extends SVNode with HasPath {
   type T = SourceFile
   
   private val dep = HashSet[PackageRef]()

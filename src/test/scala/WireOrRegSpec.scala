@@ -58,7 +58,7 @@ class WireOrRegSpec extends Sv2ChiselSpec {
     
     val stdout = out.toString
     Logger.reset()
-    stdout should containStr ( "[critical] Unable to guarantee complete scope definition for logic c resolved as wire without user-provided default value => adding default 0.U.asTypeOf(Bool) & ignoring A condition at sv2chiselTests.WireOrRegSpec:5" )
+    stdout should containStr ( "[critical] Unable to guarantee complete scope definition for logic c resolved as wire without user-provided default value => adding default 0.U.asTypeOf(Bool) & ignoring A condition at sv2chiselTests.WireOrRegSpec:5:4->10" )
     
     result should containStr ("class Test() extends RawModule {") // no clock
     result should containLineSet (

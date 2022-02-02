@@ -5,8 +5,7 @@
 package sv2chisel
 package ir
 
-import logger.{LazyLogging}
-import sv2chisel.transforms.InfoLogger
+import logger.{InfoLogging}
 import org.antlr.v4.runtime.{CommonTokenStream}
 
 
@@ -14,9 +13,10 @@ package object expressionToLiteral {
   implicit def expToLiteral(e: Expression) = new ExpressionToLiteral(e)
 }
 
-class ExpressionToLiteral(e: Expression) extends LazyLogging with InfoLogger {
+class ExpressionToLiteral(e: Expression) extends InfoLogging {
   var currentSourceFile : Option[SourceFile] = None
   var currentStream : Option[CommonTokenStream] = None
+  implicit def svnode2Interval(n:SVNode): Interval = n.tokens
   
   val ui = UndefinedInterval
   

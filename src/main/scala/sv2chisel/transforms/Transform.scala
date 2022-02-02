@@ -10,7 +10,6 @@ import sv2chisel.ir._
 import logger._
 
 import org.antlr.v4.runtime.{CommonTokenStream}
-import scala.collection.JavaConverters._
 import collection.mutable.{HashMap, ArrayBuffer}
 
 abstract class Transform extends LazyLogging {
@@ -54,78 +53,6 @@ abstract class Transform extends LazyLogging {
     }
     
     des.mapStmt(processStatement)
-  }
-}
-
-trait InfoLogger extends EasyLogger {
-  def currentSourceFile : Option[SourceFile]
-  def currentStream : Option[CommonTokenStream]
-  
-  def getAtInfo(n: SVNode): String = getAtInfo(n.tokens)
-  def getAtInfo(i: Interval): String = {
-    val path = currentSourceFile match {
-      case Some(src) => s"at ${src.path}"
-      case None => ""
-    }
-    (currentStream, i) match {
-      case (_, UndefinedInterval) => path
-      case (Some(stream), _) => 
-        val tokens = stream.getTokens(i.a, i.b)
-        val sl = tokens.asScala.head.getLine()
-        val stl = tokens.asScala.last.getLine()
-        // not working as expected : useless absolute char index
-        // val sc = tokens.asScala.head.getStartIndex()
-        // val stc = tokens.asScala.last.getStopIndex()
-        if (sl == stl) {
-          s"${path}:$sl"
-        } else {
-          s"${path}:$sl>>$stl"
-        }
-      case (None, _) => path
-    }
-  }
-  
-  /**
-    * Log msg at Error level
-    * @param msg msg generator to be invoked if level is right
-    */
-  def fatal(n: SVNode, msg: => String): Unit = {
-    fatal(s"$msg ${getAtInfo(n)}")
-  }
-  /**
-    * Log msg at Error level
-    * @param msg msg generator to be invoked if level is right
-    */
-  def critical(n: SVNode, msg: => String): Unit = {
-    critical(s"$msg ${getAtInfo(n)}")
-  }
-  /**
-    * Log msg at Warn level
-    * @param msg msg generator to be invoked if level is right
-    */
-  def warn(n: SVNode, msg: => String): Unit = {
-    warn(s"$msg ${getAtInfo(n)}")
-  }
-  /**
-    * Log msg at Info level
-    * @param msg msg generator to be invoked if level is right
-    */
-  def info(n: SVNode, msg: => String): Unit = {
-    info(s"$msg ${getAtInfo(n)}")
-  }
-  /**
-    * Log msg at Debug level
-    * @param msg msg generator to be invoked if level is right
-    */
-  def debug(n: SVNode, msg: => String): Unit = {
-    debug(s"$msg ${getAtInfo(n)}")
-  }
-  /**
-    * Log msg at Trace level
-    * @param msg msg generator to be invoked if level is right
-    */
-  def trace(n: SVNode, msg: => String): Unit = {
-    trace(s"$msg ${getAtInfo(n)}")
   }
 }
 

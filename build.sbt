@@ -109,8 +109,10 @@ lazy val root = (project in file("."))
     releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,
       inquireVersions,
-      runClean,
-      runTest,
+      releaseStepCommandAndRemaining("+clean"),
+      releaseStepCommandAndRemaining("+test"),
+      releaseStepCommandAndRemaining("+helpers/clean"),
+      releaseStepCommandAndRemaining("+helpers/test"),
       setReleaseVersion,
       commitReleaseVersion,
       tagRelease,

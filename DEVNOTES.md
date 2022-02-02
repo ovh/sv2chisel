@@ -59,8 +59,6 @@ As stated in the getting started guide, the project in charge of compiling the g
 
 #### URGENT
 
-- warn about ignored ifdef (silently ignored for now) 
-
 - support initial statements
   - static assert => convert to scala's `require` statement
   - detect initial initialization (equivalent to preset) & attempt to translate it with literals 
@@ -104,7 +102,6 @@ As stated in the getting started guide, the project in charge of compiling the g
 - add special case for empty string used as hardware => single char at 0 
 
 - front: catch "file not found" exception & terminate properly
-- emission of blackbox => do not emit comment in body (idea: special interval type to increase stram pointer without inserting comments)
 
 #### CRITICAL
 - FIX & USE OR DROP Special Vec of Char Inference for register affected to 
