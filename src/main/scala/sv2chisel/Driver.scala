@@ -55,6 +55,7 @@ object Driver extends EasyLogging {
       new LegalizeParamDefaults(options), // needs typed parameters
       
       // Styling transforms
+      new FixReservedNames(options),
       new ToCamelCase(options)
     )
     struct(s"######### Executing ${transforms.size} transforms #########")

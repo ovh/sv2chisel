@@ -4,7 +4,7 @@
 
 lazy val ScalaVersion       = "2.12.15"
 lazy val CrossScalaVersions = Seq("2.13.7", "2.12.15")
-lazy val ChiselVersion      = "3.5.0-RC2"
+lazy val ChiselVersion      = "3.5.0"
 
 lazy val ScalaTestVersion   = "3.2.2"
 lazy val AntlrVersion       = "4.7.1"
