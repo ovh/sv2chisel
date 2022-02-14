@@ -116,6 +116,7 @@ object ScalaStyleEmission {
 }
 
 object Emitter extends InfoLogging {
+  val ln = sys.props("line.separator")
   
   implicit def token2Interval(tok: Token): Interval = Some(tok.getTokenIndex()).map(i => new Interval(i,i)).get
   
@@ -171,7 +172,7 @@ object Emitter extends InfoLogging {
       }
       struct(s"# Elapsed time : $timeEmit ms")
       chiselTxt
-    }).mkString("/////////////\n","\n\n/////////////\n", "\n")
+    }).mkString(s"/////////////${ln}",s"${ln}${ln}/////////////${ln}", ln)
   }
   
   
@@ -181,7 +182,7 @@ object Emitter extends InfoLogging {
     def emitRaw(t: ChiselTxt, lastWasSingleLineComment: Boolean): String = {
       if(t.newLine || lastWasSingleLineComment) {
         lineptr += 1
-        "\n" + ctx.indent * t.indentLevel + t.txt 
+        ln + ctx.indent * t.indentLevel + t.txt 
       } else {
         t.txt
       }
@@ -201,26 +202,26 @@ object Emitter extends InfoLogging {
           case sv2017Lexer.COMMENTS => 
             // in-line comment always integrate a EOL within the text
             val eol = tok.getType() match {
-              case sv2017Lexer.ONE_LINE_COMMENT => startFromNewLineNext = true; "\n"
+              case sv2017Lexer.ONE_LINE_COMMENT => startFromNewLineNext = true; ln
               case sv2017Lexer.BLOCK_COMMENT => ""
               case _ => Utils.throwInternalError("Lexing error")
             }
             // remove trailling new line
-            val txt = tok.getText().split("\n").mkString("","\n","")
+            val txt = tok.getText().split(ln).mkString("",ln,"")
             val spaces = ws.mkString
             val newlineCount = spaces.count(_=='\n')
-            str += ((spaces.split("\n"), newlineCount) match {
+            str += ((spaces.split(ln), newlineCount) match {
               case (Array(), 0) => 
                 trace(s"case 0")
                 getSpace + tok.getText()
               
               case (Array(), n) => 
                 trace(s"case 1 n=$n");
-                val updatedTxt = tok.getText().split("\n").map(l => {
+                val updatedTxt = tok.getText().split(ln).map(l => {
                   ctx.indent * expIndent + l
-                }).mkString("\n")
-                val trailling = "\n"*(tok.getText().count(_=='\n') - updatedTxt.count(_=='\n'))
-                "\n"*n + updatedTxt + trailling
+                }).mkString(ln)
+                val trailling = ln*(tok.getText().count(_=='\n') - updatedTxt.count(_=='\n'))
+                ln*n + updatedTxt + trailling
                 
               case (Array(s@_), 0) => // most common case for single-line comments
                 trace(s"case 2")
@@ -228,18 +229,18 @@ object Emitter extends InfoLogging {
                 
               case (Array(s@_), 1) => 
                 trace(s"case 3")
-                " " + tok.getText().split("\n").mkString("","\n","\n")
+                " " + tok.getText().split(ln).mkString("",ln,ln)
                 
               case (Array(a@_, b), 1) => 
                 trace(s"case 4")
-                val updatedTxt = txt.split("\n").map(l => {
+                val updatedTxt = txt.split(ln).map(l => {
                   l.replaceAll("^[ ]{"+ b.size +"}", ctx.indent * expIndent)
-                }).mkString("\n")
-                "\n" + ctx.indent * expIndent + updatedTxt
+                }).mkString(ln)
+                ln + ctx.indent * expIndent + updatedTxt
                 
               case (a, n) => 
                 trace(s"case 5")
-                "\n"*n + a.last.replace("    ", "  ") + txt + eol
+                ln*n + a.last.replace("    ", "  ") + txt + eol
             })
             ws.clear()
             (true, false)
@@ -251,7 +252,7 @@ object Emitter extends InfoLogging {
               // compensate the one which will get suppressed upon newLine
               val newlineCount = spaces.count(_=='\n') + (if(newLine) 1 else 0)
               trace(s"Reintegrating $newlineCount `\\n`")
-              str += "\n"*newlineCount
+              str += ln*newlineCount
               ws.clear()
               (true, false)
             } else {
@@ -293,7 +294,7 @@ object Emitter extends InfoLogging {
       
       // remove last newline if necessary
       val result = newLine match {
-        case true => str.mkString.replaceAll("\\n[ ]*$", "")
+        case true => str.mkString.replaceAll("(\\r)?\\n[ ]*$", "")
         case _ => str.mkString
       }
       

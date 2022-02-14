@@ -4,6 +4,8 @@
 
 lazy val ScalaVersion       = "2.12.15"
 lazy val CrossScalaVersions = Seq("2.13.7", "2.12.15")
+lazy val ScalaNativeVersion = "2.13.7"
+// no need to follow latest patch as binary compatibility between patches is guaranteed by Chisel maintainers
 lazy val ChiselVersion      = "3.5.0"
 
 lazy val ScalaTestVersion   = "3.2.2"
@@ -83,60 +85,59 @@ lazy val commonSettings = Seq (
 
 import ReleaseTransformations._
 
-lazy val root = (project in file("."))
-  .enablePlugins(Antlr4Plugin)
-  .settings(commonSettings: _*)
-  .settings(
-    name := "sv2chisel",
-    libraryDependencies ++= Seq(
-      "org.antlr"     % "antlr4"     % AntlrVersion,
-      // JSON/YAML parsing
-      "io.circe" %% "circe-yaml" % CirceVersion,
-      "io.circe" %% "circe-core" % CirceVersion,
-      "io.circe" %% "circe-parser" % CirceVersion,
-      // Arg parsing
-      "org.sellmerfud" %% "optparse" % "2.2"
-    ),
-    Antlr4 / antlr4GenListener := false,
-    Antlr4 / antlr4GenVisitor := true,
-    Antlr4 / antlr4PackageName := Option("sv2chisel.antlr")
+lazy val sv2chiselSettings = commonSettings ++ Seq(
+  name := "sv2chisel",
+  libraryDependencies ++= Seq(
+    "org.antlr"     % "antlr4"     % AntlrVersion,
+    // JSON/YAML parsing
+    "io.circe" %% "circe-yaml" % CirceVersion,
+    "io.circe" %% "circe-core" % CirceVersion,
+    "io.circe" %% "circe-parser" % CirceVersion,
+    // Arg parsing
+    "org.sellmerfud" %% "optparse" % "2.2"
+  ),
+  Antlr4 / antlr4GenListener := false,
+  Antlr4 / antlr4GenVisitor := true,
+  Antlr4 / antlr4PackageName := Option("sv2chisel.antlr")
+)
+
+// SBT-RELEASE SETTINGS
+lazy val releaseSettings = Seq(
+  releaseIgnoreUntrackedFiles := true,
+  releaseVcsSign := true,
+  releaseVcsSignOff := true,
+  releaseProcess := Seq[ReleaseStep](
+    checkSnapshotDependencies,
+    inquireVersions,
+    releaseStepCommandAndRemaining("+clean"),
+    releaseStepCommandAndRemaining("+test"),
+    releaseStepCommandAndRemaining("+helpers/clean"),
+    releaseStepCommandAndRemaining("+helpers/test"),
+    setReleaseVersion,
+    commitReleaseVersion,
+    tagRelease,
+    // For non cross-build projects, use releaseStepCommand("publishSigned")
+    releaseStepCommandAndRemaining("+publishSigned"),
+    releaseStepCommand("sonatypeBundleRelease"),
+    releaseStepCommand("project helpers"), // need to change project to make sonatypeBundleRelease available
+    releaseStepCommand("sonatypeBundleClean"), // avoid confusion with previous publishSigned files, bug?
+    releaseStepCommandAndRemaining("+publishSigned"),
+    releaseStepCommand("sonatypeBundleRelease"),
+    releaseStepCommand("sonatypeBundleClean"),
+    releaseStepCommand("project root"), // back to work
+    setNextVersion,
+    commitNextVersion,
+    pushChanges
   )
-  // SBT-RELEASE SETTINGS
-  .settings(
-    releaseIgnoreUntrackedFiles := true,
-    releaseVcsSign := true,
-    releaseVcsSignOff := true,
-    releaseProcess := Seq[ReleaseStep](
-      checkSnapshotDependencies,
-      inquireVersions,
-      releaseStepCommandAndRemaining("+clean"),
-      releaseStepCommandAndRemaining("+test"),
-      releaseStepCommandAndRemaining("+helpers/clean"),
-      releaseStepCommandAndRemaining("+helpers/test"),
-      setReleaseVersion,
-      commitReleaseVersion,
-      tagRelease,
-      // For non cross-build projects, use releaseStepCommand("publishSigned")
-      releaseStepCommandAndRemaining("+publishSigned"),
-      releaseStepCommand("sonatypeBundleRelease"),
-      releaseStepCommand("project helpers"), // need to change project to make sonatypeBundleRelease available
-      releaseStepCommand("sonatypeBundleClean"), // avoid confusion with previous publishSigned files, bug?
-      releaseStepCommandAndRemaining("+publishSigned"),
-      releaseStepCommand("sonatypeBundleRelease"),
-      releaseStepCommand("sonatypeBundleClean"),
-      releaseStepCommand("project root"), // back to work
-      setNextVersion,
-      commitNextVersion,
-      pushChanges
-    )
-  )
-  // SBT-ASSEMBLY SETTINGS 
-  .settings(
-    assembly / mainClass := Some("com.ovhcloud.sv2chisel.Main"),
-    assembly / assemblyJarName := "sv2chisel.jar",
-    assembly / test := {},
-    assembly / assemblyOutputPath := file("./utils/bin/sv2chisel.jar")
-  )
+)
+
+// SBT-ASSEMBLY SETTINGS 
+lazy val asmSettings = Seq(
+  assembly / mainClass := Some("com.ovhcloud.sv2chisel.Main"),
+  assembly / assemblyJarName := "sv2chisel.jar",
+  assembly / test := {},
+  assembly / assemblyOutputPath := file("./utils/bin/sv2chisel.jar")
+)
   
 lazy val helpers = (project in file("helpers"))
   .settings(commonSettings: _*)
@@ -148,5 +149,51 @@ lazy val helpers = (project in file("helpers"))
       "edu.berkeley.cs" %% "chisel3" % ChiselVersion
     )
   )
+
+lazy val root = (project in file("."))
+  .enablePlugins(Antlr4Plugin)
+  .settings(sv2chiselSettings: _*)
+  .settings(releaseSettings: _*)
+  .settings(asmSettings: _*)
+
+
+///////// Native-image local setup notes ///////
+// MacOs: xcode-select --install ; then out-of-the-box
+// Linux: a bunch of basic native packages, see https://www.graalvm.org/22.0/reference-manual/native-image/ ; then out-of-the-box
+// Windows: 
+//   - VS Code setup with Win 10 SDK ; MSVC vXXX x64/x86 C++, see https://medium.com/graalvm/using-graalvm-and-native-image-on-windows-10-9954dc071311
+//   - for nativeImage command to succeed, sbt must be launched from "x64 Native Tools Command Prompt for VS 20XX"
+//   - nativeImageRun fails because nativeImage generates the executable with '.exe' file extension whereas nativeImageRun looks for the executable without extension 
+
+// IMPORTANT: root project must be commented out to make natimg project visible ... could not find a nicer way ...
+// Native image is not that easy to get right
+// sbt native image plugin fixes a bunch of issues however is does not work properly for scala 2.12
+// specifically the underlying lib providing the fix is not fetched properly (not with _2.12)
+// library with the fix: svm-subs: https://github.com/scalameta/svm-subs
+// NB: It happens to work with manual fix as in: https://github.com/plokhotnyuk/jsoniter-scala/commit/e089f06c2d8b4bdb87a6874e17bf716e8608b117
+// see discussion: https://github.com/scala/bug/issues/11634
+// with the addition of --initialize-at-build-time=scala.collection.immutable.VM
+// CONCLUSION: we build the image based on the java generated by scala 2.13, as scala 2.12 will be deprecated at some point 
+lazy val natimg = (project in file("."))
+  .enablePlugins(Antlr4Plugin)
+  .settings(sv2chiselSettings: _*)
+
+  .settings(
+    scalaVersion := ScalaNativeVersion,
+    crossScalaVersions := Seq(ScalaNativeVersion),
+    Compile / mainClass := Some("sv2chisel.Main"),
+    // Reflection usage in sv2chisel is only due to circe library (on some parts we do not actually use)
+    // However, let's generate the config properly not to be forced to use the dirty option --report-unsupported-elements-at-runtime
+    nativeImageOptions += s"-H:ReflectionConfigurationFiles=${target.value / "native-image-configs" / "reflect-config.json"}",
+    nativeImageOptions += s"-H:ConfigurationFileDirectories=${target.value / "native-image-configs" }",
+    nativeImageOptions +="-H:+JNI",
+    nativeImageOptions +="--no-fallback",
+    
+    // due to some sbt magic, the expected dependency on nativeImageCommand is not necessarily fullfilled 
+    // this should be fixed in sbt-native-image plugin version 0.3.2
+    addCommandAlias("imgBuild", "; nativeImageCommand ;nativeImageRunAgent \" -c src/main/resources/project/config.yml -l warn\" ;nativeImage"),
+    addCommandAlias("imgTest", ";nativeImageRun -c src/main/resources/project/config.yml -l info")
+  )
+  .enablePlugins(NativeImagePlugin)
 
 

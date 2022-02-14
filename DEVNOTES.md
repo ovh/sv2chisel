@@ -1,58 +1,5 @@
 # sv2chisel Development Notes
 
-### Known major translation limitations
-#### No proper reset inference [TODO: infer resets]
-- *asynchronous reset* are **NOT** supported yet, their use might lead to undesirable side effects
-- *synchronous reset* are yet treated as standard conditions 
-  - `if(rst) my_reg <= <reset_value>;` translated to `when(rst) { my_reg := <reset_value> }` chisel hardware condition 
-  - such reset registers are translated as `my_reg := Reg(<type>)` 
-  - it results in 100% valid Chisel but quite suboptimal and non-generic
-  - proper reset inference should leverage the implicit reset provided by Chisel `Module` with `RegInit(<type>, <reset_value>)`
-- *fpga preset* (`reg my_reg = <init_value>;`) are supported
-  - translated as implicit synchronous reset (`RegInit(<type>, <reset_value>)`)
-  - use the wrapper option `forcePreset = true` to emit them as preset in Chisel generated Verilog 
-  - NB: they can also easily be emitted as asynchronous reset by mixing-in the trait `RequireAsyncReset`
-
-#### Preprocessor directives are ignored [TODO: re-integrate wherever possible]
-- simple warning **(TODO)**
-- can lead to other warnings/error (typically multiple definitions of the same signal)
-Current pieces of advice:
-- If the preprocessor directives are mostly used in leaf modules of the hierarchy (typically to select vendors primitives), your best options will probably to black-box theses leaf modules *(fully supported by both sv2chisel & chisel)*
-- If your design does rely heavily on preprocessor directives across its entire hierarchy, a manual translation might be preferable
-
-#### Initial begin and assert are ignored [TODO: translate assertions; detect initializations]
-- mostly non-functional verification statements with no impact on the quality of results (simulation & synthesis)
-- Manual translations of initialization statement is required
-
-### Scala/Chisel limitations impairing user-experience
-#### Scala Int restricted to 64 and limited Chisel support of BigInt
-Scala `Int` are limited to 64 bits and BigInt are not a transparent replacement option.
-- this might lead to functional issues, in particular with shift left operations: `1 << 63` is the lowest negative integer and `1 << 64` will wrap to `1`
-- `BigInt(1) << N` would behave as expected for any value of `N`, however, not all Chisel primitives accepts BigInt, most notably `.W` (width)
-
-#### `UInt` are not bit-assignable while large `Vec` seriously slow down the whole stack from generation to simulation
-Typical example: IPv6 addresses are 128 bits vector one would like to be treated as such in the generated verilog *(and not individual bits)*
-- however bits operations are often used on IP addresses which leads to a difficult choice:
-  - use UInt for performance and accept ugly boiler plate to assign some bits wherever required
-  - use Vec for coding comfort but pay a high price in time spent by tools on the design
-- as the boiler plate code is quite dependent on the context, sv2chisel has no choice but to use Vec in such cases
-
-#### Negedge concept is not supported in Chisel
-- hence not supported for translation
-
-#### A good news to smooth a bit the roughness of user-experience
-sv2chisel-helpers provide a consequent amount of boiler-plate which considerably help the transition from verilog to chisel
-- VerilogPortWrapper & ParamWrapperGenerator to integrate a Chisel module *as IP* in existing design
-- Subrange assignment of Vec
-- Subrange assignation of Bundle
-- MemInit primitive
-- Hardware Strings support
-- Hardware Enumeration support *(to be deprecated when natively integrated to Chisel)*
-
-All these helpers are automatically imported upon use by the translated Chisel code.
-As stated in the getting started guide, the project in charge of compiling the generated Chisel shall include a proper libraryDependency to sv2chisel-helpers. 
- 
-
 ## TODO
 
 ### SHORT-TERM Improvements

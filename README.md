@@ -6,12 +6,16 @@
 
 The obtained Chisel is intended to be manually refactored to benefit from the advanced chisel's features such as type and functional parameterization thanks to Scala support for polymorphism and high-order functions. 
 
-Important notice: **sv2chisel** was developed with a test-driven development methodology, and is hence not fully covering (System)Verilog syntax.
+Important notice: **sv2chisel** was developed with a test-driven development methodology, and is hence not fully covering (System)Verilog syntax (yet).
 This means it might probably *not* work out-of-the-box with your own code, some slight adjustment might be required either in input Verilog, output Chisel or both.
 
 **sv2chisel** emerged as a research effort, if you use it or borrow some concepts in your own work, please cite the [associated paper](https://hal.archives-ouvertes.fr/hal-02949112/document) (bibtex entry below).
 
-### Repository Structure
+### Features & Limitations
+**sv2chisel** has achieved 1:1 translation of several large codebases with few or no manual modifications
+
+
+### Contents
 The current repository contains 2 projects:
 - **sv2chisel** the (System)Verilog to Chisel translator
 - *sv2chisel-helpers* a small chisel library of implicit helpers used to make Chisel emission smoother, most notably for the usual (System)Verilog index and range affectation pattern
@@ -31,9 +35,9 @@ If this is your first time using [Chisel](https://www.chisel-lang.org), we highl
 
 To set-up efficiently a new Chisel project, the easiest way is to clone the [chisel-template](https://github.com/freechipsproject/chisel-template).
 
-As final step, you need to include sv2chisel-helpers library in this new project, by adding the following line to your `build.sbt` file:
+As final step, you need to include *sv2chisel-helpers* library in this new project, by adding the following line to your local `build.sbt` file:
 ```sbt
-// sv2chisel was first published in 2021, on new sonatype servers 
+// sv2chisel was first published in 2021, on new sonatype servers hence requiring non default resolvers
 resolvers ++= Seq(
   "New Sonatype Snapshots" at "https://s01.oss.sonatype.org/content/repositories/snapshots/",
   "New Sonatype Releases" at "https://s01.oss.sonatype.org/service/local/repositories/releases/content/",

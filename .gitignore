@@ -2,6 +2,17 @@ chisel_gen/*
 test_run_dir/*
 utils/bin/sv2chisel.jar
 
+# VS CODE with metals and bloop
+.bloop/
+.bsp/
+.metals/
+project/.bloop/
+project/metals.sbt
+project/project/
+
+# SBT windows
+null/
+
 ### https://raw.github.com/github/gitignore/ade08baee2cf60afd794432b3e779fe5844c545d/Scala.gitignore
 
 *.class
@@ -40,7 +51,8 @@ project/plugins/project/
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*

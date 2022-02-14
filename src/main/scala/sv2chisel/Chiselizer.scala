@@ -124,8 +124,12 @@ package object chiselize extends EasyLogging {
       case _ => Utils.throwInternalError(s"Unable to fetch proper reference for ${e.serialize} ($e)")
     }
   }
+
+  val ln = sys.props("line.separator")
   
 }
+
+import chiselize._
 
 case class SnakeString(s: String) {
   /* 
@@ -161,7 +165,7 @@ case class ChiselTxt(
     this.copy(indentLevel = indentLevel - n)
   }
   def serialize: String = {
-    "  "*indentLevel + txt.replace("\n",  "\n" + "  "*indentLevel)
+    "  "*indentLevel + txt.replace(ln,  ln + "  "*indentLevel)
   }
 }
 object ChiselTxt {
@@ -219,8 +223,6 @@ trait Chiselized {
 }
 
 
-import chiselize._
-
 class ChiselSourceFile(val src: SourceFile) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     // descriptions must be chiselized prior to getDep
@@ -232,7 +234,7 @@ class ChiselSourceFile(val src: SourceFile) extends Chiselized {
       case s => Seq(ChiselLine(ctx, "package " + s.toCamelPkg(ctx)))
     }
       
-    rootP ++ localP ++ Seq(ChiselLine(ctx, "\nimport chisel3._")) ++ dep ++
+    rootP ++ localP ++ Seq(ChiselLine(ctx, s"${ln}import chisel3._")) ++ dep ++
       Seq(ChiselLine(ctx, "")) ++ desc // clear 1 line before descriptions
   }
 }
@@ -823,7 +825,7 @@ class ChiselStatement(val s: Statement) extends Chiselized {
       case p: Print => Seq(ChiselLine(s, ctx, p.serialize))
       case RawScala(str) => 
         // TODO : refacto => will fail on small chunks without intended newlines
-        str.split("\n").toSeq.map(txt => ChiselLine(s, ctx, txt))
+        str.split(ln).toSeq.map(txt => ChiselLine(s, ctx, txt))
       case EmptyStmt => Seq()
       
       // default, not likely to provide anything chisel-compatible  
@@ -838,7 +840,7 @@ class ChiselHeader(val s: Statement) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     s match {
       case h: ImportPackages => h.chiselize(ctx)
-      case c: CompilerDirective => Seq(ChiselLine(c, ctx, "// " + c.text + "\n"))
+      case c: CompilerDirective => Seq(ChiselLine(c, ctx, "// " + c.text + ln))
       case _ => unsupportedChisel(ctx,s, s"Unknown header")
     }
   }
@@ -1018,7 +1020,7 @@ class ChiselTypeInst(t: TypeInst){
 
 class ChiselRawScalaExpression(e: RawScalaExpression){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    (e.str.count(_ == '\n'), e.str.split("\n")) match {
+    (e.str.count(_ == '\n'), e.str.split(ln)) match {
       case (0, _) => Seq(ChiselTxt(e, ctx, e.str))
       case (1, Array(s)) => Seq(ChiselTxt(e, ctx, s))
       case (_, s) => s.toSeq.map(l => Seq(ChiselLine(e, ctx, l))).flatten
@@ -1029,7 +1031,7 @@ class ChiselRawScalaExpression(e: RawScalaExpression){
 class ChiselRawScalaExprWrapper(e: RawScalaExprWrapper){
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     def splitLines(str: String) = {
-      (str.count(_ == '\n'), str.split("\n")) match {
+      (str.count(_ == '\n'), str.split(ln)) match {
         case (0, _) => Seq(ChiselTxt(e, ctx, str))
         case (1, Array(s)) => Seq(ChiselTxt(e, ctx, s))
         case (_, s) => 
@@ -1650,7 +1652,7 @@ class ChiselConcat(e: Concat){
 
 class ChiselComment(val c: Comment) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    c.str.split("\n").toSeq.map(s => {
+    c.str.split(ln).toSeq.map(s => {
       ChiselLine(c, ctx, s"// $s")
     })
   }

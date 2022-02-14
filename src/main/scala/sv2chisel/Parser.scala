@@ -29,7 +29,8 @@ object Parser extends EasyLogging {
   }
 
   /** Parses a String and returns a parsed [[sv2chisel.ir.SourceFile SourceFile]] */
-  def parseString(text: String, path: Option[String] = None, blackboxes: Boolean = false): (SourceFile, CommonTokenStream) =
+  def parseString(text: String, path: Option[String] = None, blackboxes: Boolean = false): 
+    (SourceFile, CommonTokenStream) =
     parseCharStream(CharStreams.fromString(text), path, blackboxes)
 
   /** Parses a org.antlr.v4.runtime.CharStream and returns a parsed [[sv2chisel.ir.SourceFile SourceFile]] */

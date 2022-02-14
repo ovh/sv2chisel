@@ -9,6 +9,8 @@ import matchers.should._
 import collection.mutable.ArrayBuffer
 
 trait ChiselMatchers extends Matchers {
+  val ln = sys.props("line.separator")
+  val dq = "\""
   import matchers._
   /** Checks that the emitted circuit has the expected lines in order */
   def containLineSet(expectedLines: String*) = new ChiselStrictStringsMatcher(expectedLines)
@@ -25,15 +27,15 @@ trait ChiselMatchers extends Matchers {
         case _ => 
       }
     })
-    msg.mkString("\n")
+    msg.mkString(ln)
   }
 
   class ChiselStrictStringsMatcher(expectedLines: Seq[String]) extends Matcher[String] {
     override def apply(chisel: String): MatchResult = {
-      val data = chisel.split("\n")
+      val data = chisel.split(ln)
       MatchResult(
         data.containsSlice(expectedLines),
-        chisel + "\n did not contain \"" + expectedLines + "\"\n" +"\nDetails:\n" + findFaillingLine(data, expectedLines),
+        chisel + s"$ln did not contain $dq" + expectedLines + dq + ln +s"${ln}Details:${ln}" + findFaillingLine(data, expectedLines),
         s"Emitted chisel contained $expectedLines"
       )
     }
@@ -41,10 +43,10 @@ trait ChiselMatchers extends Matchers {
   class ChiselFlexStringsMatcher(expectedLines: Seq[String]) extends Matcher[String] {
     override def apply(chisel: String): MatchResult = {
       // remove leading & trailling spaces + console color tags 
-      val data = chisel.split("\n").map(_.trim.replaceAll("\\P{Print}\\[[0-9]+m", ""))
+      val data = chisel.split(ln).map(_.trim.replaceAll("\\P{Print}\\[[0-9]+m", ""))
       MatchResult(
         data.containsSlice(expectedLines),
-        chisel + "\n did not contain \"" + expectedLines + "\"\n" +"\nDetails:\n" + findFaillingLine(data, expectedLines),
+        chisel + s"$ln did not contain $dq" + expectedLines + dq + ln +s"${ln}Details:${ln}" + findFaillingLine(data, expectedLines),
         s"Emitted chisel contained $expectedLines"
       )
     }
