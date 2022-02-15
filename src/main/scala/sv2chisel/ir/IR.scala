@@ -1006,7 +1006,8 @@ case class DefType(
   tokens: Interval,
   attributes: VerilogAttributes,
   name: String,
-  tpe: Type
+  tpe: Type,
+  desiredName: Option[String] = None
 ) extends Statement with IsDeclaration {
   type T = DefType
   def serialize: String = s"type $name: <${tpe.serialize}>"  
@@ -1611,7 +1612,14 @@ case object Flip extends Orientation {
 }
 
 /** Field of [[BundleType]] */
-case class Field(tokens: Interval, attributes: VerilogAttributes, name: String, flip: Orientation, tpe: Type) extends SVNode with HasName {
+case class Field(
+  tokens: Interval, 
+  attributes: VerilogAttributes, 
+  name: String, 
+  flip: Orientation, 
+  tpe: Type,
+  desiredName: Option[String] = None
+) extends SVNode with HasName {
   type T = Field
   def mapInterval(f: Interval => Interval) = this.copy(tokens=f(tokens))
   def mapVerilogAttributes(f: VerilogAttributes => VerilogAttributes) = this.copy(attributes = f(attributes))
@@ -2060,7 +2068,8 @@ case class Port(
     resolution: LogicResolution,
     // contains original port name if modified
     isDefaultClock: Option[String] = None,
-    isDefaultReset: Option[String] = None
+    isDefaultReset: Option[String] = None,
+    desiredName: Option[String] = None
   ) extends Statement with IsDeclaration {
   type T = Port
   private def serial_init : String = resolution match {
@@ -2254,7 +2263,8 @@ case class Module(
     params: Seq[DefParam],
     body: Statement,
     clock : Option[String] = None,
-    reset: Option[String] = None
+    reset: Option[String] = None,
+    desiredName: Option[String] = None
   ) extends DefModule {
   type T = Module
   def serialize: String = serializeHeader("module") + indent("\n" + body.serialize)
@@ -2283,7 +2293,8 @@ case class ExtModule(
     resourcePath: Option[String],
     clock : Option[String] = None,
     reset: Option[String] = None,
-    paramMap: Seq[NamedAssign] = Seq()
+    paramMap: Seq[NamedAssign] = Seq(),
+    desiredName: Option[String] = None
   ) extends DefModule {
   type T = ExtModule
   

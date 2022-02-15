@@ -23,7 +23,7 @@ class PropagateClocks(val options: TranslationOptions) extends DefModuleBasedTra
           def updatedPortMap(name: String): Seq[Assign] = {
             // remove clock from port map
             val renamedClock = m.ports.collectFirst{
-              case Port(_,_,_,_,_,_,Some(n),_) => n
+                case port:Port if(!port.isDefaultClock.isEmpty) => port.isDefaultClock.get
             }.getOrElse("<error>")
             i.portMap.flatMap(p => {
               p match {
@@ -71,7 +71,7 @@ class PropagateClocks(val options: TranslationOptions) extends DefModuleBasedTra
               // update port map for instance
               // NOTE: updating the port map here is not enough, Module(new sub) will require withClock context
               val renamedClock = m.ports.collectFirst{
-                case Port(_,_,_,_,_,_,Some(n),_) => n
+                case port:Port if(!port.isDefaultClock.isEmpty) => port.isDefaultClock.get
               }.getOrElse("<error>")
               val portMap = i.portMap.map(p => {
                 p match {

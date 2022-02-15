@@ -287,13 +287,28 @@ class ChiselModule(val m: Module) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     val mCtxt = ctx.incr()
     val pCtxt = mCtxt.incr()
+    val dq = "\""
+    
+    val top = ctx.options.chiselizer.topLevelChiselGenerators.find(g => g.name == m.name || g.name.toCamelCap == m.name)
     
     // filter out clock & reset ports provided by Module if inference succeeded earlier
+    var clockRename : Option[String] = None
     val (mod, kind) = (m.clock, m.reset) match {
       case (_, Some(r)) => 
         unsupportedChisel(ctx, m, s"Reset inference ($r) unsupported for now")
         (m, "Module")
-      case (Some(c), None) => (m.mapPort(p => if(p.name == c) EmptyStmt else p), "Module")
+      case (Some(c), None) => 
+        val ports = m.mapPort(p => if(p.name == c) {
+          p.isDefaultClock match {
+            case Some(originalName) if(originalName != "clock") => 
+              clockRename = Some(s"${dq}clock${dq} -> $dq$originalName$dq")
+            case _ =>
+          }
+          EmptyStmt
+        } else {
+          p
+        })
+        (ports, "Module")
       case (None, None) => (m, "RawModule")
     }
     
@@ -307,9 +322,13 @@ class ChiselModule(val m: Module) extends Chiselized {
     } else {
       s += ChiselTxt(mCtxt, s") extends $kind {")
     }
-    s ++= mod.body.chiselize(mCtxt)
+    m.desiredName match {
+      case Some(n) if(top.isDefined) => s+= ChiselLine(mCtxt, s"override def desiredName = $dq$n$dq") 
+      case _ => 
+    }
+    s ++= (if(top.isDefined) mod.body.chiselize(mCtxt.withDesired) else mod.body.chiselize(mCtxt.noDesired))
     s += ChiselClosingLine(m, ctx, "}")
-    ctx.options.chiselizer.topLevelChiselGenerators.find(g => g.name == m.name || g.name.toCamelCap == m.name) match { 
+    top match { 
       case Some(topOptions) =>
         val appName = s"${m.name}Gen"
         rinfo(ctx, m, s"Adding top level app generator for module ${m.name} with name $appName")
@@ -345,11 +364,33 @@ class ChiselModule(val m: Module) extends Chiselized {
 
             }).dropRight(1)
             s += ChiselLine(mCtxt, s"))")
-            s += ChiselLine(mCtxt, s"ParamWrapperGenerator.emit(Map(params -> gen), unflatPorts = true, args = args)")
+            
+            s += ChiselLine(mCtxt, s"ParamWrapperGenerator.emit(")
+            s += ChiselLine(pCtxt, "Map(params -> gen),")
+            clockRename match {
+              case Some(r) =>
+                s += ChiselLine(pCtxt, s"renameWrapperPorts = Map($r),")
+              case _ => 
+            }
+            s += ChiselLine(pCtxt, "forcePreset = true,") // for now infered reset are all only presets
+            s += ChiselLine(pCtxt, "unflatPorts = true,")
+            s += ChiselLine(pCtxt, "args = args")
+            s += ChiselLine(mCtxt, ")")
+            
           } else {
             
             ctx.src.addDep(PackageRef(UndefinedInterval, "sv2chisel.helpers.tools", "VerilogPortWrapper"))
-            s += ChiselLine(mCtxt, s"VerilogPortWrapper.emit(() => new ${m.name}(), args = args)")
+            
+            s += ChiselLine(mCtxt, s"VerilogPortWrapper.emit(")
+            s += ChiselLine(pCtxt, s"() => new ${m.name}(),")
+            clockRename match {
+              case Some(r) =>
+                s += ChiselLine(pCtxt, s"renameWrapperPorts = Map($r),")
+              case _ => 
+            }
+            s += ChiselLine(pCtxt, "forcePreset = true,") // for now infered reset are all only presets
+            s += ChiselLine(pCtxt, "args = args")
+            s += ChiselLine(mCtxt, ")")
 
           }
         } else {
@@ -370,6 +411,11 @@ class ChiselModule(val m: Module) extends Chiselized {
 }
 
 class ChiselExtModule(val e: ExtModule) extends Chiselized {
+  lazy val requireWrapper: Boolean = {
+    e.clock.isDefined ||
+      e.ports.collectFirst { case p if(!p.tpe.isInstanceOf[UIntType] && !p.tpe.isInstanceOf[BoolType]) => p }.isDefined
+  }
+  
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     val mCtxt = ctx.incr()
     val pCtxt = mCtxt.incr()
@@ -434,7 +480,6 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
     
     // to avoid unused warnings
     val ioRefUsage = HashSet[String]()
-    var requireWrapper = false
     val innerBBportsW = HashMap[String, Option[Width]]()
     def checkUsage(p: Port): Unit = {
       def checkUsageExpr(e: Expression): Unit = {
@@ -448,7 +493,6 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
         case _:UIntType => innerBBportsW += p.name -> None
         case _:BoolType => innerBBportsW += p.name -> None
         case _ => 
-          requireWrapper = true
           innerBBportsW += p.name -> Some(p.tpe.widthOption.getOrElse(UnknownWidth()))
       }
     }
@@ -514,7 +558,10 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
     }).flatten
     s ++= defParamsTxt
     
-    if(requireWrapper) s += ChiselLine(mCtxt, s"override def desiredName = $dq${e.name}Wrapper$dq")
+    if(requireWrapper) 
+      s += ChiselLine(mCtxt, s"override def desiredName = $dq${e.name}Wrapper$dq")
+    else if (e.desiredName.isDefined)
+      s += ChiselLine(mCtxt, s"override def desiredName = $dq${e.desiredName.get}$dq")
     
     s += ChiselLine(e.body, mCtxt, s"val io = IO(new Bundle {")
     val portsOuter = if(requireWrapper) ports.map(p => p.copy(name = p.name.toCamel(ctx))) else ports
@@ -555,7 +602,8 @@ class ChiselExtModule(val e: ExtModule) extends Chiselized {
         s += ChiselTxt(mCtxt, s") extends BlackBox$resource {")
       }
       s ++= defParamsTxt
-      s += ChiselLine(mCtxt, s"override def desiredName = $dq${e.name}$dq") // actual mapping to existing file
+      // actual mapping to existing file
+      s += ChiselLine(mCtxt, s"override def desiredName = $dq${e.desiredName.getOrElse(e.name)}$dq") 
       s += ChiselLine(mCtxt, s"val io = IO(new Bundle {") // still using a bundle of ios for compatibility
       s ++= ports.flatMap(p => {
           innerBBportsW(p.name) match {
@@ -665,11 +713,16 @@ class ChiselDefParam(val p: DefParam) extends Chiselized {
 class ChiselPort(val p: Port) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = chiselize(ctx, true)
   def chiselize(ctx: ChiselEmissionContext, withIO: Boolean): Seq[ChiselTxt] = {
+    val suggestName = p.desiredName match {
+      case Some(name) if(ctx.useDesiredName) => s""".suggestName("$name")"""
+      case _ => "" 
+    }
+    
     val io = if(withIO) "IO(" else ""
-    val cb = if(withIO) ")" else ""
+    val cb = if(withIO) s")$suggestName" else ""
     Seq(ChiselLine(p, ctx, s"val ${ctx.safe(p.name)} = $io${p.direction.serialize}(")) ++
       p.tpe.chiselize(ctx.hw()) ++ 
-      Seq(ChiselTxt(ctx, s"$cb)"))
+      Seq(ChiselTxt(ctx, s")$cb"))
   }
   def chiselizeAsArgument(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     Seq(ChiselTxt(p, ctx, s"${p.name}:")) ++ p.tpe.chiselize(ctx.hw(),scalaTypeOnly=true)
@@ -678,15 +731,20 @@ class ChiselPort(val p: Port) extends Chiselized {
 
 class ChiselField(val f: Field) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
-    val decl = s"val ${ctx.safe(f.name)} ="
+    val (decl, fwd) = f.desiredName match {
+      case Some(n) => 
+        (s"val ${ctx.safe(n)} =", Seq(ChiselLine(ctx, s"def ${ctx.safe(f.name)} = ${ctx.safe(n)}")))
+      case _ =>
+        (s"val ${ctx.safe(f.name)} =", Seq())
+    }
     f.flip match {
       case Flip => 
         Seq(ChiselLine(f, ctx, s"$decl Flipped(")) ++
           f.tpe.chiselize(ctx.incr()) ++
-          Seq(ChiselTxt(f, ctx, ")"))
+          Seq(ChiselTxt(f, ctx, ")")) ++ fwd
         
       case _ => 
-        Seq(ChiselLine(f, ctx, s"$decl ")) ++ f.tpe.chiselize(ctx.incr())
+        Seq(ChiselLine(f, ctx, s"$decl ")) ++ f.tpe.chiselize(ctx.incr()) ++ fwd
     }
   }
 }
@@ -939,10 +997,15 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
 class ChiselDefType(val t: DefType) extends Chiselized {
   def chiselize(ctx: ChiselEmissionContext): Seq[ChiselTxt] = {
     def addHwEnumDep() = ctx.src.addDep(PackageRef(UndefinedInterval, "sv2chisel.helpers.enum", "_"))
-    
+    val dq = "\""
     t.tpe match {
       case b: BundleType => 
-        Seq(ChiselLine(t, ctx, s"class ${t.name} extends Bundle {")) ++
+        val className = t.desiredName match {
+          case Some(n) => Seq(ChiselLine(ctx.incr(), s"override def className = $dq$n$dq"))
+          case _ => Seq()
+        }
+        
+        Seq(ChiselLine(t, ctx, s"class ${t.name} extends Bundle {")) ++ className ++
           b.fields.flatMap(_.chiselize(ctx.hw().incr().check(Utils.isLegalBundleField))) ++
           Seq(ChiselClosingLine(t, ctx, "} "))
           

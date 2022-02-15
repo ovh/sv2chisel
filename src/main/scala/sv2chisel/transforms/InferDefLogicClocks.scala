@@ -218,7 +218,7 @@ class InferDefLogicClocks(val options: TranslationOptions) extends DescriptionBa
       instModule match {
         case Some(d: DefModule) =>
           val clock = d.ports.zipWithIndex.collectFirst{
-            case (Port(_,_,_,_,_,_,Some(n),_),p) => (n,p)
+            case (port:Port,p) if(!port.isDefaultClock.isEmpty) => (port.isDefaultClock.get,p)
           }.getOrElse(("<unknown>", -1))
           
           val mappedDir = d.ports.map(p => p.name -> p.direction).toMap

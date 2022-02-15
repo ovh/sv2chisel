@@ -25,6 +25,7 @@ trait ChiselEmissionContext {
   val emissionBasePath: String
   val isHardware : Boolean 
   val isRawConnect : Boolean
+  val useDesiredName : Boolean
   val indentLevel : Int
   val indent : String
   def check(f: String => Boolean): ChiselEmissionContext
@@ -34,6 +35,8 @@ trait ChiselEmissionContext {
   def decr(n: Int = 1): ChiselEmissionContext
   def raw(): ChiselEmissionContext
   def unraw(): ChiselEmissionContext
+  def withDesired(): ChiselEmissionContext
+  def noDesired(): ChiselEmissionContext
   def hw(): ChiselEmissionContext
   def sw(): ChiselEmissionContext
   def setStream(s: CommonTokenStream): ChiselEmissionContext
@@ -52,6 +55,7 @@ case class ScalaStyleEmission(
   indentLevel: Int,
   isHardware: Boolean,
   isRawConnect: Boolean,
+  useDesiredName: Boolean,
   stream: CommonTokenStream,
   src: SourceFile,
   srcBasePath: String,
@@ -71,6 +75,8 @@ case class ScalaStyleEmission(
   def sw(): ChiselEmissionContext = this.copy(isHardware = false)
   def raw(): ChiselEmissionContext = this.copy(isRawConnect = true)
   def unraw(): ChiselEmissionContext = this.copy(isRawConnect = false)
+  def withDesired(): ChiselEmissionContext = this.copy(useDesiredName = true)
+  def noDesired(): ChiselEmissionContext = this.copy(useDesiredName = false)
   def setStream(s: CommonTokenStream) = this.copy(stream = s)
   def setSrc(s: SourceFile) = this.copy(src = s)
   def setFile(src: SourceFile, stream: CommonTokenStream) = this.copy(src = src, stream = stream)
@@ -106,6 +112,7 @@ object ScalaStyleEmission {
       indentLevel = 0,
       isHardware = false,
       isRawConnect = false,
+      useDesiredName = false,
       stream = pe.stream,
       src = pe.src,
       srcBasePath = pe.basePath,

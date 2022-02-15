@@ -6,24 +6,74 @@ package sv2chisel
 package transforms
 
 import sv2chisel.ir._
+import collection.mutable.HashSet
 
 class ToCamelCase(val options: TranslationOptions) extends DescriptionBasedTransform {
-  implicit var srcFile = currentSourceFile
-  implicit var stream = currentStream
+  implicit var srcFile = None
+  implicit var stream = None
+  
+  private val ioTypes = new HashSet[String]()
+  
+  private def addUserRefType(u:UserRefType):Unit = {
+    u.tpe match {
+      case b:BundleType => 
+        debug(b, s"Adding user type ${u.name}")
+        ioTypes += u.name
+        addBundleTypeRec(b)
+      case _ =>
+    }
+  }
+  
+  private def addBundleTypeRec(b:BundleType):Unit = {
+    b.fields.foreach(f => {
+      f.tpe match {
+        case u:UserRefType => addUserRefType(u)
+        case b:BundleType => addBundleTypeRec(b)
+        case _ => 
+      }
+    })
+  }
+  
+  private def inspectTypeRec(tpe:Type): Unit = {
+    tpe match {
+      case u:UserRefType => addUserRefType(u)
+      case b:BundleType => addBundleTypeRec(b)
+      case v:VecType => inspectTypeRec(v.tpe.head)
+      case _ =>
+    }
+  }
+  
+  override val preprocessDescription = Some(((d: Description) => {
+    d match {
+      case m: DefModule if(options.chiselizer.topLevelChiselGenerators.find(_.name == m.name).isDefined) => 
+        debug(m, s"Inspection ports of module ${m.name}")
+        m.foreachPort(p => inspectTypeRec(p.tpe))
+      case _ => 
+    }
+    d
+  }))
+  
+  // Rendering Goal:
+  // class TreeFilterPktDataT extends Bundle {
+  //   override def className = "tree_filter_pkt_data_t"
+  //   val src_ip = Vec(64, Bool())
+  //   def srcIp = src_ip
   
   implicit def stringToSnake(s: String) = new SnakeString(s)
+  private def dName(s: String): Option[String] = if(s == s.toCamel) None else Some(s)
+  private def dNameC(s: String): Option[String] = if(s == s.toCamelCap) None else Some(s)
   
   def processDescription(d: Description): Description = {
     d match {
       case m: Module if(options.chiselizer.toCamelCase) => 
         val params = m.params.map(p => p.copy(name = p.name.toCamel).mapExpr(processExpression(_)("")))
-        m.copy(params = params, body = processStatement(m.body), name = m.name.toCamelCap)
+        m.copy(params = params, body = processStatement(m.body), name = m.name.toCamelCap, desiredName = dNameC(m.name))
         
       case m: ExtModule if(options.chiselizer.toCamelCase) => 
         val params = m.params.map(p => p.copy(name = p.name.toCamel).mapExpr(processExpression(_)("")))
         val paramMap = m.paramMap.map(na => na.copy(expr = processExpression(na.expr)(""))) // do not update name here
         val body = processStatement(m.body)(skipPorts = true) // ports have to be handled in Chiselizer 
-        m.copy(params = params, paramMap = paramMap, name = m.name.toCamelCap, body = body)
+        m.copy(params = params, paramMap = paramMap, name = m.name.toCamelCap, body = body, desiredName=dNameC(m.name))
         
       case p: DefPackage if(options.chiselizer.toCamelCase) => 
         p.copy(body = processStatement(p.body), name = p.name.toCamelPkg)
@@ -40,7 +90,7 @@ class ToCamelCase(val options: TranslationOptions) extends DescriptionBasedTrans
   def processExpression(e: Expression)(implicit instName: String): Expression = {
     def processRef(r: Reference): Reference = r.copy(name = r.name.toCamel, path = r.path.map(_.toCamelPkg))
     e match {
-      case a: Assign => processAssign(a)
+      case a: Assign => processAssign(a, preserveName=false)
       case _ =>
         e.mapExpr(processExpression).mapType(processType).mapWidth(_.mapExpr(processExpression)) match {
           case r: Reference if(r.path.headOption.map(_ == instName).getOrElse(false)) => 
@@ -65,9 +115,10 @@ class ToCamelCase(val options: TranslationOptions) extends DescriptionBasedTrans
     }
   }
   
-  def processAssign(a: Assign)(implicit instName: String): Assign = {
+  def processAssign(a: Assign, preserveName: Boolean)(implicit instName: String): Assign = {
     // NB: not required to deal with remoteType at this stage
     a.mapExpr(processExpression) match {
+      case na: NamedAssign if(preserveName) => na.copy(assignExpr = na.assignExpr.map(processExpression))
       case na: NamedAssign => na.copy(name = na.name.toCamel, assignExpr = na.assignExpr.map(processExpression))
       case na: NoNameAssign => na.copy(assignExpr = na.assignExpr.map(processExpression))
       case aa => aa
@@ -89,16 +140,34 @@ class ToCamelCase(val options: TranslationOptions) extends DescriptionBasedTrans
   }
   
   def processStatement(s: Statement)(implicit skipPorts: Boolean = false): Statement = {
+    implicit val instName = ""
     s match {
       // camelCase shall never be applied twice 
       case i: DefInstance => 
         val module = i.module.copy(name = i.module.name.toCamelCap, path = i.module.path.map(_.toCamelPkg))
-        val paramMap = i.paramMap.map(processAssign(_)(i.name))
-        val portMap = i.portMap.map(processAssign(_)(i.name))
+        val paramMap = i.paramMap.map(p => processAssign(p, preserveName=false)(i.name))
+        val preservePortName = currentProject.get.findModule(i.module.serialize) match {
+          case Some(e:ExtModule) => !(new ChiselExtModule(e).requireWrapper)
+          case _ => false
+        }
+        val portMap = i.portMap.map(p => processAssign(p, preserveName=preservePortName)(i.name))
         i.copy(name = i.name.toCamel, module = module, paramMap = paramMap, portMap = portMap)
-        
+      
+      case t: DefType if(ioTypes.contains(t.name)) => 
+        t.tpe match {
+          case b:BundleType => 
+            info(t, s"Special ioType transform for deftype ${t.name}")
+            val tpe = b.copy(fields = b.fields.map(f => {
+              f.copy(name = f.name.toCamel, desiredName = dName(f.name), tpe = processType(f.tpe))
+            }))
+            t.copy(name = t.name.toCamelCap, tpe = tpe, desiredName = dNameC(t.name))
+          
+          case _ => 
+            warn(t, s"IGNORING Special ioType transform for non-bundle deftype ${t.name}")
+            t.copy(name = t.name.toCamel).mapExpr(processExpression).mapType(processType)
+        }
+      
       case _ => 
-        implicit val instName = ""
         s.mapStmt(processStatement).mapExpr(processExpression).mapType(processType) match {
           case i: ImportPackages => i.copy(packages = i.packages.map(p => {
             p.copy(item = (if(p.item == "_") "_" else p.item.toCamel), path = p.path.toCamelPkg)
@@ -113,7 +182,7 @@ class ToCamelCase(val options: TranslationOptions) extends DescriptionBasedTrans
             }
 
           case f: DefFunction => f.copy(name = f.name.toCamel)
-          case p: Port if(!skipPorts) => p.copy(name = p.name.toCamel)
+          case p: Port if(!skipPorts) => p.copy(name = p.name.toCamel, desiredName = dName(p.name))
           case st => st 
         }
     }

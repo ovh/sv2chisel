@@ -91,7 +91,7 @@ class TypeReferences(val options: TranslationOptions) extends DescriptionBasedTr
         }
         tpe match {
           case b: BundleType => // this is the only one expected here 
-            b.fields.collect{case Field(_, _, name, _, tpe) if (name == s.name) => tpe} match {
+            b.fields.collect{case Field(_, _, name, _, tpe, _) if (name == s.name) => tpe} match {
               case Seq(t) => s.copy(tpe = t, kind = s.expr.kind)
               case _ => 
                  critical(s, s"Unable to propagate type '${b.serialize}' for expression '${s.serialize}' because there are multiple fields named as '${s.name}'")
