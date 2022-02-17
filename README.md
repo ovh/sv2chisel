@@ -9,7 +9,7 @@ The resulting Chisel is intended to be manually refactored to benefit from the a
 Several research efforts, such as [this paper](https://hal.archives-ouvertes.fr/hal-03157426/document), demonstrate in practice the relevance of such refactoring.
 
 **sv2chisel** has achieved 1:1 translation of several large codebases with few or no manual modifications.
-[Discover all Features & Limitations](https://github.com/ovh/sv2chisel/blob/master/FEATURES_LIMITATIONS.md) 
+[Discover all Features & Limitations](https://github.com/ovh/sv2chisel/blob/master/FEATURES_LIMITATIONS.md#sv2chisel-features--limitations) 
 
 **sv2chisel** emerged as a research effort, if you use it or borrow some concepts in your own work, please cite the [associated paper](https://hal.archives-ouvertes.fr/hal-02949112/document) [(bibtex entry below)](#citing-this-work).
 
@@ -55,7 +55,7 @@ resolvers ++= Seq(
   "New Sonatype Releases" at "https://s01.oss.sonatype.org/service/local/repositories/releases/content/",
 )
 // For simpler usage, sv2chisel minor version is aligned on chisel stack minor version: x.5.x 
-libraryDependencies += "com.ovhcloud" %% "sv2chisel-helpers" % "0.5.0-SNAPSHOT"
+libraryDependencies += "com.ovhcloud" %% "sv2chisel-helpers" % "0.5.0"
 ```
 
 This new project is intended to be used as output target for the Chisel files converted from your (System)Verilog sources.
