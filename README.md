@@ -1,34 +1,46 @@
 # sv2chisel (System)Verilog to Chisel Translator
 [![Maintenance](https://img.shields.io/maintenance/yes/2022.svg)]() 
 [![License](https://img.shields.io/badge/license-BSD%203--Clause-blue)](https://github.com/ovh/sv2chisel/blob/master/LICENSE)
+[![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/ovh/sv2chisel.svg?include_prereleases&sort=semver)](https://github.com/ovh/sv2chisel/releases/latest)
 <!-- [![Build Status](https://travis-ci.org/ovh/sv2chisel.svg)](https://travis-ci.org/ovh/sv2chisel)  -->
 **sv2chisel** translates synthesizable (System)Verilog to *low-level* Chisel.
 
-The obtained Chisel is intended to be manually refactored to benefit from the advanced chisel's features such as type and functional parameterization thanks to Scala support for polymorphism and high-order functions. 
+The resulting Chisel is intended to be manually refactored to benefit from the advanced Chisel's features such as type and functional parameterization thanks to Scala support for polymorphism and high-order functions. 
+Several research efforts, such as [this paper](https://hal.archives-ouvertes.fr/hal-03157426/document), demonstrate in practice the relevance of such refactoring.
 
-Important notice: **sv2chisel** was developed with a test-driven development methodology, and is hence not fully covering (System)Verilog syntax (yet).
-This means it might probably *not* work out-of-the-box with your own code, some slight adjustment might be required either in input Verilog, output Chisel or both.
+**sv2chisel** has achieved 1:1 translation of several large codebases with few or no manual modifications.
+[Discover all Features & Limitations](https://github.com/ovh/sv2chisel/blob/master/FEATURES_LIMITATIONS.md) 
 
-**sv2chisel** emerged as a research effort, if you use it or borrow some concepts in your own work, please cite the [associated paper](https://hal.archives-ouvertes.fr/hal-02949112/document) (bibtex entry below).
+**sv2chisel** emerged as a research effort, if you use it or borrow some concepts in your own work, please cite the [associated paper](https://hal.archives-ouvertes.fr/hal-02949112/document) [(bibtex entry below)](#citing-this-work).
 
-### Features & Limitations
-**sv2chisel** has achieved 1:1 translation of several large codebases with few or no manual modifications
-
-
-### Contents
-The current repository contains 2 projects:
-- **sv2chisel** the (System)Verilog to Chisel translator
-- *sv2chisel-helpers* a small chisel library of implicit helpers used to make Chisel emission smoother, most notably for the usual (System)Verilog index and range affectation pattern
-
-Note: *sv2chisel-helpers* is not used directly by **sv2chisel** but by the emitted Chisel code. (Check if emitted files include some `import sv2chisel.helpers`)
+### Project Contents
+The current repository holds the sv2chisel project which is divided in two parts: 
+- **sv2chisel** a standalone tool, able to translate (System)Verilog sources into Chisel
+- *sv2chisel-helpers* a Chisel/scala library, sometimes required by the translated Chisel and more generally providing [various utilities to integrate Chisel into HDL projects](https://github.com/ovh/sv2chisel/blob/master/FEATURES_LIMITATIONS.md#generation-utilities-for-chisel-integration-chisel-as-ip)
 
 ---
 
-# Setup
-
+# Getting Started
+ 
 ## Get sv2chisel
-- **Simplest way:** Get sv2chisel executable from [sv2chisel releases](https://github.com/ovh/sv2chisel/releases/) (*requirement: java SE 15+* [*java class 59+*](https://en.wikipedia.org/wiki/Java_class_file#General_layout))
-- or see [manual usage from sources](#manual-usage-from-sources) below
+> Note: the version of sv2chisel x.5.x is aligned on Chisel stack 3.5.x and the versioning intends to follow the same evolution as Chisel stack one on minors
+
+#### Native Binaries
+sv2chisel releases provide native standalone binaries for the following platforms:
+- [Linux](https://github.com/ovh/sv2chisel/releases/download/v0.5.0/sv2chisel_linux_amd64) *(tested on a regular basis on Ubuntu 20.04)*
+- [Darwin](https://github.com/ovh/sv2chisel/releases/download/v0.5.0/sv2chisel_darwin_amd64) *(tested on a regular basis on MacOS with Darwin Kernel Version 17.7.0)*
+- [Windows](https://github.com/ovh/sv2chisel/releases/download/v0.5.0/sv2chisel_windows_amd64.exe) *(tested on windows 10 -- git-bash is recommended for colored console printing)*
+
+Just `chmod u+x sv2chisel_<build>` and you are all set for your first translation!
+
+#### Fat JAR
+sv2chisel releases also provide a [standalone jar]((https://github.com/ovh/sv2chisel/releases/download/v0.5.0/sv2chisel_jar.tar.gz)) file which only require a jvm installation.
+
+Just `untar -xzf sv2chisel_jar.tar.gz` and you are all set for your first translation! 
+
+
+#### From code
+Finally, sv2chisel code can be directly executed with any working sbt installation by cloning this repository, see [direct usage from sources](#direct-usage-from-sources).
 
 ## Setup your own Chisel project
 If this is your first time using [Chisel](https://www.chisel-lang.org), we highly recommend you to follow either the [online bootcamp](https://mybinder.org/v2/gh/freechipsproject/chisel-bootcamp/master) or the [chisel-tutorials](https://github.com/ucb-bar/chisel-tutorial) first.
@@ -81,7 +93,7 @@ See `./sv2chisel -help` to get started, basic usage:
 
 **IMPORTANT TRANSLATION NOTICE**
 
-Please review and fix any error (fatal/critical) messages reported by **sv2chisel** before proceeding any further, as the generated Chisel code will probably not be usable in such cases.
+Please review and fix (or at least acknowledge) any error (fatal/critical) messages reported by **sv2chisel** before proceeding any further, as the generated Chisel code will probably not be usable in such cases.
 
 Do not hesitate to raise an issue [here](https://github.com/ovh/sv2chisel/issues) in case of trouble.
 
@@ -93,50 +105,14 @@ Do not hesitate to raise an issue [here](https://github.com/ovh/sv2chisel/issues
 In order to check the translation correctness of the translation, let's now translate it back to Verilog!
 Yeah it sounds silly but it's the way it works: Chisel is an hardware construction language, not intended to be provided directly to synthesis and simulation tools but rather to be executed and produce a low-level Verilog, almost down to netlist.
 
-Let's take an example of input verilog
-```verilog
-module test #(
-    param TEST = 1
-  )(
-    input clock,
-    input reset,
-    input a,
-    output b
-  )
-  // module body
-endmodule
-```
 
-that would be translated into Chisel
-```scala
-package myproject
+Getting started with Chisel generation API can be a bit frightening for Scala/Chisel newcomers, fortunately sv2chisel is able to generate that boilerplate for you.
+See [details about specifying a top-level in the config file](https://github.com/ovh/sv2chisel/blob/master/FEATURES_LIMITATIONS.md#translationoptionschiselizertoplevelchiselgenerators-listdict) or [Manual setup example below](#manual-chisel-project-setup).
 
-import chisel3._
-import sv2chisel.helpers.vecconvert._ // assuming module body requires it
+>In a nutshell, just set the `translationOptions.Chiselizer.topLevelChiselGenerators` option in your config file, using the syntax presented in the [example config file](https://github.com/ovh/sv2chisel/blob/master/src/main/resources/project/config.yml)
 
-class test extends MultiIOModule (
-    val TEST: Int = 1
-  ){
-    val a = IO(Input(Bool())
-    val b = IO(Output(Bool())
-  
-  // module body
-}
-```
-
-We will use this small chisel main app to generate it:
-
-```scala
-import myproject._
-import chisel3.stage._
-
-object MyTestGenerator extends App { 
-  (new ChiselStage()).emitVerilog(new test(10))
-}
-```
-**HINT:** To automatically create this scala App, just set the `translationOptions.Chiselizer.addTopLevelChiselGenerator: "test"` option in your config file, using the syntax presented in the [example config file](https://github.com/ovh/sv2chisel/blob/master/src/main/resources/project/config.yml) 
-
-To produce your Verilog, run this app with sbt `runMain MyTestGenerator` if placed in *src/main* or with sbt `test:runMain MyTestGenerator` if placed in src/test.
+It will generate an object App such as `object my_moduleGen extends App {/* */}`.
+To generate your Verilog, run this app with sbt `runMain my_moduleGen` if placed in *src/main/scala* or with sbt `Test / runMain my_moduleGen` if placed in *src/test/scala*.
 
 ---
 
@@ -155,15 +131,15 @@ You can now integrate the chisel-emitted Verilog into your usual simulation and 
 Simulation should pass and synthesis produce on-par resource usage results.
 If it is not the case, investigate the translation result, be sure you understand the implication of every warning message and feel free to open an issue for help or to raise a discovered bug.
 
-**HINT**: Beware that ports are flattened in the resulting verilog, you might hence need to write a verilog wrapper by yourself to actually integrate the resulting verilog *(TODO: integrate internal ParamWrapperGenerator to sv2chisel-helpers)*: 
-- a port `myport: Vec(n+1, <>)` *(verilog [N:0])* becomes n ports from `myport_0: <>` to `myport_n: <>`
-- a port `myport: Bundle` *(verilog struct)* becomes several individual ports named after the fields names such as `myport_myfieldA` ... `myport_myfieldN`
+> Beware that ports are flattened in the resulting verilog, you might hence need a verilog wrapper to integrate the resulting verilog, [*fortunately sv2chisel can bring it to you!*](https://github.com/ovh/sv2chisel/blob/master/FEATURES_LIMITATIONS.md#translationoptionschiselizertoplevelchiselgenerators-listdict)
+> - a port `myport: Vec(n+1, <>)` *(verilog [N:0])* becomes n ports from `myport_0: <>` to `myport_n: <>`
+> - a port `myport: Bundle` *(verilog struct)* becomes several individual ports named after the fields names such as `myport_myfieldA` ... `myport_myfieldN`
 
 
 ## 4. Upgrade your low-level Chisel
 Your translated project is working as expected?
 Here is precisely where the whole fun starts, and where this step-by step guide stops.
-Please refer to [Chisel documentation](https://www.chisel-lang.org) for user-guide and example around Chisel's generation powers.
+Please refer to [Chisel documentation](https://www.chisel-lang.org) for various user-guides and examples to truly unleash Chisel's generation powers.
 
 ---
 
@@ -190,7 +166,7 @@ You've developed a new cool feature? Fixed an annoying bug? We'd be happy
 to hear from you!
 
 ## Getting Started
-If you have successfully published sv2chisel locally, then you are all set to start hacking into the code.
+If you have successfully published sv2chisel locally, then you are all set to start hacking into the code, otherwise see [direct usage from sources](#direct-usage-from-sources).
 
 ## Documentation 
 The in-code documentation remains yet quite sparse.
@@ -254,14 +230,17 @@ sbt:sv2chisel> helpers/publishSigned
 See https://github.com/ovh/sv2chisel/blob/master/LICENSE
 
 ---
+
+# Annexes
+
 ---
 
-# Manual Usage From Sources
+## Direct Usage From Sources
 
-## Prerequisite
+### Prerequisite
 - Install sbt [official documentation](https://www.scala-sbt.org/1.x/docs/Setup.html)
 
-## Publish locally sv2chisel & sv2chisel-helpers
+### Publish locally sv2chisel & sv2chisel-helpers
 ```bash
 git clone https://github.com/ovh/sv2chisel.git
 cd sv2chisel
@@ -305,3 +284,48 @@ This template is to be edited to fit your needs and saved under a proper scala h
 ##### Translate your code 
 In your translator project sbt: `runMain MyTranslator`
 
+---
+
+## Manual chisel project setup
+
+Let's take an example of input verilog
+```verilog
+module test #(
+    param TEST = 1
+  )(
+    input clock,
+    input reset,
+    input a,
+    output b
+  )
+  // module body
+endmodule
+```
+
+that would be translated into Chisel
+```scala
+package myproject
+
+import chisel3._
+import sv2chisel.helpers.vecconvert._ // assuming module body requires it
+
+class test extends MultiIOModule (
+    val TEST: Int = 1
+  ){
+    val a = IO(Input(Bool())
+    val b = IO(Output(Bool())
+  
+  // module body
+}
+```
+
+We will use this small chisel main app to generate it:
+
+```scala
+import myproject._
+import chisel3.stage._
+
+object MyTestGenerator extends App { 
+  (new ChiselStage()).emitVerilog(new test(10))
+}
+```

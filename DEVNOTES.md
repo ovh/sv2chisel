@@ -10,9 +10,6 @@
   - static assert => convert to scala's `require` statement
   - detect initial initialization (equivalent to preset) & attempt to translate it with literals 
 
-- fix blackbox emission 
-  - add compatibility with toCamelCase
-
 - cleanToken on function return type => currently leads to weird emission of comments
 - wrapper: fix compatibility with toCamelCase option 
   - probably need to record port names before conversion to camelCase somewhere (not bijective)
