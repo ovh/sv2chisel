@@ -119,6 +119,7 @@ lazy val releaseSettings = Seq(
     // For non cross-build projects, use releaseStepCommand("publishSigned")
     releaseStepCommandAndRemaining("+publishSigned"),
     releaseStepCommand("sonatypeBundleRelease"),
+    releaseStepCommand("sonatypeBundleClean"), // avoid confusion with previous publishSigned files, bug?
     releaseStepCommand("project helpers"), // need to change project to make sonatypeBundleRelease available
     releaseStepCommand("sonatypeBundleClean"), // avoid confusion with previous publishSigned files, bug?
     releaseStepCommandAndRemaining("+publishSigned"),
