@@ -573,14 +573,18 @@ class Visitor(
     //   | DECIMAL_TRISTATE_NUMBER_WITH_BASE 
     //   | HEX_NUMBER 
     //  ;
-    val hexPattern: Regex = "([0-9]+)?'(?:x|X|h|H)\\s*([0-9_a-fA-FxXzZ?_]+)".r
-    val octPattern: Regex = "([0-9]+)?'(?:o|O)\\s*([0-7xXzZ?_]+)".r
-    val decPattern: Regex = "([0-9]+)?'(?:d|D)\\s*([0-9_]+)".r
-    val binPattern: Regex = "([0-9]+)?'(?:b|B)\\s*([01xXzZ?_]+)".r
+    val hexPattern: Regex = "(`\\w+|[0-9]+)?'(?:x|X|h|H)\\s*([0-9_a-fA-FxXzZ?_]+)".r
+    val octPattern: Regex = "(`\\w+|[0-9]+)?'(?:o|O)\\s*([0-7xXzZ?_]+)".r
+    val decPattern: Regex = "(`\\w+|[0-9]+)?'(?:d|D)\\s*([0-9_]+)".r
+    val binPattern: Regex = "(`\\w+|[0-9]+)?'(?:b|B)\\s*([01xXzZ?_]+)".r
     val intPattern: Regex = "([0-9_]+)".r
     
     def getW(str: String): Width = {
-      Width(BigInt(str, 10))
+      str.head match { // cannot be empty
+        case '`' => Width(i, Reference(i, str.tail, Seq("`")))
+        case _ => Width(BigInt(str, 10))
+      }
+      
     }
     
     def safeNum(n: Number): Expression = {

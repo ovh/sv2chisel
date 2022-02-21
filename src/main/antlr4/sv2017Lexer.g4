@@ -31,12 +31,11 @@ TICK_UNDEF: '`undef' ;
 
 TICK_KW_VALUE:
   ( TICK_DEFINE
-    | TICK_DEFINE
     | TICK_IFNDEF
     | TICK_IFDEF
     | TICK_ELSIF
     | TICK_UNDEF
-    ) .*? '\r'? '\n' -> channel(2) ;
+    ) ( ~[\r\n]*? '\\' '\r'? '\n' )* ~[\r\n]*? '\r'? '\n' -> channel(2) ;
 
 TICK_ELSE: '`else' -> channel(2) ;
 TICK_ENDIF: '`endif' -> channel(2) ;
@@ -338,7 +337,9 @@ ANY_BASED_NUMBER:
   | HEX_NUMBER 
  ;
 BASED_NUMBER_WITH_SIZE:
-    UNSIGNED_NUMBER ANY_BASED_NUMBER;
+  UNSIGNED_NUMBER ANY_BASED_NUMBER;
+BASED_NUMBER_WITH_TICK_SIZE:
+  TICK_IDENTIFIER ANY_BASED_NUMBER;
 
 REAL_NUMBER_WITH_EXP:
  UNSIGNED_NUMBER ( DOT UNSIGNED_NUMBER )? EXP ( SIGN )? UNSIGNED_NUMBER;

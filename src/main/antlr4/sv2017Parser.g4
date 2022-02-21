@@ -158,6 +158,7 @@ implicit_class_handle:
 ;
 integral_number:
    BASED_NUMBER_WITH_SIZE
+   | BASED_NUMBER_WITH_TICK_SIZE
    | ( UNSIGNED_NUMBER )? ANY_BASED_NUMBER
    | UNSIGNED_NUMBER
 ;
