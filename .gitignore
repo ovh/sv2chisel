@@ -1,6 +1,9 @@
 chisel_gen/*
 test_run_dir/*
 utils/bin/sv2chisel.jar
+*.dot
+*.svg
+*.v
 
 # VS CODE with metals and bloop
 .bloop/

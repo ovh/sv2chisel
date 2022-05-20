@@ -962,11 +962,12 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
     
     // to do : proper management of clock & reset for non trivial cases
     import ChiselizerOptions.UnpackedEmissionStyle.{Reg, Mem}
-    (s.tpe, value, ctx.options.chiselizer.unpackedEmissionStyle) match {
-      case (u: UnpackedVecType, None, Reg) => ChiselTxtS(s, ctx, s"Reg(") ++ u.chiselize(hCtxt) ++ rpar
-      case (u: UnpackedVecType, _, Reg) => ChiselTxtS(s, ctx, s"RegInit(") ++ u.chiselize(hCtxt) ++ valueTokens
+    (res, s.tpe, value, ctx.options.chiselizer.unpackedEmissionStyle) match {
+      case (_:LogicRegister, u: UnpackedVecType, None, Reg) => ChiselTxtS(s, ctx, s"Reg(") ++ u.chiselize(hCtxt) ++ rpar
+      case (_:LogicRegister, u: UnpackedVecType, _, Reg) => 
+        ChiselTxtS(s, ctx, s"RegInit(") ++ u.chiselize(hCtxt) ++ valueTokens
         
-      case (u: UnpackedVecType, _, Mem) => 
+      case (_:LogicRegister, u: UnpackedVecType, _, Mem) => 
         rinfo(ctx, s, s"Emitting unpacked for node ${s.name}")
         (u.tpe, value) match {
           case (Seq(t), None) => ChiselTxtS(s, ctx, s"Mem(") ++ u.getLen.chiselize(ctx) ++
@@ -984,10 +985,10 @@ class ChiselDefLogic(val s: DefLogic) extends Chiselized {
           case _ => unsupportedChisel(ctx, s, "MixedVecType")
         }
         
-      case (UserRefType(_,_,_,_:EnumType), None, _) => // standard 
+      case (_, UserRefType(_,_,_,_:EnumType), None, _) => // standard 
         ChiselTxtS(s, ctx, s"$kind(") ++ s.tpe.chiselize(hCtxt) ++ valueTokens
         
-      case (UserRefType(_,_,_,_:EnumType), _, _) => ChiselTxtS(s, ctx, s"$kind(") ++ valueTokens // avoid type
+      case (_, UserRefType(_,_,_,_:EnumType), _, _) => ChiselTxtS(s, ctx, s"$kind(") ++ valueTokens // avoid type
       
       case _ => ChiselTxtS(s, ctx, s"$kind(") ++ s.tpe.chiselize(hCtxt) ++ valueTokens
     }
